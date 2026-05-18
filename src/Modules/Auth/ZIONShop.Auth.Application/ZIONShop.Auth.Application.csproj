@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <PackageReference Include="MediatR" />
+    <PackageReference Include="FluentValidation" />
+    <PackageReference Include="FluentValidation.DependencyInjectionExtensions" />
+    <PackageReference Include="AutoMapper" />
+    <PackageReference Include="BCrypt.Net-Next" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\ZIONShop.Auth.Domain\ZIONShop.Auth.Domain.csproj" />
+    <ProjectReference Include="..\..\..\BuildingBlocks\ZIONShop.SharedKernel\ZIONShop.SharedKernel.csproj" />
+    <ProjectReference Include="..\..\..\BuildingBlocks\ZIONShop.Auth\ZIONShop.Auth.csproj" />
+    <ProjectReference Include="..\..\..\BuildingBlocks\ZIONShop.EventBus\ZIONShop.EventBus.csproj" />
+    <ProjectReference Include="..\..\..\BuildingBlocks\ZIONShop.Contracts\ZIONShop.Contracts.csproj" />
+  </ItemGroup>
+</Project>

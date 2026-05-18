@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" />
+    <PackageReference Include="BCrypt.Net-Next" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\ZIONShop.Auth.Domain\ZIONShop.Auth.Domain.csproj" />
+    <ProjectReference Include="..\ZIONShop.Auth.Application\ZIONShop.Auth.Application.csproj" />
+  </ItemGroup>
+</Project>

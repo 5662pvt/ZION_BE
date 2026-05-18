@@ -1,0 +1,56 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <UserSecretsId>zionshop-api</UserSecretsId>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
+    <PackageReference Include="Asp.Versioning.Mvc" />
+    <PackageReference Include="Asp.Versioning.Mvc.ApiExplorer" />
+    <PackageReference Include="Swashbuckle.AspNetCore" />
+    <PackageReference Include="Serilog.AspNetCore" />
+    <PackageReference Include="Serilog.Sinks.Seq" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+  </ItemGroup>
+  <ItemGroup>
+    <!-- BuildingBlocks -->
+    <ProjectReference Include="..\..\BuildingBlocks\ZIONShop.SharedKernel\ZIONShop.SharedKernel.csproj" />
+    <ProjectReference Include="..\..\BuildingBlocks\ZIONShop.Common\ZIONShop.Common.csproj" />
+    <ProjectReference Include="..\..\BuildingBlocks\ZIONShop.Auth\ZIONShop.Auth.csproj" />
+    <ProjectReference Include="..\..\BuildingBlocks\ZIONShop.EventBus\ZIONShop.EventBus.csproj" />
+    <ProjectReference Include="..\..\BuildingBlocks\ZIONShop.Caching\ZIONShop.Caching.csproj" />
+    <ProjectReference Include="..\..\BuildingBlocks\ZIONShop.Logging\ZIONShop.Logging.csproj" />
+    <ProjectReference Include="..\..\BuildingBlocks\ZIONShop.Contracts\ZIONShop.Contracts.csproj" />
+    <!-- Phase 1 modules -->
+    <ProjectReference Include="..\..\Modules\Auth\ZIONShop.Auth.Application\ZIONShop.Auth.Application.csproj" />
+    <ProjectReference Include="..\..\Modules\Auth\ZIONShop.Auth.Infrastructure\ZIONShop.Auth.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\Modules\Users\ZIONShop.Users.Application\ZIONShop.Users.Application.csproj" />
+    <ProjectReference Include="..\..\Modules\Users\ZIONShop.Users.Infrastructure\ZIONShop.Users.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\Modules\Products\ZIONShop.Products.Application\ZIONShop.Products.Application.csproj" />
+    <ProjectReference Include="..\..\Modules\Products\ZIONShop.Products.Infrastructure\ZIONShop.Products.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\Modules\Cart\ZIONShop.Cart.Application\ZIONShop.Cart.Application.csproj" />
+    <ProjectReference Include="..\..\Modules\Cart\ZIONShop.Cart.Infrastructure\ZIONShop.Cart.Infrastructure.csproj" />
+    <!-- Skeleton modules (for solution wiring; DI extensions are no-ops) -->
+    <ProjectReference Include="..\..\Modules\Orders\ZIONShop.Orders.Application\ZIONShop.Orders.Application.csproj" />
+    <ProjectReference Include="..\..\Modules\Orders\ZIONShop.Orders.Infrastructure\ZIONShop.Orders.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\Modules\Inventory\ZIONShop.Inventory.Application\ZIONShop.Inventory.Application.csproj" />
+    <ProjectReference Include="..\..\Modules\Inventory\ZIONShop.Inventory.Infrastructure\ZIONShop.Inventory.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\Modules\Payments\ZIONShop.Payments.Application\ZIONShop.Payments.Application.csproj" />
+    <ProjectReference Include="..\..\Modules\Payments\ZIONShop.Payments.Infrastructure\ZIONShop.Payments.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\Modules\Promotions\ZIONShop.Promotions.Application\ZIONShop.Promotions.Application.csproj" />
+    <ProjectReference Include="..\..\Modules\Promotions\ZIONShop.Promotions.Infrastructure\ZIONShop.Promotions.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\Modules\Notifications\ZIONShop.Notifications.Application\ZIONShop.Notifications.Application.csproj" />
+    <ProjectReference Include="..\..\Modules\Notifications\ZIONShop.Notifications.Infrastructure\ZIONShop.Notifications.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\Modules\Reviews\ZIONShop.Reviews.Application\ZIONShop.Reviews.Application.csproj" />
+    <ProjectReference Include="..\..\Modules\Reviews\ZIONShop.Reviews.Infrastructure\ZIONShop.Reviews.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\Modules\Admin\ZIONShop.Admin.Application\ZIONShop.Admin.Application.csproj" />
+    <ProjectReference Include="..\..\Modules\Admin\ZIONShop.Admin.Infrastructure\ZIONShop.Admin.Infrastructure.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Update="appsettings*.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>
