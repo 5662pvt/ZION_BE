@@ -1,0 +1,10 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\ZIONShop.Inventory.Domain\ZIONShop.Inventory.Domain.csproj" />
+    <ProjectReference Include="..\ZIONShop.Inventory.Application\ZIONShop.Inventory.Application.csproj" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,356 @@
+# CLAUDE.md
+
+## Project Overview
+
+Project Name: Ecommerce Enterprise Platform
+Architecture: Modular Monolith + Clean Architecture
+Backend: .NET 8 Web API
+Frontend: ReactJS + Vite
+Database: PostgreSQL / SQL Server
+Cache: Redis
+Message Broker: RabbitMQ
+Authentication: JWT + Refresh Token
+Deployment: Docker + CI/CD
+
+Goals:
+
+* Production ready
+* Maintainable
+* Scalable
+* High performance
+* Easy migration to Microservices
+* AI-friendly codebase
+
+---
+
+# Architecture Principles
+
+Mandatory:
+
+1. Follow SOLID principles
+2. Follow Clean Architecture
+3. Follow Modular Monolith design
+4. Follow CQRS pattern
+5. Follow Event Driven communication
+6. Prefer composition over inheritance
+7. Use Dependency Injection
+8. Async all the way
+9. Keep modules isolated
+10. Avoid tight coupling
+
+---
+
+# Layer Rules
+
+Dependency Direction:
+
+API
+↓
+Application
+↓
+Domain
+↓
+Infrastructure
+
+Rules:
+
+Domain:
+
+* Cannot reference Infrastructure
+* Cannot contain EF Core logic
+* Cannot contain HTTP logic
+* Cannot contain external service calls
+
+Application:
+
+* Contains business use cases
+* Uses DTOs
+* Uses Commands/Queries
+* Uses Validators
+* Uses interfaces
+
+Infrastructure:
+
+* EF Core implementation
+* Redis implementation
+* RabbitMQ implementation
+* External APIs
+
+API:
+
+* Thin controllers
+* No business logic
+* Request/response only
+
+---
+
+# Module Structure
+
+Each module must contain:
+
+Modules/
+ModuleName/
+ModuleName.Domain/
+ModuleName.Application/
+ModuleName.Infrastructure/
+ModuleName.API/
+ModuleName.Tests/
+
+---
+
+# Naming Convention
+
+Commands:
+CreateProductCommand
+UpdateOrderCommand
+DeleteCartItemCommand
+
+Queries:
+GetProductQuery
+GetUserProfileQuery
+GetOrdersQuery
+
+Handlers:
+CreateProductCommandHandler
+GetProductQueryHandler
+
+Validators:
+CreateProductCommandValidator
+
+DTO:
+ProductDto
+OrderResponseDto
+
+Events:
+OrderCreatedEvent
+PaymentCompletedEvent
+InventoryUpdatedEvent
+
+Controllers:
+ProductsController
+OrdersController
+
+Interfaces:
+IProductRepository
+IInventoryService
+
+---
+
+# Backend Rules
+
+Required:
+
+* Use MediatR
+* Use FluentValidation
+* Use Result<T>
+* Use AutoMapper
+* Use Repository Pattern
+* Use Unit Of Work only when necessary
+* Use Domain Events
+* Use CancellationToken
+
+Forbidden:
+
+* Fat controllers
+* Business logic in controllers
+* Direct DbContext access outside Infrastructure
+* Static services
+* Circular dependencies
+* Duplicate business logic
+
+---
+
+# Database Rules
+
+Required:
+
+* Soft delete
+* Auditable entity
+* Migration required
+* RowVersion for concurrency
+* Transaction for critical flows
+
+Entity base:
+
+Id
+CreatedDate
+CreatedBy
+LastModifiedDate
+LastModifiedBy
+IsDeleted
+RowVersion
+
+Forbidden:
+
+* Massive joins
+* Cascade delete everywhere
+* Business logic in SQL
+
+---
+
+# API Rules
+
+Response format:
+
+{
+success: true,
+message: "Success",
+data: {},
+errors: [],
+pagination: {}
+}
+
+Required:
+
+* API versioning
+* Swagger documentation
+* Pagination
+* Filtering
+* Sorting
+* Validation
+
+---
+
+# Security Rules
+
+Required:
+
+* JWT authentication
+* Refresh token
+* Password hashing
+* Authorization policies
+* Rate limiting
+* Input validation
+* SQL injection prevention
+* XSS prevention
+
+Forbidden:
+
+* Plain text passwords
+* Secrets in source code
+* Hardcoded keys
+
+---
+
+# Event Driven Rules
+
+Modules communicate through:
+
+* Domain Events
+* Integration Events
+
+Examples:
+
+OrderCreated
+PaymentCompleted
+InventoryReserved
+EmailRequested
+
+Forbidden:
+
+* Direct module dependency
+
+---
+
+# Inventory Rules
+
+* Stock cannot become negative
+* Reserved stock required
+* Reservation timeout: 15 minutes
+* Inventory update must use transaction
+* Concurrency protection required
+
+Concurrency strategy:
+
+1. SQL Transaction
+2. RowVersion
+3. Redis Lock
+4. Queue Processing
+
+---
+
+# Frontend Rules
+
+Structure:
+
+src/
+modules/
+components/
+services/
+hooks/
+layouts/
+routes/
+store/
+
+Required:
+
+* React Query for server state
+* Redux Toolkit for global state
+* Lazy loading
+* Feature-based architecture
+* Reusable components
+
+Forbidden:
+
+* API calls inside large UI components
+* Business logic in components
+* Massive pages
+
+---
+
+# Testing Rules
+
+Required:
+
+* Unit tests
+* Integration tests
+* Concurrency tests
+* API tests
+
+Naming:
+
+MethodName_Should_ExpectedBehavior_When_State
+
+Example:
+
+CreateOrder_Should_ReturnError_When_StockUnavailable
+
+---
+
+# Git Workflow
+
+Branch:
+
+feature/module-name
+bugfix/issue-name
+hotfix/issue-name
+
+Commit:
+
+feat:
+fix:
+refactor:
+chore:
+test:
+
+Example:
+
+feat: implement product search
+fix: resolve inventory concurrency issue
+
+---
+
+# AI Instructions
+
+When generating code:
+
+1. Follow all architecture rules
+2. Preserve module boundaries
+3. Preserve naming convention
+4. Avoid assumptions
+5. Ask for clarification if business rules are unclear
+6. Do not generate duplicate logic
+7. Prioritize maintainability
+8. Prioritize performance
+9. Prioritize readability
+10. Generate production-ready code only

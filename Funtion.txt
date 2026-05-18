@@ -1,0 +1,503 @@
+1. HƯỚNG KIẾN TRÚC TỔNG THỂ
+
+Bạn đang đi đúng hướng với:
+
+Modular Monolith
+Clean Architecture
+ReactJS Frontend
+Event-Driven
+Redis + RabbitMQ
+Production-ready
+
+Đây là kiến trúc rất phù hợp cho:
+
+startup
+SME
+enterprise vừa
+ecommerce scale lớn
+
+vì:
+
+✅ deploy đơn giản hơn microservices
+✅ maintain dễ hơn
+✅ performance tốt
+✅ cost thấp
+✅ vẫn tách module rõ ràng
+✅ sau này split service được
+
+2. KIẾN TRÚC ĐỀ XUẤT CHO PROJECT
+Backend Architecture
+src/
+│
+├── BuildingBlocks/
+│   ├── SharedKernel/
+│   ├── Contracts/
+│   ├── EventBus/
+│   ├── Caching/
+│   ├── Logging/
+│   ├── Auth/
+│   └── Common/
+│
+├── Modules/
+│   ├── Auth/
+│   ├── Users/
+│   ├── Products/
+│   ├── Inventory/
+│   ├── Cart/
+│   ├── Orders/
+│   ├── Payments/
+│   ├── Promotions/
+│   ├── Notifications/
+│   ├── Reviews/
+│   └── Admin/
+│
+├── Api/
+│
+└── Tests/
+3. CẤU TRÚC CLEAN ARCHITECTURE CHO MỖI MODULE
+
+Ví dụ:
+
+Modules/
+└── Products/
+    ├── Products.Domain/
+    ├── Products.Application/
+    ├── Products.Infrastructure/
+    └── Products.API/
+4. STRUCTURE BÊN TRONG MODULE
+Domain
+Products.Domain/
+├── Entities/
+├── ValueObjects/
+├── Enums/
+├── Events/
+├── Repositories/
+├── Specifications/
+├── Exceptions/
+└── Services/
+
+KHÔNG chứa:
+
+EF Core
+SQL
+Redis
+Http
+Application
+Products.Application/
+├── Features/
+│   ├── CreateProduct/
+│   ├── UpdateProduct/
+│   ├── GetProduct/
+│   └── SearchProduct/
+│
+├── DTOs/
+├── Interfaces/
+├── Validators/
+├── Mappings/
+├── Behaviors/
+└── Services/
+
+Nên dùng:
+
+CQRS
+MediatR
+FluentValidation
+Infrastructure
+Products.Infrastructure/
+├── Persistence/
+├── Repositories/
+├── Configurations/
+├── Cache/
+├── Services/
+├── MessageBus/
+└── External/
+API
+Products.API/
+├── Controllers/
+├── Endpoints/
+├── Middleware/
+└── DependencyInjection/
+5. ĐÂY LÀ PHẦN QUAN TRỌNG NHẤT:
+THIẾT KẾ AI-READY CODEBASE
+
+Đa số project fail khi dùng Claude Code vì:
+
+❌ structure không rõ
+❌ naming inconsistent
+❌ business rule nằm lung tung
+❌ module phụ thuộc nhau
+❌ folder quá lớn
+❌ thiếu convention
+
+AI rất cần:
+
+predictable structure
+stable naming
+isolated module
+clear responsibility
+6. CẤU TRÚC AGENT CHO CLAUDE CODE
+
+Đây là phần bạn nên đầu tư mạnh.
+
+ĐỀ XUẤT MULTI-AGENT STRUCTURE
+.ai/
+│
+├── context/
+│   ├── architecture.md
+│   ├── coding-rules.md
+│   ├── database-rules.md
+│   ├── api-rules.md
+│   ├── frontend-rules.md
+│   ├── event-driven.md
+│   └── security-rules.md
+│
+├── agents/
+│   ├── backend-architect.md
+│   ├── frontend-architect.md
+│   ├── database-architect.md
+│   ├── domain-expert.md
+│   ├── reviewer.md
+│   ├── refactor-agent.md
+│   ├── test-agent.md
+│   └── devops-agent.md
+│
+├── prompts/
+│   ├── create-module.md
+│   ├── create-feature.md
+│   ├── create-endpoint.md
+│   ├── create-entity.md
+│   ├── create-migration.md
+│   └── review-code.md
+│
+└── memory/
+    ├── business-rules.md
+    ├── glossary.md
+    └── module-dependencies.md
+7. AGENT RESPONSIBILITY
+backend-architect
+
+Nhiệm vụ:
+
+enforce clean architecture
+dependency rule
+module boundary
+CQRS
+event driven
+domain-expert
+
+Nhiệm vụ:
+
+business logic
+aggregate
+invariants
+validation rule
+domain events
+reviewer
+
+Nhiệm vụ:
+
+SOLID
+anti-pattern detection
+performance
+security
+clean code
+refactor-agent
+
+Nhiệm vụ:
+
+split large service
+optimize query
+reduce coupling
+remove duplicated logic
+test-agent
+
+Nhiệm vụ:
+
+unit test
+integration test
+concurrency test
+load test
+8. CÁCH CLAUDE CODE NÊN HIỂU PROJECT
+
+Bạn cần file:
+
+CLAUDE.md
+
+Đây là “system prompt” cho toàn bộ project.
+
+Ví dụ:
+
+# Architecture Rules
+
+- Project uses Modular Monolith + Clean Architecture
+- No direct Infrastructure access from API
+- All business logic must stay in Application or Domain
+- Use CQRS pattern
+- Use MediatR
+- Use Repository Pattern
+- Use Domain Events
+- Use Result Pattern
+- Use FluentValidation
+
+# Coding Rules
+
+- Async all the way
+- No fat controller
+- No business logic in controller
+- No static service
+- No circular dependency
+
+# Module Rules
+
+- Modules communicate using Events
+- No direct DbContext access across modules
+
+Cái này cực kỳ quan trọng.
+
+9. ĐỀ XUẤT DEVELOPMENT FLOW
+STEP 1 — Foundation
+
+Làm trước:
+
+logging
+exception handling
+auth
+middleware
+response wrapper
+result pattern
+validation pipeline
+event bus abstraction
+STEP 2 — Shared Kernel
+SharedKernel/
+├── BaseEntity
+├── AggregateRoot
+├── Result<T>
+├── DomainEvent
+├── IRepository
+├── IDomainEventDispatcher
+└── AuditableEntity
+STEP 3 — MODULE TEMPLATE
+
+Tạo module template chuẩn.
+
+Ví dụ:
+
+create-module Products
+
+Claude tự generate:
+
+Domain
+Application
+Infrastructure
+API
+Tests
+STEP 4 — BUSINESS FIRST
+
+Đừng build UI trước.
+
+Build:
+
+domain
+use case
+API
+integration
+frontend
+10. FRONTEND ARCHITECTURE ĐỀ XUẤT
+src/
+├── app/
+├── shared/
+├── modules/
+│   ├── auth/
+│   ├── products/
+│   ├── cart/
+│   ├── orders/
+│   └── admin/
+│
+├── services/
+├── hooks/
+├── layouts/
+├── routes/
+└── store/
+11. FRONTEND BEST PRACTICE
+NÊN
+
+✅ feature-based structure
+✅ React Query cho server state
+✅ Redux Toolkit cho global state
+✅ lazy loading
+✅ reusable UI
+✅ centralized API client
+✅ permission-based route
+
+12. KHÔNG NÊN
+
+❌ gọi API trực tiếp trong component lớn
+❌ shared state lung tung
+❌ business logic trong UI
+❌ hardcode permission
+❌ component quá lớn
+
+13. DATABASE STRATEGY
+KHÔNG dùng:
+generic repository everywhere
+massive join
+God table
+NÊN:
+Aggregate per module
+
+Ví dụ:
+
+Orders
+Products
+Inventory
+
+tách rõ.
+
+14. EVENT-DRIVEN STRATEGY
+
+Bạn đang đi đúng hướng.
+
+Ví dụ:
+
+OrderCreated
+    ↓
+InventoryReserved
+    ↓
+PaymentRequested
+    ↓
+PaymentCompleted
+    ↓
+SendEmailRequested
+
+Rất phù hợp để:
+
+scale
+decouple
+async processing
+15. CONCURRENCY STRATEGY
+
+Đây là phần sống còn của ecommerce.
+
+Bạn nên combine:
+
+Level 1
+SQL Transaction
+Level 2
+RowVersion
+Level 3
+Redis Distributed Lock
+Level 4
+Queue Processing
+
+Đây là production-grade strategy.
+
+16. ĐỀ XUẤT MODULE ƯU TIÊN
+
+KHÔNG build tất cả cùng lúc.
+
+Phase 1
+Auth
+Users
+Products
+Categories
+Cart
+Phase 2
+Orders
+Inventory
+Payment
+Phase 3
+Promotions
+Reviews
+Notifications
+Phase 4
+Analytics
+Recommendation
+Search engine
+17. CI/CD ĐỀ XUẤT
+Backend
+Build
+→ Test
+→ Docker Build
+→ Push Registry
+→ Deploy
+Frontend
+Lint
+→ Test
+→ Build
+→ Deploy
+18. DEVOPS ĐỀ XUẤT
+Docker Compose Local
+api
+sql
+redis
+rabbitmq
+seq
+nginx
+Production
+Kubernetes
+hoặc
+Docker Swarm
+19. QUAN TRỌNG NHẤT:
+MODULE BOUNDARY
+
+Nếu boundary không rõ:
+
+Claude sẽ generate sai
+business logic bị duplicate
+dependency loạn
+khó split microservice
+20. KẾT LUẬN HƯỚNG TIẾP CẬN TỐT NHẤT
+Kiến trúc phù hợp nhất cho bạn:
+
+✅ Modular Monolith
+✅ Clean Architecture
+✅ CQRS
+✅ Event-Driven
+✅ Redis + RabbitMQ
+✅ React Modular Frontend
+✅ AI-ready structure
+✅ Domain-first development
+
+THỨ TỰ TRIỂN KHAI NÊN LÀ
+1. Foundation
+2. SharedKernel
+3. Auth
+4. Product
+5. Cart
+6. Order
+7. Inventory
+8. Payment
+9. Notification
+10. Admin
+PHẦN QUAN TRỌNG NHẤT ĐỂ CLAUDE CODE HOẠT ĐỘNG TỐT
+
+Bạn cần:
+
+architecture rules
+coding rules
+module rules
+naming convention
+folder convention
+dependency rules
+bounded context
+agent specialization
+
+Nếu muốn, mình có thể tiếp tục giúp bạn:
+
+thiết kế full folder structure chuẩn enterprise
+viết CLAUDE.md
+viết toàn bộ AI Agent prompts
+generate module template
+thiết kế CQRS pattern chuẩn
+thiết kế event bus abstraction
+thiết kế shared kernel
+thiết kế Docker Compose full stack
+thiết kế CI/CD GitHub Actions
+thiết kế database schema ecommerce chuẩn enterprise
+thiết kế permission system RBAC
+thiết kế inventory concurrency flow
+thiết kế order saga workflow
+thiết kế frontend enterprise structure
+thiết kế API response standard
+thiết kế logging + tracing + monitoring stack
+thiết kế migration strategy để tách microservices sau này.

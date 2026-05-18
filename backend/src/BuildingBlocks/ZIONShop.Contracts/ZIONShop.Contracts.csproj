@@ -1,0 +1,5 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\ZIONShop.EventBus\ZIONShop.EventBus.csproj" />
+  </ItemGroup>
+</Project>

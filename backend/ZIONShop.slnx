@@ -1,0 +1,75 @@
+<Solution>
+  <Folder Name="/src/" />
+  <Folder Name="/src/Api/">
+    <Project Path="src/Api/ZIONShop.Api/ZIONShop.Api.csproj" />
+  </Folder>
+  <Folder Name="/src/BuildingBlocks/">
+    <Project Path="src/BuildingBlocks/ZIONShop.Auth/ZIONShop.Auth.csproj" />
+    <Project Path="src/BuildingBlocks/ZIONShop.Caching/ZIONShop.Caching.csproj" />
+    <Project Path="src/BuildingBlocks/ZIONShop.Common/ZIONShop.Common.csproj" />
+    <Project Path="src/BuildingBlocks/ZIONShop.Contracts/ZIONShop.Contracts.csproj" />
+    <Project Path="src/BuildingBlocks/ZIONShop.EventBus/ZIONShop.EventBus.csproj" />
+    <Project Path="src/BuildingBlocks/ZIONShop.Logging/ZIONShop.Logging.csproj" />
+    <Project Path="src/BuildingBlocks/ZIONShop.SharedKernel/ZIONShop.SharedKernel.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/" />
+  <Folder Name="/src/Modules/Admin/">
+    <Project Path="src/Modules/Admin/ZIONShop.Admin.Application/ZIONShop.Admin.Application.csproj" />
+    <Project Path="src/Modules/Admin/ZIONShop.Admin.Domain/ZIONShop.Admin.Domain.csproj" />
+    <Project Path="src/Modules/Admin/ZIONShop.Admin.Infrastructure/ZIONShop.Admin.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/Auth/">
+    <Project Path="src/Modules/Auth/ZIONShop.Auth.Application/ZIONShop.Auth.Application.csproj" />
+    <Project Path="src/Modules/Auth/ZIONShop.Auth.Domain/ZIONShop.Auth.Domain.csproj" />
+    <Project Path="src/Modules/Auth/ZIONShop.Auth.Infrastructure/ZIONShop.Auth.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/Cart/">
+    <Project Path="src/Modules/Cart/ZIONShop.Cart.Application/ZIONShop.Cart.Application.csproj" />
+    <Project Path="src/Modules/Cart/ZIONShop.Cart.Domain/ZIONShop.Cart.Domain.csproj" />
+    <Project Path="src/Modules/Cart/ZIONShop.Cart.Infrastructure/ZIONShop.Cart.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/Inventory/">
+    <Project Path="src/Modules/Inventory/ZIONShop.Inventory.Application/ZIONShop.Inventory.Application.csproj" />
+    <Project Path="src/Modules/Inventory/ZIONShop.Inventory.Domain/ZIONShop.Inventory.Domain.csproj" />
+    <Project Path="src/Modules/Inventory/ZIONShop.Inventory.Infrastructure/ZIONShop.Inventory.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/Notifications/">
+    <Project Path="src/Modules/Notifications/ZIONShop.Notifications.Application/ZIONShop.Notifications.Application.csproj" />
+    <Project Path="src/Modules/Notifications/ZIONShop.Notifications.Domain/ZIONShop.Notifications.Domain.csproj" />
+    <Project Path="src/Modules/Notifications/ZIONShop.Notifications.Infrastructure/ZIONShop.Notifications.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/Orders/">
+    <Project Path="src/Modules/Orders/ZIONShop.Orders.Application/ZIONShop.Orders.Application.csproj" />
+    <Project Path="src/Modules/Orders/ZIONShop.Orders.Domain/ZIONShop.Orders.Domain.csproj" />
+    <Project Path="src/Modules/Orders/ZIONShop.Orders.Infrastructure/ZIONShop.Orders.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/Payments/">
+    <Project Path="src/Modules/Payments/ZIONShop.Payments.Application/ZIONShop.Payments.Application.csproj" />
+    <Project Path="src/Modules/Payments/ZIONShop.Payments.Domain/ZIONShop.Payments.Domain.csproj" />
+    <Project Path="src/Modules/Payments/ZIONShop.Payments.Infrastructure/ZIONShop.Payments.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/Products/">
+    <Project Path="src/Modules/Products/ZIONShop.Products.Application/ZIONShop.Products.Application.csproj" />
+    <Project Path="src/Modules/Products/ZIONShop.Products.Domain/ZIONShop.Products.Domain.csproj" />
+    <Project Path="src/Modules/Products/ZIONShop.Products.Infrastructure/ZIONShop.Products.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/Promotions/">
+    <Project Path="src/Modules/Promotions/ZIONShop.Promotions.Application/ZIONShop.Promotions.Application.csproj" />
+    <Project Path="src/Modules/Promotions/ZIONShop.Promotions.Domain/ZIONShop.Promotions.Domain.csproj" />
+    <Project Path="src/Modules/Promotions/ZIONShop.Promotions.Infrastructure/ZIONShop.Promotions.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/Reviews/">
+    <Project Path="src/Modules/Reviews/ZIONShop.Reviews.Application/ZIONShop.Reviews.Application.csproj" />
+    <Project Path="src/Modules/Reviews/ZIONShop.Reviews.Domain/ZIONShop.Reviews.Domain.csproj" />
+    <Project Path="src/Modules/Reviews/ZIONShop.Reviews.Infrastructure/ZIONShop.Reviews.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/Users/">
+    <Project Path="src/Modules/Users/ZIONShop.Users.Application/ZIONShop.Users.Application.csproj" />
+    <Project Path="src/Modules/Users/ZIONShop.Users.Domain/ZIONShop.Users.Domain.csproj" />
+    <Project Path="src/Modules/Users/ZIONShop.Users.Infrastructure/ZIONShop.Users.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/tests/" />
+  <Folder Name="/tests/Unit/">
+    <Project Path="tests/Unit/ZIONShop.Products.Tests/ZIONShop.Products.Tests.csproj" />
+  </Folder>
+</Solution>
