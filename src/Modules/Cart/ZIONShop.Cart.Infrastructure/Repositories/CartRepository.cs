@@ -24,4 +24,6 @@ public class CartRepository : ICartRepository
         await _db.Carts.AddAsync(cart, cancellationToken);
 
     public void Update(DomainCart cart) => _db.Carts.Update(cart);
+
+    public void Remove(DomainCart cart) => _db.Carts.Remove(cart);
 }

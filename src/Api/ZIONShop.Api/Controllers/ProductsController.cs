@@ -3,8 +3,10 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using ZIONShop.Auth.Authorization;
 using ZIONShop.Common.Api;
+using ZIONShop.Products.Application.Features.ArchiveProduct;
 using ZIONShop.Products.Application.Features.CreateProduct;
 using ZIONShop.Products.Application.Features.GetProduct;
+using ZIONShop.Products.Application.Features.PublishProduct;
 using ZIONShop.Products.Application.Features.SearchProducts;
 using ZIONShop.Products.Application.Features.UpdateProduct;
 
@@ -55,6 +57,16 @@ public class ProductsController : ControllerBase
         var cmd = new UpdateProductCommand(id, body.Name, body.Description, body.Price, body.Currency, body.CategoryId, body.Brand);
         return (await _mediator.Send(cmd, ct)).ToActionResult("Product updated");
     }
+
+    [HttpPost("{id:guid}/archive")]
+    [Authorize(Policy = Policies.AdminOnly)]
+    public async Task<IActionResult> Archive(Guid id, CancellationToken ct)
+        => (await _mediator.Send(new ArchiveProductCommand(id), ct)).ToActionResult("Product archived");
+
+    [HttpPost("{id:guid}/publish")]
+    [Authorize(Policy = Policies.AdminOnly)]
+    public async Task<IActionResult> Publish(Guid id, CancellationToken ct)
+        => (await _mediator.Send(new PublishProductCommand(id), ct)).ToActionResult("Product published");
 }
 
 public record SearchProductsRequest(int Page = 1, int PageSize = 20, string? Keyword = null, Guid? CategoryId = null, decimal? MinPrice = null, decimal? MaxPrice = null, string? Sort = null);

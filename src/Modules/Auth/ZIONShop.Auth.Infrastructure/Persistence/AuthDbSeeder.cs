@@ -10,11 +10,18 @@ public static class AuthDbSeeder
         await db.Database.MigrateAsync(cancellationToken);
 
         var adminEmail = "admin@zionshop.local";
-        if (!await db.Users.AnyAsync(u => u.Email == adminEmail, cancellationToken))
+        var admin = await db.Users.FirstOrDefaultAsync(u => u.Email == adminEmail, cancellationToken);
+        if (admin is null)
         {
             var hash = BCrypt.Net.BCrypt.HashPassword("Admin@123");
-            var admin = User.Register(adminEmail, hash, "ZIONShop Admin", new[] { "Admin", "Customer" });
+            admin = User.Register(adminEmail, hash, "ZIONShop Admin", new[] { "Admin", "Customer" });
+            admin.ConfirmEmail();
             await db.Users.AddAsync(admin, cancellationToken);
+            await db.SaveChangesAsync(cancellationToken);
+        }
+        else if (!admin.EmailConfirmed)
+        {
+            admin.ConfirmEmail();
             await db.SaveChangesAsync(cancellationToken);
         }
     }

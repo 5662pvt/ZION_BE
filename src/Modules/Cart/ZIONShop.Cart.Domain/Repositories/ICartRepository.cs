@@ -9,4 +9,5 @@ public interface ICartRepository
     Task<Entities.Cart?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
     Task AddAsync(Entities.Cart cart, CancellationToken cancellationToken = default);
     void Update(Entities.Cart cart);
+    void Remove(Entities.Cart cart);
 }

@@ -23,5 +23,9 @@ public class CategoryRepository : ICategoryRepository
     public async Task AddAsync(Category category, CancellationToken cancellationToken = default) =>
         await _db.Categories.AddAsync(category, cancellationToken);
 
+    public void Update(Category category) => _db.Categories.Update(category);
+
+    public void Remove(Category category) => _db.Categories.Remove(category);
+
     public IQueryable<Category> Query() => _db.Categories.AsQueryable();
 }

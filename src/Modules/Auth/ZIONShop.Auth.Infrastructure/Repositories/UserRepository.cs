@@ -17,6 +17,9 @@ public class UserRepository : IUserRepository
     public Task<User?> GetByEmailAsync(string email, CancellationToken cancellationToken = default) =>
         _db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Email == email, cancellationToken);
 
+    public Task<User?> GetByEmailForUpdateAsync(string email, CancellationToken cancellationToken = default) =>
+        _db.Users.FirstOrDefaultAsync(u => u.Email == email, cancellationToken);
+
     public Task AddRefreshTokenAsync(RefreshToken token, CancellationToken cancellationToken = default) =>
         _db.RefreshTokens.AddAsync(token, cancellationToken).AsTask();
 
