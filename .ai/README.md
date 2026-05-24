@@ -20,9 +20,11 @@ Tài liệu dự án được **chia nhỏ** để Claude/Cursor chỉ đọc ph
 | Module Inventory | `07-database`, `11-inventory`, `10-event-driven`, `06` | `modules/inventory.md` |
 | Module Payments | `10-event-driven`, `09-security`, `08-api`, `06` | `modules/payments.md` |
 | Frontend (bất kỳ feature) | `04-frontend-structure`, `08-api`, `01-overview` | module FE tương ứng |
+| **Admin Portal** (màn hình back-office) | `16-admin-portal-phases`, `04-frontend-structure`, `09-security`, `08-api` | `modules/admin.md`, `modules/products.md`, `modules/promotions.md`, `modules/orders.md` |
 | Integration events / RabbitMQ | `10-event-driven`, `02-architecture` | — |
 | Tests / CI | `13-testing-git`, `12-roadmap` | — |
 | Review / refactor toàn repo | `14-ai-instructions`, `02-architecture` | tất cả liên quan module |
+| **Copy prompt chuẩn** | `17-ai-prompts` | `16-admin-portal-phases`, `12-roadmap` |
 
 ## Thư mục
 
@@ -45,13 +47,17 @@ Tài liệu dự án được **chia nhỏ** để Claude/Cursor chỉ đọc ph
 │   ├── 13-testing-git.md
 │   ├── 14-ai-instructions.md
 │   ├── 15-sources.md
+│   ├── 16-admin-portal-phases.md   ← Admin UI phases A0–A7, screen plan
+│   ├── 17-ai-prompts.md            ← Prompt copy-paste theo task
 │   └── modules/              ← bounded context từng module
 │       ├── auth.md
 │       ├── products.md
 │       ├── cart.md
 │       ├── orders.md
 │       ├── inventory.md
-│       └── payments.md
+│       ├── payments.md
+│       ├── admin.md
+│       └── promotions.md
 ```
 
 **Quy tắc ưu tiên:** Nội dung trong `.ai/context/` và `CLAUDE.md` thắng `structure.txt` / `Funtion.txt` khi mâu thuẫn.

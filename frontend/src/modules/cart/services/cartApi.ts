@@ -1,4 +1,5 @@
 import { apiClient, unwrap } from '@/services/apiClient';
+import { CART_TOKEN_HEADER } from '@/shared/constants';
 import type { ApiResponse } from '@/shared/types/api';
 import type { Cart } from '../types';
 
@@ -21,6 +22,14 @@ export const cartApi = {
   },
   clear: async (): Promise<Cart> => {
     const res = await apiClient.delete<ApiResponse<Cart>>('/cart');
+    return unwrap(res);
+  },
+  merge: async (cartToken: string): Promise<Cart> => {
+    const res = await apiClient.post<ApiResponse<Cart>>(
+      '/cart/merge',
+      {},
+      { headers: { [CART_TOKEN_HEADER]: cartToken } },
+    );
     return unwrap(res);
   },
 };

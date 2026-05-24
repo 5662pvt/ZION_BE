@@ -33,10 +33,19 @@ export function LoginPage() {
             {(login.error as Error).message || 'Login failed'}
           </div>
         )}
+        <div className="text-right">
+          <Link to="/forgot-password" className="text-sm text-brand-700 hover:underline">Forgot password?</Link>
+        </div>
         <button type="submit" className="btn-primary w-full" disabled={formState.isSubmitting || login.isPending}>
           {login.isPending ? 'Signing in…' : 'Sign in'}
         </button>
       </form>
+      {login.isError && (login.error as Error).message?.toLowerCase().includes('not verified') && (
+        <p className="text-sm text-amber-700 mt-2">
+          Email not verified.{' '}
+          <Link to="/register" className="text-brand-700 hover:underline">Register again</Link> or check your inbox for the code.
+        </p>
+      )}
       <p className="text-sm text-slate-500 mt-4">
         No account? <Link to="/register" className="text-brand-700 hover:underline">Register</Link>
       </p>

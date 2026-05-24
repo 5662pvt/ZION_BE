@@ -12,6 +12,7 @@ public class AuthDbContext : DbContext, IAuthUnitOfWork
 
     public DbSet<User> Users => Set<User>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
+    public DbSet<AuthOtp> AuthOtps => Set<AuthOtp>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

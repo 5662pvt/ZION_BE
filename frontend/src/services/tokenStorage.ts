@@ -13,4 +13,5 @@ export const tokenStorage = {
   },
   getCartToken: () => localStorage.getItem(CART_TOKEN_KEY),
   setCartToken: (token: string) => localStorage.setItem(CART_TOKEN_KEY, token),
+  clearCartToken: () => localStorage.removeItem(CART_TOKEN_KEY),
 };

@@ -1,6 +1,7 @@
 using MediatR;
 using ZIONShop.Products.Application.DTOs;
 using ZIONShop.Products.Application.Mappings;
+using ZIONShop.Products.Domain.Enums;
 using ZIONShop.Products.Domain.Exceptions;
 using ZIONShop.Products.Domain.Repositories;
 using ZIONShop.SharedKernel.Results;
@@ -22,7 +23,8 @@ public class GetProductBySlugQueryHandler : IRequestHandler<GetProductBySlugQuer
     {
         var slug = request.Slug.Trim().ToLowerInvariant();
         var product = await _products.GetBySlugAsync(slug, cancellationToken);
-        if (product is null) return Result.Failure<ProductDto>(ProductsErrors.ProductNotFound);
+        if (product is null || product.Status != ProductStatus.Published)
+            return Result.Failure<ProductDto>(ProductsErrors.ProductNotFound);
 
         string? categoryName = null;
         if (product.CategoryId.HasValue)

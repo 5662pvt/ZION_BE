@@ -24,7 +24,10 @@ export function MainLayout() {
                 <button className="btn-outline" onClick={() => { logout(); navigate('/'); }}>Logout</button>
               </div>
             ) : (
-              <Link to="/login" className="btn-primary">Login</Link>
+              <>
+                <Link to="/register" className="btn-outline">Register</Link>
+                <Link to="/login" className="btn-primary">Login</Link>
+              </>
             )}
           </nav>
         </div>

@@ -5,6 +5,8 @@ import { ProtectedRoute } from './ProtectedRoute';
 
 const LoginPage = lazy(() => import('@/modules/auth/pages/LoginPage').then((m) => ({ default: m.LoginPage })));
 const RegisterPage = lazy(() => import('@/modules/auth/pages/RegisterPage').then((m) => ({ default: m.RegisterPage })));
+const ForgotPasswordPage = lazy(() => import('@/modules/auth/pages/ForgotPasswordPage').then((m) => ({ default: m.ForgotPasswordPage })));
+const ResetPasswordPage = lazy(() => import('@/modules/auth/pages/ResetPasswordPage').then((m) => ({ default: m.ResetPasswordPage })));
 const ProductsListPage = lazy(() => import('@/modules/products/pages/ProductsListPage').then((m) => ({ default: m.ProductsListPage })));
 const ProductDetailPage = lazy(() => import('@/modules/products/pages/ProductDetailPage').then((m) => ({ default: m.ProductDetailPage })));
 const CartPage = lazy(() => import('@/modules/cart/pages/CartPage').then((m) => ({ default: m.CartPage })));
@@ -19,6 +21,8 @@ export const router = createBrowserRouter([
       { path: '/', element: <Navigate to="/products" replace /> },
       { path: '/login', element: <Suspense fallback={<Fallback />}><LoginPage /></Suspense> },
       { path: '/register', element: <Suspense fallback={<Fallback />}><RegisterPage /></Suspense> },
+      { path: '/forgot-password', element: <Suspense fallback={<Fallback />}><ForgotPasswordPage /></Suspense> },
+      { path: '/reset-password', element: <Suspense fallback={<Fallback />}><ResetPasswordPage /></Suspense> },
       { path: '/products', element: <Suspense fallback={<Fallback />}><ProductsListPage /></Suspense> },
       { path: '/products/:slug', element: <Suspense fallback={<Fallback />}><ProductDetailPage /></Suspense> },
       { path: '/cart', element: <Suspense fallback={<Fallback />}><CartPage /></Suspense> },

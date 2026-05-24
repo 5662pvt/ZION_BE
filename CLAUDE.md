@@ -39,6 +39,8 @@
 | 13 | [testing-git](.ai/context/13-testing-git.md) | Tests, branches, commits |
 | 14 | [ai-instructions](.ai/context/14-ai-instructions.md) | Checklist feature/module mới |
 | 15 | [sources](.ai/context/15-sources.md) | `structure.txt`, `Funtion.txt` |
+| 16 | [admin-portal-phases](.ai/context/16-admin-portal-phases.md) | **Admin back-office**: products, categories, orders, KM, quà, báo cáo |
+| 17 | [ai-prompts](.ai/context/17-ai-prompts.md) | **Prompt chuẩn** copy-paste cho từng task / phase |
 
 **Routing chi tiết:** [.ai/README.md](.ai/README.md)
 
@@ -54,19 +56,19 @@
 | Orders | [modules/orders.md](.ai/context/modules/orders.md) |
 | Inventory | [modules/inventory.md](.ai/context/modules/inventory.md) |
 | Payments | [modules/payments.md](.ai/context/modules/payments.md) |
+| Admin (reports, shell) | [modules/admin.md](.ai/context/modules/admin.md) |
+| Promotions & Gifts | [modules/promotions.md](.ai/context/modules/promotions.md) |
 
 ---
 
-## Ví dụ prompt cho Claude
+## Prompt ngắn
+
+[17-ai-prompts.md](.ai/context/17-ai-prompts.md) — copy **BASE** + 1 dòng TASK.
 
 ```
-Implement CreateProduct in Products module.
-Read: .ai/context/05-module-layout.md, 06-backend-rules.md, 07-database.md, 08-api.md, modules/products.md
-```
+ZIONShop: .NET8 + React/Vite + SQL Server. Đọc CLAUDE.md + các file Read bên dưới. Một task/session. Domain→App→API→FE. Không PostgreSQL, không cross-DbContext, Categories trong Products.
 
-```
-Implement checkout reserve stock flow.
-Read: .ai/context/10-event-driven.md, 11-inventory.md, modules/orders.md, modules/inventory.md
+BASE. Đọc: 12-roadmap, 16-admin §7, 17-ai-prompts. Chọn 1 task kế tiếp (Phase 1 gaps → Admin A0 → Inventory), implement, liệt kê việc còn lại. Không commit.
 ```
 
 ---
@@ -80,4 +82,4 @@ Read: .ai/context/10-event-driven.md, 11-inventory.md, modules/orders.md, module
 
 Khi mâu thuẫn: **`.ai/context/*` + file này** là chuẩn.
 
-*Last updated: 2026-05-17*
+*Last updated: 2026-05-18*

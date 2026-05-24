@@ -20,7 +20,12 @@ frontend/
     │   ├── orders/
     │   ├── checkout/
     │   ├── account/
-    │   └── admin/
+    │   └── admin/        # /admin/* — see 16-admin-portal-phases.md
+    │       ├── layouts/
+    │       ├── pages/    # catalog, orders, marketing, reports
+    │       ├── components/
+    │       ├── hooks/
+    │       └── services/
     ├── services/         # apiClient + interceptors
     ├── hooks/
     ├── layouts/

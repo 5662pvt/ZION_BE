@@ -31,6 +31,7 @@ public class LoginCommandHandler : IRequestHandler<LoginCommand, Result<AuthToke
         var user = await _users.GetByEmailAsync(request.Email.Trim().ToLowerInvariant(), cancellationToken);
         if (user is null) return Result.Failure<AuthTokenDto>(AuthErrors.InvalidCredentials);
         if (!user.IsActive) return Result.Failure<AuthTokenDto>(AuthErrors.UserInactive);
+        if (!user.EmailConfirmed) return Result.Failure<AuthTokenDto>(AuthErrors.EmailNotConfirmed);
         if (!BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
             return Result.Failure<AuthTokenDto>(AuthErrors.InvalidCredentials);
 

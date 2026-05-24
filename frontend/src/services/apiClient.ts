@@ -78,9 +78,38 @@ async function refreshAccessToken(): Promise<string | null> {
   return refreshInFlight;
 }
 
+export function getApiErrorMessage(error: unknown): string {
+  if (axios.isAxiosError(error)) {
+    const data = error.response?.data as ApiResponse<unknown> | undefined;
+    if (data?.errors?.length) {
+      return data.errors.map((e) => e.message).join(' ');
+    }
+    if (data?.message) return data.message;
+  }
+  if (error instanceof Error && !error.message.startsWith('Request failed with status code')) {
+    return error.message;
+  }
+  return 'Request failed. Please try again.';
+}
+
 export function unwrap<T>(response: { data: ApiResponse<T> }): T {
   if (!response.data.success || response.data.data === null) {
     throw new Error(response.data.message || 'Request failed');
   }
   return response.data.data;
+}
+
+export async function requestAndUnwrap<T>(
+  request: () => Promise<{ data: ApiResponse<T> }>,
+): Promise<T> {
+  try {
+    const res = await request();
+    return unwrap(res);
+  } catch (error) {
+    throw new Error(getApiErrorMessage(error));
+  }
+}
+
+export async function postAndUnwrap<T>(url: string, body?: unknown): Promise<T> {
+  return requestAndUnwrap<T>(() => apiClient.post<ApiResponse<T>>(url, body));
 }

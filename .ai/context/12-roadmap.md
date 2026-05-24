@@ -26,6 +26,8 @@ Complete **Domain → Application → API → tests** before matching frontend m
 | 3 | Promotions, Reviews, Notifications | Engagement |
 | 4 | Admin, Analytics, Search | Operations |
 
+**Admin Portal UI** (màn hình back-office) có lộ trình riêng theo phase A0–A7: [16-admin-portal-phases.md](16-admin-portal-phases.md). Có thể bắt A0–A2 song song khi Phase 1 gần xong.
+
 Do **not** build all modules at once.
 
 ## CI/CD

@@ -14,6 +14,7 @@ public class User : AggregateRoot
     public string PasswordHash { get; private set; } = string.Empty;
     public string? DisplayName { get; private set; }
     public bool IsActive { get; private set; } = true;
+    public bool EmailConfirmed { get; private set; }
     public DateTime? LastLoginAt { get; private set; }
 
     public string RolesRaw
@@ -45,6 +46,16 @@ public class User : AggregateRoot
     }
 
     public void RecordLogin() => LastLoginAt = DateTime.UtcNow;
+
+    public void ConfirmEmail() => EmailConfirmed = true;
+
+    public void SetPasswordHash(string passwordHash) => PasswordHash = passwordHash;
+
+    public void RevokeAllRefreshTokens()
+    {
+        foreach (var token in _refreshTokens.Where(t => t.IsActive))
+            token.Revoke();
+    }
 
     public void AddRefreshToken(RefreshToken token) => _refreshTokens.Add(token);
 

@@ -70,4 +70,10 @@ public class Cart : AggregateRoot
         UserId = userId;
         AnonymousId = null;
     }
+
+    public void MergeFrom(Cart guest)
+    {
+        foreach (var item in guest.Items.ToList())
+            AddItem(item.ProductId, item.ProductName, item.Quantity, item.UnitPrice, item.Currency);
+    }
 }

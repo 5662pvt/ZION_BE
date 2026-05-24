@@ -1,9 +1,11 @@
 using MediatR;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using ZIONShop.Auth.CurrentUser;
 using ZIONShop.Cart.Application.Features.AddItem;
 using ZIONShop.Cart.Application.Features.ClearCart;
 using ZIONShop.Cart.Application.Features.GetCart;
+using ZIONShop.Cart.Application.Features.MergeGuestCart;
 using ZIONShop.Cart.Application.Features.RemoveItem;
 using ZIONShop.Cart.Application.Features.UpdateItem;
 using ZIONShop.Common.Api;
@@ -63,6 +65,18 @@ public class CartController : ControllerBase
         var anonymous = ResolveAnonymous();
         var result = await _mediator.Send(new ClearCartCommand(_currentUser.UserId, anonymous), ct);
         return result.ToActionResult("Cart cleared");
+    }
+
+    [HttpPost("merge")]
+    [Authorize]
+    public async Task<IActionResult> Merge(CancellationToken ct)
+    {
+        if (_currentUser.UserId is null) return Unauthorized(ApiResponse.Fail("Unauthorized"));
+        string? anon = null;
+        if (Request.Headers.TryGetValue(AnonHeader, out var v) && !string.IsNullOrWhiteSpace(v))
+            anon = v.ToString();
+        var result = await _mediator.Send(new MergeGuestCartCommand(_currentUser.UserId.Value, anon), ct);
+        return result.ToActionResult("Cart merged");
     }
 
     private string? ResolveAnonymous()

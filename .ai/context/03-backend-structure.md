@@ -43,10 +43,10 @@ backend/
 | Orders | Order lifecycle, checkout | 2 |
 | Inventory | Stock, reservation, release | 2 |
 | Payments | Payment intents, webhooks | 2 |
-| Promotions | Coupons, campaigns | 3 |
+| Promotions | Coupons, campaigns, gift rules | 3 |
 | Reviews | Ratings | 3 |
 | Notifications | Email/SMS via events | 3 |
-| Admin | Back-office, RBAC | 4 |
+| Admin | Reports, dashboard read-models (CRUD catalog → Products) | 4 |
 
 ## Categories (resolved)
 
