@@ -4,6 +4,6 @@ public record AuthTokenDto(string AccessToken, DateTime AccessTokenExpiresAt, st
 
 public record RegisterPendingDto(string Email, bool RequiresVerification);
 
-public record MessageDto(string Message);
+public record MessageDto(string Message, string? DevCode = null);
 
 public record UserDto(Guid Id, string Email, string? DisplayName, IReadOnlyList<string> Roles);

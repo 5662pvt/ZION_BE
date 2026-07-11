@@ -26,19 +26,18 @@ public class ResetPasswordCommandHandler : IRequestHandler<ResetPasswordCommand,
     public async Task<Result<MessageDto>> Handle(ResetPasswordCommand request, CancellationToken cancellationToken)
     {
         var email = request.Email.Trim().ToLowerInvariant();
-        var user = await _users.GetByIdAsync(
-            (await _users.GetByEmailAsync(email, cancellationToken))?.Id ?? Guid.Empty,
-            cancellationToken);
-        if (user is null) return Result.Failure<MessageDto>(AuthErrors.InvalidOtp);
-        if (!user.EmailConfirmed) return Result.Failure<MessageDto>(AuthErrors.EmailNotConfirmed);
+        var user = await _users.GetByEmailForUpdateAsync(email, cancellationToken);
+        if (user is null) return Result.Failure<MessageDto>(AuthErrors.InvalidResetCode);
 
         var otp = await _otps.GetActiveByEmailAndPurposeAsync(email, AuthOtpPurpose.PasswordReset, cancellationToken);
-        if (otp is null) return Result.Failure<MessageDto>(AuthErrors.OtpExpired);
+        if (otp is null) return Result.Failure<MessageDto>(AuthErrors.ResetCodeExpired);
 
         var hash = _hasher.Hash(request.Code.Trim());
-        if (!otp.Verify(hash)) return Result.Failure<MessageDto>(AuthErrors.InvalidOtp);
+        if (!otp.Verify(hash)) return Result.Failure<MessageDto>(AuthErrors.InvalidResetCode);
 
         otp.MarkUsed();
+        if (!user.EmailConfirmed)
+            user.ConfirmEmail();
         user.SetPasswordHash(BCrypt.Net.BCrypt.HashPassword(request.NewPassword));
         user.RevokeAllRefreshTokens();
         _users.Update(user);

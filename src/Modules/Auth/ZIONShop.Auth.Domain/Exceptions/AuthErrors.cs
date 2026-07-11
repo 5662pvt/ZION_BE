@@ -13,4 +13,6 @@ public static class AuthErrors
     public static readonly Error EmailAlreadyConfirmed = Error.Conflict("Auth.EmailAlreadyConfirmed", "Email is already verified");
     public static readonly Error InvalidOtp = Error.Validation("Auth.InvalidOtp", "Verification code is invalid");
     public static readonly Error OtpExpired = Error.Validation("Auth.OtpExpired", "Verification code has expired");
+    public static readonly Error InvalidResetCode = Error.Validation("Auth.InvalidResetCode", "Reset code is invalid. Use the latest code from your email.");
+    public static readonly Error ResetCodeExpired = Error.Validation("Auth.ResetCodeExpired", "Reset code has expired. Request a new code.");
 }

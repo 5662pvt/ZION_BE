@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using ZIONShop.Auth.Application.Interfaces;
 using ZIONShop.Auth.Application.Options;
 using ZIONShop.Auth.Domain.Repositories;
+using ZIONShop.Auth.Infrastructure.Dev;
 using ZIONShop.Auth.Infrastructure.Email;
 using ZIONShop.Auth.Infrastructure.Persistence;
 using ZIONShop.Auth.Infrastructure.Repositories;
@@ -20,6 +21,7 @@ public static class AuthInfrastructureExtensions
 
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<IAuthOtpRepository, AuthOtpRepository>();
+        services.AddSingleton<IDevOtpAccessor, DevOtpAccessor>();
         services.AddScoped<IAuthUnitOfWork>(sp => sp.GetRequiredService<AuthDbContext>());
         var emailSection = configuration.GetSection(EmailOptions.SectionName);
         services.Configure<EmailOptions>(emailSection);

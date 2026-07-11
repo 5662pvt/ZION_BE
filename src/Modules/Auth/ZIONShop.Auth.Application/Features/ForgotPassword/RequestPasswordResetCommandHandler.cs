@@ -15,22 +15,28 @@ public class RequestPasswordResetCommandHandler : IRequestHandler<RequestPasswor
     private readonly IUserRepository _users;
     private readonly IAuthUnitOfWork _uow;
     private readonly AuthOtpDeliveryService _otpDelivery;
+    private readonly IDevOtpAccessor _devOtp;
 
-    public RequestPasswordResetCommandHandler(IUserRepository users, IAuthUnitOfWork uow, AuthOtpDeliveryService otpDelivery)
+    public RequestPasswordResetCommandHandler(
+        IUserRepository users,
+        IAuthUnitOfWork uow,
+        AuthOtpDeliveryService otpDelivery,
+        IDevOtpAccessor devOtp)
     {
         _users = users;
         _uow = uow;
         _otpDelivery = otpDelivery;
+        _devOtp = devOtp;
     }
 
     public async Task<Result<MessageDto>> Handle(RequestPasswordResetCommand request, CancellationToken cancellationToken)
     {
         var email = request.Email.Trim().ToLowerInvariant();
         var user = await _users.GetByEmailForUpdateAsync(email, cancellationToken);
-        if (user is null || !user.EmailConfirmed)
+        if (user is null)
             return Result.Success(new MessageDto(GenericMessage));
 
-        await _otpDelivery.SendAsync(
+        var code = await _otpDelivery.SendAsync(
             user,
             AuthOtpPurpose.PasswordReset,
             "Reset your ZIONShop password",
@@ -38,6 +44,6 @@ public class RequestPasswordResetCommandHandler : IRequestHandler<RequestPasswor
             cancellationToken);
         await _uow.SaveChangesAsync(cancellationToken);
 
-        return Result.Success(new MessageDto(GenericMessage));
+        return Result.Success(new MessageDto(GenericMessage, _devOtp.RevealIfDevelopment(code)));
     }
 }
