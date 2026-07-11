@@ -17,6 +17,7 @@ export interface RegisterPending {
 
 export interface MessageResponse {
   message: string;
+  devCode?: string | null;
 }
 
 export interface MeResponse {

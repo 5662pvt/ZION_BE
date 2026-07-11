@@ -1,0 +1,45 @@
+# .NET
+bin/
+obj/
+out/
+*.user
+*.suo
+*.userprefs
+*.cache
+.vs/
+.vscode/
+*.pidb
+*.svclog
+*.scc
+*.pfx
+*.publishsettings
+.idea/
+
+# Local secrets
+appsettings.*.local.json
+.env
+.env.*.local
+secrets.json
+
+# Node / Vite
+node_modules/
+dist/
+.vite/
+coverage/
+.next/
+.parcel-cache/
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+docker-compose.override.yml
+
+# EF Core
+*.mdf
+*.ldf
