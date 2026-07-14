@@ -17,7 +17,6 @@
     <PackageReference Include="coverlet.collector" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\..\src\Modules\Products\ZIONShop.Products.Application\ZIONShop.Products.Application.csproj" />
-    <ProjectReference Include="..\..\..\src\Modules\Products\ZIONShop.Products.Infrastructure\ZIONShop.Products.Infrastructure.csproj" />
+<ProjectReference Include="..\..\..\src\Modules\Products\ZIONShop.Products.Infrastructure\ZIONShop.Products.Infrastructure.csproj" />
   </ItemGroup>
 </Project>

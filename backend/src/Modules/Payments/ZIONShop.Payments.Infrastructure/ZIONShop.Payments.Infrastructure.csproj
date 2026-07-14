@@ -5,6 +5,5 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\ZIONShop.Payments.Domain\ZIONShop.Payments.Domain.csproj" />
-    <ProjectReference Include="..\ZIONShop.Payments.Application\ZIONShop.Payments.Application.csproj" />
   </ItemGroup>
 </Project>

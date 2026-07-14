@@ -6,6 +6,5 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\ZIONShop.Notifications.Domain\ZIONShop.Notifications.Domain.csproj" />
-    <ProjectReference Include="..\..\..\BuildingBlocks\ZIONShop.SharedKernel\ZIONShop.SharedKernel.csproj" />
   </ItemGroup>
 </Project>

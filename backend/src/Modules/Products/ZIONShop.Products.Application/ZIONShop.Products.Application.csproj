@@ -8,7 +8,5 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\ZIONShop.Products.Domain\ZIONShop.Products.Domain.csproj" />
-    <ProjectReference Include="..\..\..\BuildingBlocks\ZIONShop.SharedKernel\ZIONShop.SharedKernel.csproj" />
-    <ProjectReference Include="..\..\..\BuildingBlocks\ZIONShop.Common\ZIONShop.Common.csproj" />
   </ItemGroup>
 </Project>

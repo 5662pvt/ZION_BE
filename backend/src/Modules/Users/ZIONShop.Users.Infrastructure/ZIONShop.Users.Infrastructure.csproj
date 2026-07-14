@@ -8,7 +8,6 @@
     </PackageReference>
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\ZIONShop.Users.Domain\ZIONShop.Users.Domain.csproj" />
-    <ProjectReference Include="..\ZIONShop.Users.Application\ZIONShop.Users.Application.csproj" />
+<ProjectReference Include="..\ZIONShop.Users.Application\ZIONShop.Users.Application.csproj" />
   </ItemGroup>
 </Project>
