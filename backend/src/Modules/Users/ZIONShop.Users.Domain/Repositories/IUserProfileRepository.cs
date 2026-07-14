@@ -8,5 +8,6 @@ public interface IUserProfileRepository
     Task<UserProfile?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
     Task<bool> ExistsForAuthUserAsync(Guid authUserId, CancellationToken cancellationToken = default);
     Task AddAsync(UserProfile profile, CancellationToken cancellationToken = default);
+    Task AddAddressAsync(Address address, CancellationToken cancellationToken = default);
     void Update(UserProfile profile);
 }

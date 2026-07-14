@@ -18,17 +18,20 @@ public class RegisterUserCommandHandler : IRequestHandler<RegisterUserCommand, R
     private readonly IAuthUnitOfWork _uow;
     private readonly IEventBus _eventBus;
     private readonly AuthOtpDeliveryService _otpDelivery;
+    private readonly IDevOtpAccessor _devOtp;
 
     public RegisterUserCommandHandler(
         IUserRepository users,
         IAuthUnitOfWork uow,
         IEventBus eventBus,
-        AuthOtpDeliveryService otpDelivery)
+        AuthOtpDeliveryService otpDelivery,
+        IDevOtpAccessor devOtp)
     {
         _users = users;
         _uow = uow;
         _eventBus = eventBus;
         _otpDelivery = otpDelivery;
+        _devOtp = devOtp;
     }
 
     public async Task<Result<RegisterPendingDto>> Handle(RegisterUserCommand request, CancellationToken cancellationToken)
@@ -45,7 +48,7 @@ public class RegisterUserCommandHandler : IRequestHandler<RegisterUserCommand, R
 
         await _eventBus.PublishAsync(new UserRegisteredIntegrationEvent(user.Id, user.Email, user.DisplayName), cancellationToken);
 
-        await _otpDelivery.SendAsync(
+        var code = await _otpDelivery.SendAsync(
             user,
             AuthOtpPurpose.EmailVerification,
             "Verify your ZIONShop account",
@@ -53,6 +56,6 @@ public class RegisterUserCommandHandler : IRequestHandler<RegisterUserCommand, R
             cancellationToken);
         await _uow.SaveChangesAsync(cancellationToken);
 
-        return Result.Success(new RegisterPendingDto(user.Email, true));
+        return Result.Success(new RegisterPendingDto(user.Email, true, _devOtp.RevealIfDevelopment(code)));
     }
 }

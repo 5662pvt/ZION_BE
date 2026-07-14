@@ -23,5 +23,12 @@ public class UserProfileRepository : IUserProfileRepository
     public async Task AddAsync(UserProfile profile, CancellationToken cancellationToken = default) =>
         await _db.UserProfiles.AddAsync(profile, cancellationToken);
 
-    public void Update(UserProfile profile) => _db.UserProfiles.Update(profile);
+    public async Task AddAddressAsync(Address address, CancellationToken cancellationToken = default) =>
+        await _db.Addresses.AddAsync(address, cancellationToken);
+
+    public void Update(UserProfile profile)
+    {
+        if (_db.Entry(profile).State == EntityState.Detached)
+            _db.UserProfiles.Update(profile);
+    }
 }

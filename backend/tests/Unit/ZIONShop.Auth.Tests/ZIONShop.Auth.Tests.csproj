@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+  <ItemGroup>
+    <Using Include="Xunit" />
+    <Using Include="FluentAssertions" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+    <PackageReference Include="FluentAssertions" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" />
+    <PackageReference Include="coverlet.collector" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\src\BuildingBlocks\ZIONShop.Auth\ZIONShop.Auth.csproj" />
+    <ProjectReference Include="..\..\..\src\Modules\Auth\ZIONShop.Auth.Application\ZIONShop.Auth.Application.csproj" />
+    <ProjectReference Include="..\..\..\src\Modules\Auth\ZIONShop.Auth.Infrastructure\ZIONShop.Auth.Infrastructure.csproj" />
+  </ItemGroup>
+</Project>

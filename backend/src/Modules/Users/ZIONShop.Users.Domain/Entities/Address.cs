@@ -19,14 +19,26 @@ public class Address : BaseEntity
     {
         Id = Guid.NewGuid(),
         UserProfileId = userProfileId,
-        Line1 = line1,
-        Line2 = line2,
-        City = city,
-        State = state,
-        Country = country,
-        PostalCode = postalCode,
+        Line1 = line1.Trim(),
+        Line2 = string.IsNullOrWhiteSpace(line2) ? null : line2.Trim(),
+        City = city.Trim(),
+        State = string.IsNullOrWhiteSpace(state) ? null : state.Trim(),
+        Country = country.Trim(),
+        PostalCode = postalCode.Trim(),
         IsDefault = isDefault
     };
+
+    public void Update(string line1, string? line2, string city, string? state, string country, string postalCode)
+    {
+        Line1 = line1.Trim();
+        Line2 = string.IsNullOrWhiteSpace(line2) ? null : line2.Trim();
+        City = city.Trim();
+        State = string.IsNullOrWhiteSpace(state) ? null : state.Trim();
+        Country = country.Trim();
+        PostalCode = postalCode.Trim();
+    }
+
+    public void SetDefault() => IsDefault = true;
 
     public void UnsetDefault() => IsDefault = false;
 }

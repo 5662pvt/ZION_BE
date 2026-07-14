@@ -6,6 +6,9 @@ using ZIONShop.Common.Api;
 using ZIONShop.Users.Application.Features.AddAddress;
 using ZIONShop.Users.Application.Features.GetProfile;
 using ZIONShop.Users.Application.Features.ListAddresses;
+using ZIONShop.Users.Application.Features.RemoveAddress;
+using ZIONShop.Users.Application.Features.SetDefaultAddress;
+using ZIONShop.Users.Application.Features.UpdateAddress;
 using ZIONShop.Users.Application.Features.UpdateProfile;
 
 namespace ZIONShop.Api.Controllers;
@@ -53,7 +56,30 @@ public class UsersController : ControllerBase
         var cmd = new AddAddressCommand(_currentUser.UserId.Value, body.Line1, body.Line2, body.City, body.State, body.Country, body.PostalCode, body.IsDefault);
         return (await _mediator.Send(cmd, ct)).ToActionResult("Address added");
     }
+
+    [HttpPut("me/addresses/{addressId:guid}")]
+    public async Task<IActionResult> UpdateAddress(Guid addressId, [FromBody] UpdateAddressRequest body, CancellationToken ct)
+    {
+        if (_currentUser.UserId is null) return Unauthorized(ApiResponse.Fail("Unauthorized"));
+        var cmd = new UpdateAddressCommand(_currentUser.UserId.Value, addressId, body.Line1, body.Line2, body.City, body.State, body.Country, body.PostalCode, body.IsDefault);
+        return (await _mediator.Send(cmd, ct)).ToActionResult("Address updated");
+    }
+
+    [HttpPost("me/addresses/{addressId:guid}/default")]
+    public async Task<IActionResult> SetDefaultAddress(Guid addressId, CancellationToken ct)
+    {
+        if (_currentUser.UserId is null) return Unauthorized(ApiResponse.Fail("Unauthorized"));
+        return (await _mediator.Send(new SetDefaultAddressCommand(_currentUser.UserId.Value, addressId), ct)).ToActionResult("Default address updated");
+    }
+
+    [HttpDelete("me/addresses/{addressId:guid}")]
+    public async Task<IActionResult> RemoveAddress(Guid addressId, CancellationToken ct)
+    {
+        if (_currentUser.UserId is null) return Unauthorized(ApiResponse.Fail("Unauthorized"));
+        return (await _mediator.Send(new RemoveAddressCommand(_currentUser.UserId.Value, addressId), ct)).ToActionResult("Address removed");
+    }
 }
 
 public record UpdateProfileRequest(string? FullName, string? PhoneNumber, DateTime? DateOfBirth);
 public record AddAddressRequest(string Line1, string? Line2, string City, string? State, string Country, string PostalCode, bool IsDefault);
+public record UpdateAddressRequest(string Line1, string? Line2, string City, string? State, string Country, string PostalCode, bool IsDefault);

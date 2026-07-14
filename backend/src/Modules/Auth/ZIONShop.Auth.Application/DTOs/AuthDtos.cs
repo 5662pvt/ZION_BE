@@ -2,7 +2,7 @@ namespace ZIONShop.Auth.Application.DTOs;
 
 public record AuthTokenDto(string AccessToken, DateTime AccessTokenExpiresAt, string RefreshToken, Guid UserId, string Email, IReadOnlyList<string> Roles);
 
-public record RegisterPendingDto(string Email, bool RequiresVerification);
+public record RegisterPendingDto(string Email, bool RequiresVerification, string? DevCode = null);
 
 public record MessageDto(string Message, string? DevCode = null);
 

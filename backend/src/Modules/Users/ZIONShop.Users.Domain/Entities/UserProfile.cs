@@ -45,4 +45,38 @@ public class UserProfile : AggregateRoot
         _addresses.Add(address);
         return address;
     }
+
+    public Address? UpdateAddress(Guid addressId, string line1, string? line2, string city, string? state, string country, string postalCode, bool isDefault)
+    {
+        var address = _addresses.FirstOrDefault(a => a.Id == addressId);
+        if (address is null) return null;
+
+        address.Update(line1, line2, city, state, country, postalCode);
+        if (isDefault) SetDefaultAddress(addressId);
+        return address;
+    }
+
+    public bool RemoveAddress(Guid addressId)
+    {
+        var address = _addresses.FirstOrDefault(a => a.Id == addressId);
+        if (address is null) return false;
+
+        var wasDefault = address.IsDefault;
+        _addresses.Remove(address);
+
+        if (wasDefault && _addresses.Count > 0)
+            _addresses[0].SetDefault();
+
+        return true;
+    }
+
+    public bool SetDefaultAddress(Guid addressId)
+    {
+        var address = _addresses.FirstOrDefault(a => a.Id == addressId);
+        if (address is null) return false;
+
+        foreach (var item in _addresses) item.UnsetDefault();
+        address.SetDefault();
+        return true;
+    }
 }
