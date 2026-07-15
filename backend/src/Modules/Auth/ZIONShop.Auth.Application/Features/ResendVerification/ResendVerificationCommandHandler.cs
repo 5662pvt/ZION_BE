@@ -14,14 +14,12 @@ public class ResendVerificationCommandHandler : IRequestHandler<ResendVerificati
     private readonly IUserRepository _users;
     private readonly IAuthUnitOfWork _uow;
     private readonly AuthOtpDeliveryService _otpDelivery;
-    private readonly IDevOtpAccessor _devOtp;
 
-    public ResendVerificationCommandHandler(IUserRepository users, IAuthUnitOfWork uow, AuthOtpDeliveryService otpDelivery, IDevOtpAccessor devOtp)
+    public ResendVerificationCommandHandler(IUserRepository users, IAuthUnitOfWork uow, AuthOtpDeliveryService otpDelivery)
     {
         _users = users;
         _uow = uow;
         _otpDelivery = otpDelivery;
-        _devOtp = devOtp;
     }
 
     public async Task<Result<MessageDto>> Handle(ResendVerificationCommand request, CancellationToken cancellationToken)
@@ -34,14 +32,21 @@ public class ResendVerificationCommandHandler : IRequestHandler<ResendVerificati
         if (user.EmailConfirmed)
             return Result.Failure<MessageDto>(AuthErrors.EmailAlreadyConfirmed);
 
-        var code = await _otpDelivery.SendAsync(
-            user,
-            AuthOtpPurpose.EmailVerification,
-            "Verify your ZIONShop account",
-            "Your email verification code is:",
-            cancellationToken);
+        try
+        {
+            await _otpDelivery.SendAsync(
+                user,
+                AuthOtpPurpose.EmailVerification,
+                "Verify your ZIONShop account",
+                "Your email verification code is:",
+                cancellationToken);
+        }
+        catch
+        {
+            return Result.Failure<MessageDto>(AuthErrors.EmailDeliveryFailed);
+        }
 
         await _uow.SaveChangesAsync(cancellationToken);
-        return Result.Success(new MessageDto("Verification code sent.", _devOtp.RevealIfDevelopment(code)));
+        return Result.Success(new MessageDto("Verification code sent."));
     }
 }

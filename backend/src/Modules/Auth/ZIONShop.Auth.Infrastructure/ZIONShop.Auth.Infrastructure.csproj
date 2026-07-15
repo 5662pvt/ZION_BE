@@ -11,4 +11,8 @@
     <PackageReference Include="MailKit" />
     <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" />
   </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\ZIONShop.Auth.Application\ZIONShop.Auth.Application.csproj" />
+    <ProjectReference Include="..\ZIONShop.Auth.Domain\ZIONShop.Auth.Domain.csproj" />
+  </ItemGroup>
 </Project>

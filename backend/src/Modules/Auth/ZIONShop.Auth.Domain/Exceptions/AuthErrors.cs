@@ -15,4 +15,5 @@ public static class AuthErrors
     public static readonly Error OtpExpired = Error.Validation("Auth.OtpExpired", "Verification code has expired");
     public static readonly Error InvalidResetCode = Error.Validation("Auth.InvalidResetCode", "Reset code is invalid. Use the latest code from your email.");
     public static readonly Error ResetCodeExpired = Error.Validation("Auth.ResetCodeExpired", "Reset code has expired. Request a new code.");
+    public static readonly Error EmailDeliveryFailed = Error.Failure("Auth.EmailDeliveryFailed", "Could not send the email. Please check email settings and try again.");
 }

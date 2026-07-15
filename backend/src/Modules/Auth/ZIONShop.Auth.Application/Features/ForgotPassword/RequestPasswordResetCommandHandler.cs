@@ -3,6 +3,7 @@ using ZIONShop.Auth.Application.DTOs;
 using ZIONShop.Auth.Application.Interfaces;
 using ZIONShop.Auth.Application.Services;
 using ZIONShop.Auth.Domain.Enums;
+using ZIONShop.Auth.Domain.Exceptions;
 using ZIONShop.Auth.Domain.Repositories;
 using ZIONShop.SharedKernel.Results;
 
@@ -15,18 +16,15 @@ public class RequestPasswordResetCommandHandler : IRequestHandler<RequestPasswor
     private readonly IUserRepository _users;
     private readonly IAuthUnitOfWork _uow;
     private readonly AuthOtpDeliveryService _otpDelivery;
-    private readonly IDevOtpAccessor _devOtp;
 
     public RequestPasswordResetCommandHandler(
         IUserRepository users,
         IAuthUnitOfWork uow,
-        AuthOtpDeliveryService otpDelivery,
-        IDevOtpAccessor devOtp)
+        AuthOtpDeliveryService otpDelivery)
     {
         _users = users;
         _uow = uow;
         _otpDelivery = otpDelivery;
-        _devOtp = devOtp;
     }
 
     public async Task<Result<MessageDto>> Handle(RequestPasswordResetCommand request, CancellationToken cancellationToken)
@@ -36,14 +34,22 @@ public class RequestPasswordResetCommandHandler : IRequestHandler<RequestPasswor
         if (user is null)
             return Result.Success(new MessageDto(GenericMessage));
 
-        var code = await _otpDelivery.SendAsync(
-            user,
-            AuthOtpPurpose.PasswordReset,
-            "Reset your ZIONShop password",
-            "Your password reset code is:",
-            cancellationToken);
+        try
+        {
+            await _otpDelivery.SendAsync(
+                user,
+                AuthOtpPurpose.PasswordReset,
+                "Reset your ZIONShop password",
+                "Your password reset code is:",
+                cancellationToken);
+        }
+        catch
+        {
+            return Result.Failure<MessageDto>(AuthErrors.EmailDeliveryFailed);
+        }
+
         await _uow.SaveChangesAsync(cancellationToken);
 
-        return Result.Success(new MessageDto(GenericMessage, _devOtp.RevealIfDevelopment(code)));
+        return Result.Success(new MessageDto(GenericMessage));
     }
 }
