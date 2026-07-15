@@ -43,3 +43,9 @@ docker-compose.override.yml
 # EF Core
 *.mdf
 *.ldf
+
+# Agent/local tooling
+.agents/
+.cursor/
+skills-lock.json
+.tmp/
