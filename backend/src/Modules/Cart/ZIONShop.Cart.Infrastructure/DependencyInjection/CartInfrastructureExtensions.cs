@@ -13,8 +13,8 @@ public static class CartInfrastructureExtensions
     public static IServiceCollection AddCartInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
         services.AddDbContext<CartDbContext>(options =>
-            options.UseSqlServer(configuration.GetConnectionString("DefaultConnection"),
-                sql => sql.MigrationsHistoryTable("__EFMigrationsHistory", CartDbContext.Schema)));
+            options.UseNpgsql(configuration.GetConnectionString("DefaultConnection"),
+                npgsql => npgsql.MigrationsHistoryTable("__EFMigrationsHistory", CartDbContext.Schema)));
 
         services.AddScoped<ICartRepository, CartRepository>();
         services.AddScoped<ICartUnitOfWork>(sp => sp.GetRequiredService<CartDbContext>());

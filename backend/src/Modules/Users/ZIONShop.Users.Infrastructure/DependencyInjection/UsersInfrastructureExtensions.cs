@@ -13,8 +13,8 @@ public static class UsersInfrastructureExtensions
     public static IServiceCollection AddUsersInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
         services.AddDbContext<UsersDbContext>(options =>
-            options.UseSqlServer(configuration.GetConnectionString("DefaultConnection"),
-                sql => sql.MigrationsHistoryTable("__EFMigrationsHistory", UsersDbContext.Schema)));
+            options.UseNpgsql(configuration.GetConnectionString("DefaultConnection"),
+                npgsql => npgsql.MigrationsHistoryTable("__EFMigrationsHistory", UsersDbContext.Schema)));
 
         services.AddScoped<IUserProfileRepository, UserProfileRepository>();
         services.AddScoped<IUsersUnitOfWork>(sp => sp.GetRequiredService<UsersDbContext>());

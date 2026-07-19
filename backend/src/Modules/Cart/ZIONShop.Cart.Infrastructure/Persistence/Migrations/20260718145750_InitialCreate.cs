@@ -19,16 +19,15 @@ namespace ZIONShop.Cart.Infrastructure.Persistence.Migrations
                 schema: "cart",
                 columns: table => new
                 {
-                    Id = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    UserId = table.Column<Guid>(type: "uniqueidentifier", nullable: true),
-                    AnonymousId = table.Column<string>(type: "nvarchar(64)", maxLength: 64, nullable: true),
-                    ExpiresAt = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    CreatedDate = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    CreatedBy = table.Column<string>(type: "nvarchar(128)", maxLength: 128, nullable: true),
-                    LastModifiedDate = table.Column<DateTime>(type: "datetime2", nullable: true),
-                    LastModifiedBy = table.Column<string>(type: "nvarchar(128)", maxLength: 128, nullable: true),
-                    IsDeleted = table.Column<bool>(type: "bit", nullable: false, defaultValue: false),
-                    RowVersion = table.Column<byte[]>(type: "rowversion", rowVersion: true, nullable: false)
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    UserId = table.Column<Guid>(type: "uuid", nullable: true),
+                    AnonymousId = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: true),
+                    ExpiresAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    CreatedDate = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    CreatedBy = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: true),
+                    LastModifiedDate = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    LastModifiedBy = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: true),
+                    IsDeleted = table.Column<bool>(type: "boolean", nullable: false, defaultValue: false)
                 },
                 constraints: table =>
                 {
@@ -40,13 +39,13 @@ namespace ZIONShop.Cart.Infrastructure.Persistence.Migrations
                 schema: "cart",
                 columns: table => new
                 {
-                    Id = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    CartId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    ProductId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    ProductName = table.Column<string>(type: "nvarchar(256)", maxLength: 256, nullable: false),
-                    Quantity = table.Column<int>(type: "int", nullable: false),
-                    UnitPrice = table.Column<decimal>(type: "decimal(18,2)", nullable: false),
-                    Currency = table.Column<string>(type: "nvarchar(3)", maxLength: 3, nullable: false)
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    CartId = table.Column<Guid>(type: "uuid", nullable: false),
+                    ProductId = table.Column<Guid>(type: "uuid", nullable: false),
+                    ProductName = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: false),
+                    Quantity = table.Column<int>(type: "integer", nullable: false),
+                    UnitPrice = table.Column<decimal>(type: "numeric(18,2)", nullable: false),
+                    Currency = table.Column<string>(type: "character varying(3)", maxLength: 3, nullable: false)
                 },
                 constraints: table =>
                 {
@@ -72,7 +71,7 @@ namespace ZIONShop.Cart.Infrastructure.Persistence.Migrations
                 table: "Carts",
                 column: "AnonymousId",
                 unique: true,
-                filter: "[AnonymousId] IS NOT NULL");
+                filter: "\"AnonymousId\" IS NOT NULL");
 
             migrationBuilder.CreateIndex(
                 name: "IX_Carts_UserId",
@@ -80,7 +79,7 @@ namespace ZIONShop.Cart.Infrastructure.Persistence.Migrations
                 table: "Carts",
                 column: "UserId",
                 unique: true,
-                filter: "[UserId] IS NOT NULL");
+                filter: "\"UserId\" IS NOT NULL");
         }
 
         /// <inheritdoc />

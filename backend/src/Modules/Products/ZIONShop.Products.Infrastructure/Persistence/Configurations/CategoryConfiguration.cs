@@ -22,7 +22,7 @@ public class CategoryConfiguration : IEntityTypeConfiguration<Category>
         builder.Property(c => c.LastModifiedDate);
         builder.Property(c => c.LastModifiedBy).HasMaxLength(128);
         builder.Property(c => c.IsDeleted).HasDefaultValue(false);
-        builder.Property(c => c.RowVersion).IsRowVersion();
+        builder.Ignore(c => c.RowVersion);
 
         builder.HasQueryFilter(c => !c.IsDeleted);
     }

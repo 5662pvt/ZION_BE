@@ -37,7 +37,7 @@ ZIONShop/
 ```powershell
 cd backend
 cp .env.example .env
-docker compose up -d sqlserver redis rabbitmq seq
+docker compose up -d postgres redis rabbitmq seq
 docker compose up -d --build api
 docker compose --profile dev up -d frontend-dev
 ```

@@ -14,8 +14,8 @@ public static class ProductsInfrastructureExtensions
     public static IServiceCollection AddProductsInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
         services.AddDbContext<ProductsDbContext>(options =>
-            options.UseSqlServer(configuration.GetConnectionString("DefaultConnection"),
-                sql => sql.MigrationsHistoryTable("__EFMigrationsHistory", ProductsDbContext.Schema)));
+            options.UseNpgsql(configuration.GetConnectionString("DefaultConnection"),
+                npgsql => npgsql.MigrationsHistoryTable("__EFMigrationsHistory", ProductsDbContext.Schema)));
 
         services.AddScoped<IProductRepository, ProductRepository>();
         services.AddScoped<ICategoryRepository, CategoryRepository>();

@@ -19,18 +19,17 @@ namespace ZIONShop.Users.Infrastructure.Persistence.Migrations
                 schema: "users",
                 columns: table => new
                 {
-                    Id = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    AuthUserId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    Email = table.Column<string>(type: "nvarchar(256)", maxLength: 256, nullable: false),
-                    FullName = table.Column<string>(type: "nvarchar(128)", maxLength: 128, nullable: true),
-                    PhoneNumber = table.Column<string>(type: "nvarchar(32)", maxLength: 32, nullable: true),
-                    DateOfBirth = table.Column<DateTime>(type: "datetime2", nullable: true),
-                    CreatedDate = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    CreatedBy = table.Column<string>(type: "nvarchar(128)", maxLength: 128, nullable: true),
-                    LastModifiedDate = table.Column<DateTime>(type: "datetime2", nullable: true),
-                    LastModifiedBy = table.Column<string>(type: "nvarchar(128)", maxLength: 128, nullable: true),
-                    IsDeleted = table.Column<bool>(type: "bit", nullable: false, defaultValue: false),
-                    RowVersion = table.Column<byte[]>(type: "rowversion", rowVersion: true, nullable: false)
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    AuthUserId = table.Column<Guid>(type: "uuid", nullable: false),
+                    Email = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: false),
+                    FullName = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: true),
+                    PhoneNumber = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: true),
+                    DateOfBirth = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    CreatedDate = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    CreatedBy = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: true),
+                    LastModifiedDate = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    LastModifiedBy = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: true),
+                    IsDeleted = table.Column<bool>(type: "boolean", nullable: false, defaultValue: false)
                 },
                 constraints: table =>
                 {
@@ -42,15 +41,15 @@ namespace ZIONShop.Users.Infrastructure.Persistence.Migrations
                 schema: "users",
                 columns: table => new
                 {
-                    Id = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    UserProfileId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    Line1 = table.Column<string>(type: "nvarchar(256)", maxLength: 256, nullable: false),
-                    Line2 = table.Column<string>(type: "nvarchar(256)", maxLength: 256, nullable: true),
-                    City = table.Column<string>(type: "nvarchar(128)", maxLength: 128, nullable: false),
-                    State = table.Column<string>(type: "nvarchar(128)", maxLength: 128, nullable: true),
-                    Country = table.Column<string>(type: "nvarchar(64)", maxLength: 64, nullable: false),
-                    PostalCode = table.Column<string>(type: "nvarchar(16)", maxLength: 16, nullable: false),
-                    IsDefault = table.Column<bool>(type: "bit", nullable: false)
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    UserProfileId = table.Column<Guid>(type: "uuid", nullable: false),
+                    Line1 = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: false),
+                    Line2 = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
+                    City = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
+                    State = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: true),
+                    Country = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: false),
+                    PostalCode = table.Column<string>(type: "character varying(16)", maxLength: 16, nullable: false),
+                    IsDefault = table.Column<bool>(type: "boolean", nullable: false)
                 },
                 constraints: table =>
                 {

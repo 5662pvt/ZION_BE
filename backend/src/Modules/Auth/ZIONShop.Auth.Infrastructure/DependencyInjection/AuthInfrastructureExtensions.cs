@@ -15,8 +15,8 @@ public static class AuthInfrastructureExtensions
     public static IServiceCollection AddAuthInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
         services.AddDbContext<AuthDbContext>(options =>
-            options.UseSqlServer(configuration.GetConnectionString("DefaultConnection"),
-                sql => sql.MigrationsHistoryTable("__EFMigrationsHistory", AuthDbContext.Schema)));
+            options.UseNpgsql(configuration.GetConnectionString("DefaultConnection"),
+                npgsql => npgsql.MigrationsHistoryTable("__EFMigrationsHistory", AuthDbContext.Schema)));
 
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<IAuthOtpRepository, AuthOtpRepository>();

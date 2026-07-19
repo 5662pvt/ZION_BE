@@ -22,7 +22,7 @@ public class UserProfileConfiguration : IEntityTypeConfiguration<UserProfile>
         builder.Property(p => p.LastModifiedDate);
         builder.Property(p => p.LastModifiedBy).HasMaxLength(128);
         builder.Property(p => p.IsDeleted).HasDefaultValue(false);
-        builder.Property(p => p.RowVersion).IsRowVersion();
+        builder.Ignore(p => p.RowVersion);
 
         builder.Ignore(p => p.DomainEvents);
         builder.HasQueryFilter(p => !p.IsDeleted);
