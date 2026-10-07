@@ -26,9 +26,9 @@ Publish after commit:
 - Inventory (via events only)
 - Payments (via events)
 
-## FE module
+## FE module (ZION_FE)
 
-`frontend/src/modules/orders/`, `frontend/src/modules/checkout/`
+`app/(shop)/orders/`, `app/(shop)/checkout/`, `services/orders.service.ts`, `hooks/useOrders.ts`
 
 ## Docs to load
 

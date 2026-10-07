@@ -10,11 +10,11 @@
 
 | Quy tắc | Chi tiết |
 |---------|----------|
-| **Admin UI** | `frontend/src/modules/admin/` — route prefix `/admin/*`, layout riêng |
+| **Admin UI** | `ZION_FE/app/admin/` — route prefix `/admin/*`, layout riêng |
 | **Business CRUD** | Thuộc **module nghiệp vụ** (Products, Orders, Promotions…) — **không** nhét logic vào Admin.Domain |
 | **Admin module (BE)** | Chỉ cho: dashboard tổng hợp, báo cáo read-model, audit log (sau), re-export API nếu cần BFF |
 | **Authorization** | JWT role `Admin` hoặc `Staff` + policy `AdminOnly` / `StaffOrAdmin` |
-| **Thứ tự** | Backend use case → API → test → **một màn admin** → hook React Query |
+| **Thứ tự** | Backend use case → API → test → **một màn admin** → hook TanStack Query |
 | **Một task = một màn** | Không gộp “toàn bộ admin” trong một PR |
 
 ```mermaid
@@ -95,18 +95,15 @@ Read: 16-admin-portal-phases.md, 04-frontend-structure.md, 09-security.md, modul
 - `DeleteProduct` / `ArchiveProduct` command
 - `PublishProduct` / `UnpublishProduct` (dùng `ProductStatus` domain)
 
-**FE structure:**
+**FE structure (ZION_FE):**
 ```
-modules/admin/
-├── layouts/AdminLayout.tsx
-├── pages/catalog/
-│   ├── ProductListPage.tsx
-│   ├── ProductFormPage.tsx      # create + edit
-├── components/catalog/
-│   ├── ProductTable.tsx
-│   └── ProductFormFields.tsx
-├── hooks/useAdminProducts.ts
-└── services/adminProductsApi.ts
+app/admin/
+├── layout.tsx                      # AdminLayout
+├── products/
+│   ├── page.tsx                    # list
+│   └── [id]/edit/page.tsx          # create + edit
+services/adminProducts.service.ts
+hooks/useAdminProducts.ts
 ```
 
 **Prompt mẫu:**
@@ -258,7 +255,7 @@ Icon + label tiếng Anh trong code; UI label có thể VI.
 - [ ] Form: validation client mirror FluentValidation
 - [ ] Loading / error / empty state
 - [ ] Table pagination khớp `pagination` envelope
-- [ ] Không hardcode role — dùng constant từ `shared/constants/roles.ts`
+- [ ] Không hardcode role — dùng constant từ `constants/roles.ts`
 
 ---
 

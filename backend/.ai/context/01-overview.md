@@ -18,8 +18,8 @@
 | Layer | Technology | Notes |
 |-------|------------|-------|
 | Backend | .NET 8 Web API | Modular Monolith |
-| Frontend | React 18+ + Vite | Feature-based modules |
-| Database | **Microsoft SQL Server** | EF Core 8; **do NOT use PostgreSQL** |
+| Frontend | Next.js 16 App Router + TypeScript + antd 5 + TanStack Query | Separate sibling repo `ZION_FE` — not under this repo's `frontend/` (empty/unused) |
+| Database | **PostgreSQL** | `Npgsql.EntityFrameworkCore.PostgreSQL` 8.0.10, EF Core 8; Neon for cloud; **do NOT use SQL Server** |
 | Cache | Redis | Distributed cache, locks |
 | Message broker | RabbitMQ | Integration events |
 | Auth | JWT + Refresh Token | RBAC |

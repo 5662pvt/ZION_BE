@@ -18,9 +18,9 @@ Guest cart (session/cookie ID) and authenticated user cart; merge on login.
 - Prices resolved at checkout from Products/Orders — cart stores snapshot or live price per product policy (clarify with team if unclear)
 - No cross-module DbContext — fetch product validity via application service contract or cache, not direct Products DB
 
-## FE module
+## FE module (ZION_FE)
 
-`frontend/src/modules/cart/`
+`app/(shop)/cart/`, `services/cart.service.ts`, `hooks/useCart.ts`
 
 ## Docs to load
 

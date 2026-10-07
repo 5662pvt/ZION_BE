@@ -1,67 +1,59 @@
 # 04 — Frontend Structure & Rules
 
+> Frontend lives in the **separate sibling repo `ZION_FE`** (own `.git`), not under this repo's `frontend/` (empty/unused placeholder). Always Glob-verify paths before editing — see `ZION_FE/AGENTS.md` for FE-specific warnings (this Next.js version has breaking changes; read `node_modules/next/dist/docs/` before writing FE code).
+
+## Stack
+
+- **Next.js 16** (App Router) + TypeScript
+- **antd 5** for UI components
+- **TanStack Query** for server state
+- No Redux, no Vite, no React Router — this is Next.js App Router, not the old Vite SPA layout.
+
 ## Folder tree
 
 ```
-frontend/
-├── package.json
-├── vite.config.ts
-└── src/
-    ├── app/              # providers: QueryClient, Redux, Router
-    ├── shared/
-    │   ├── components/
-    │   ├── utils/
-    │   ├── types/
-    │   └── constants/
-    ├── modules/          # mirror backend domains
-    │   ├── auth/
-    │   ├── products/
-    │   ├── cart/
-    │   ├── orders/
-    │   ├── checkout/
-    │   ├── account/
-    │   └── admin/        # /admin/* — see 16-admin-portal-phases.md
-    │       ├── layouts/
-    │       ├── pages/    # catalog, orders, marketing, reports
-    │       ├── components/
-    │       ├── hooks/
-    │       └── services/
-    ├── services/         # apiClient + interceptors
-    ├── hooks/
-    ├── layouts/
-    ├── routes/           # lazy imports
-    └── store/            # Redux — global UI/auth only
+ZION_FE/
+├── app/
+│   ├── (shop)/           # storefront routes
+│   ├── (auth)/           # login/register routes
+│   ├── admin/            # /admin/* — back-office
+│   └── providers.tsx     # TanStack QueryClientProvider, antd ConfigProvider
+├── services/
+│   ├── apiClient.ts       # base client + interceptors
+│   └── <domain>.service.ts
+├── hooks/
+│   └── use<Domain>.ts     # TanStack Query hooks per domain
+├── types/
+└── constants/
+    └── roles.ts           # role constants — never hardcode role strings
 ```
 
 ## Rules (MUST)
 
 | Required | Forbidden |
 |----------|-----------|
-| React Query for **server state** | API calls in large page components |
-| Redux Toolkit for **global client state** | Business logic in components |
-| `React.lazy` for routes | Massive single-file pages |
-| Centralized `apiClient` + auth interceptor | Hardcoded permissions |
-| Permission-based routes | Duplicate fetch logic |
-| Reusable UI in `shared/components` | Scattered API URLs |
+| TanStack Query for **server state** | API calls in large page components |
+| `services/<domain>.service.ts` for all API calls | Duplicate fetch logic / scattered API URLs |
+| `hooks/use<Domain>.ts` wrapping TanStack Query | Business logic in components |
+| Role checks via `constants/roles.ts` | Hardcoded permissions/roles |
+| antd components for UI | Massive single-file pages |
 
-## Feature module pattern
+## Feature pattern
 
 ```
-modules/products/
-├── pages/
-├── components/
-├── hooks/           # useProducts, useProductDetail
-├── services/        # productsApi.ts
-└── types/
+services/products.service.ts   # API calls
+hooks/useProducts.ts            # TanStack Query hooks
+app/(shop)/products/            # pages/components
 ```
 
 ## API integration
 
-- Base URL from env (`VITE_API_URL`)
+- Base URL from env (`NEXT_PUBLIC_API_URL`)
 - Expect backend envelope from [08-api.md](08-api.md): `{ success, message, data, errors, pagination }`
-- Map errors to UI consistently in `apiClient` interceptor
+- Map errors to UI consistently in `services/apiClient.ts`
 
 ## Related docs
 
 - API contract: [08-api.md](08-api.md)
 - Security (tokens): [09-security.md](09-security.md)
+- Admin portal phases/paths: [16-admin-portal-phases.md](16-admin-portal-phases.md)

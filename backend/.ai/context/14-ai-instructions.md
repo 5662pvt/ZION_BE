@@ -5,7 +5,7 @@ When generating ZIONShop code, **MUST**:
 1. Read [CLAUDE.md](../../CLAUDE.md) index + only relevant `.ai/context/` files
 2. Preserve module boundaries — no cross-module Infrastructure
 3. Use naming from [06-backend-rules.md](06-backend-rules.md)
-4. **SQL Server + EF Core** only
+4. **PostgreSQL + EF Core** only
 5. **Categories** inside Products module
 6. Full feature slice: Command/Query + Handler + Validator + mapping
 7. `Result<T>` for expected failures
@@ -32,7 +32,7 @@ When generating ZIONShop code, **MUST**:
 
 - [ ] Domain, Application, Infrastructure, Tests projects
 - [ ] DI registration in host `Api`
-- [ ] DbContext + SQL Server migrations
+- [ ] DbContext + PostgreSQL migrations
 - [ ] Integration event contracts
 - [ ] Add `modules/{name}.md` if boundaries are non-trivial
 

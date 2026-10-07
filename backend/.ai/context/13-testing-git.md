@@ -5,7 +5,7 @@
 | Type | Scope |
 |------|-------|
 | Unit | Domain, handlers, validators |
-| Integration | API + SQL Server (Testcontainers or local) |
+| Integration | API + PostgreSQL (Testcontainers or local) |
 | Concurrency | Inventory reservation, RowVersion conflicts |
 | API E2E | Auth, checkout critical paths |
 

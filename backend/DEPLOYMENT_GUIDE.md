@@ -2,11 +2,11 @@
 
 Guide nay di theo huong hien tai cua du an:
 
-- Backend: .NET 8, Docker, PostgreSQL.
-- Frontend: React/Vite.
+- Backend: .NET 8, Docker, PostgreSQL. (Repo nay la `ZION_BE`.)
+- Frontend: Next.js 16 (App Router) + antd 5 — repo rieng `ZION_FE` (sibling repo, khong phai `ZION_BE/frontend` — thu muc do rong/khong dung).
 - Database cloud: PostgreSQL managed service, vi du Neon, Supabase, Render PostgreSQL.
 - CI/CD: GitHub Actions.
-- Root repo giu gon: `backend/`, `frontend/`, `.gitignore`, `CLAUDE.md`.
+- Root repo giu gon: `backend/`, `frontend/` (khong dung), `.gitignore`, `CLAUDE.md`.
 
 ## 1. Muc tieu moi truong
 
@@ -32,10 +32,10 @@ dotnet restore
 dotnet run --project src\Api\ZIONShop.Api\ZIONShop.Api.csproj
 ```
 
-Frontend chay rieng:
+Frontend chay rieng (repo `ZION_FE`):
 
 ```powershell
-cd frontend
+cd ../ZION_FE
 npm install
 npm run dev
 ```
@@ -51,7 +51,7 @@ Quy tac:
 Tao PostgreSQL database theo cau truc:
 
 ```text
-PostgreSQL server/project
+PostgreSQL instance/project
 |-- zionshop-dev
 |-- zionshop-staging
 `-- zionshop-prod
@@ -185,7 +185,7 @@ Azure Static Web Apps
 
 Ly do:
 
-- Hop React/Vite.
+- Phu hop Next.js (repo `ZION_FE`).
 - Co CI/CD voi GitHub.
 - Serve static nhanh.
 - Tach rieng frontend khoi backend.

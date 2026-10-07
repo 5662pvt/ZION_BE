@@ -7,7 +7,7 @@
 ## BASE (ghim mọi prompt)
 
 ```
-ZIONShop: .NET8 + React/Vite + SQL Server. Đọc CLAUDE.md + các file Read bên dưới. Một task/session. Domain→App→API→FE. Không PostgreSQL, không cross-DbContext, Categories trong Products.
+ZIONShop: .NET8 + Next.js (ZION_FE) + PostgreSQL. Đọc CLAUDE.md + các file Read bên dưới. Một task/session. Domain→App→API→FE. Không SQL Server, không cross-DbContext, Categories trong Products.
 ```
 
 ---

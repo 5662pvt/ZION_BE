@@ -30,15 +30,19 @@ Complete **Domain → Application → API → tests** before matching frontend m
 
 Do **not** build all modules at once.
 
+## Current decided roadmap (2026-10)
+
+See **"Kế hoạch 2026-10"** in [backend-implementation-status.md](backend-implementation-status.md) for the concrete wave-by-wave plan (W0–W6) that supersedes the generic phase table above for near-term sequencing.
+
 ## CI/CD
 
 **Backend:** Build → Test → Docker → Registry → Deploy
 
-**Frontend:** Lint → Test → Build → Deploy
+**Frontend (ZION_FE):** Lint → Test → Build → Deploy
 
 ## Docker Compose (local)
 
-Services: `api`, `sqlserver`, `redis`, `rabbitmq`, `seq`, `nginx`
+Services: `api`, `postgres`, `redis`, `rabbitmq`, `seq`, `nginx`
 
 Production: Kubernetes or Docker Swarm.
 
@@ -46,3 +50,4 @@ Production: Kubernetes or Docker Swarm.
 
 - Overview: [01-overview.md](01-overview.md)
 - Foundation list: [06-backend-rules.md](06-backend-rules.md)
+- Status + current roadmap: [backend-implementation-status.md](backend-implementation-status.md)

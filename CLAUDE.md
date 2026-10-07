@@ -6,23 +6,25 @@ Read this file first. Detailed agent context now lives in `backend/.ai/context/`
 
 ZIONShop is an ecommerce platform with:
 
-- Backend: .NET 8 modular monolith, Clean Architecture, CQRS, MediatR, EF Core, SQL Server.
-- Frontend: React, Vite, TypeScript.
+- Backend: .NET 8 modular monolith, Clean Architecture, CQRS, MediatR, EF Core, PostgreSQL (Npgsql; Neon for cloud).
+- Frontend: Next.js 16 App Router + TypeScript + antd 5 + TanStack Query — separate sibling repo `../ZION_FE` (this repo's own `frontend/` folder is an empty, unused placeholder).
 - Infrastructure: Docker Compose and nginx under `backend/`.
 
 ## Root Layout
 
 ```text
-ZIONShop/
-|-- backend/
-|-- frontend/
+ZIONShop/ (this repo = ZION_BE)
+|-- backend/        # real code: ZIONShop.slnx, src/, tests/
+|-- frontend/        # empty placeholder — NOT used
 |-- .gitignore
 `-- CLAUDE.md
+
+../ZION_FE/          # actual frontend — separate repo, Next.js 16 + antd 5
 ```
 
 ## Rules
 
-- Use SQL Server only. Do not introduce PostgreSQL.
+- Use PostgreSQL only. Do not introduce SQL Server.
 - Keep module data isolated. Do not access another module's `DbContext` directly.
 - Keep Categories inside the Products module.
 - Follow the dependency direction: API -> Application -> Domain <- Infrastructure.
@@ -56,8 +58,7 @@ docker compose up -d --build api
 ```
 
 ```powershell
-cd frontend
-npm install
-npm run dev
+cd ../ZION_FE
+npm run lint
 npm run build
 ```

@@ -1,13 +1,13 @@
 # ZIONShop
 
-Ecommerce enterprise platform: modular monolith backend (.NET 8) and React frontend (Vite + TypeScript).
+Ecommerce enterprise platform: modular monolith backend (.NET 8, PostgreSQL) in this repo (`ZION_BE`), and a Next.js 16 frontend in the **separate sibling repo `ZION_FE`** (own `.git`).
 
 This scaffold follows [CLAUDE.md](../CLAUDE.md) for architecture rules and conventions.
 
 ## Layout
 
 ```text
-ZIONShop/
+ZION_BE/ (this repo)
 |-- backend/
 |   |-- ZIONShop.slnx
 |   |-- Directory.Build.props
@@ -21,9 +21,10 @@ ZIONShop/
 |   |   |-- BuildingBlocks/
 |   |   `-- Modules/
 |   `-- tests/Unit/
-|-- frontend/
-|   `-- src/
+|-- frontend/            # empty placeholder — NOT used
 `-- CLAUDE.md
+
+../ZION_FE/               # actual frontend — separate repo, Next.js 16 + antd 5
 ```
 
 ## Prerequisites
@@ -39,14 +40,12 @@ cd backend
 cp .env.example .env
 docker compose up -d postgres redis rabbitmq seq
 docker compose up -d --build api
-docker compose --profile dev up -d frontend-dev
 ```
 
 - API: <http://localhost:8080/swagger>
 - Swagger via nginx: <http://localhost/swagger/>
 - Seq logs: <http://localhost:8081>
 - RabbitMQ UI: <http://localhost:15672>
-- Frontend dev: <http://localhost:5173>
 
 Seed account: `admin@zionshop.local` / `Admin@123`.
 
@@ -62,13 +61,7 @@ Open <http://localhost:8080/swagger>.
 
 ## Run Frontend Locally
 
-```powershell
-cd frontend
-npm install
-npm run dev
-```
-
-Open <http://localhost:5173>.
+Frontend is the separate repo `ZION_FE` (Next.js 16). See `ZION_FE/README.md` for setup; point it at this API via `NEXT_PUBLIC_API_URL`.
 
 ## Testing
 

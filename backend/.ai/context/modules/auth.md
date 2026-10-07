@@ -24,9 +24,9 @@ Login, register, JWT access token, refresh token rotation, revoke, password rese
 
 [09-security.md](../09-security.md)
 
-## FE module
+## FE module (ZION_FE)
 
-`frontend/src/modules/auth/` — login, register pages; store tokens via Redux + `apiClient` interceptor.
+`app/(auth)/` — login, register pages; `services/auth.service.ts`, `hooks/useAuth.ts` (TanStack Query); tokens handled via `services/apiClient.ts` interceptor.
 
 ## Docs to load
 

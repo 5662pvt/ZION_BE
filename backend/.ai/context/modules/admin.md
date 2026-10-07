@@ -43,25 +43,22 @@ Catalog write hiện dùng `AdminOnly` trên Products/Categories — có thể m
 
 **Implementation note:** Có thể query cross-schema bằng **read-only SQL views** trong Admin.Infrastructure — **không** inject Orders DbContext vào Products.
 
-## Frontend paths
+## Frontend paths (ZION_FE)
 
 ```
-frontend/src/modules/admin/
-├── layouts/AdminLayout.tsx
-├── components/AdminSidebar.tsx
-├── pages/
-│   ├── DashboardPage.tsx
-│   ├── catalog/          # products, categories
-│   ├── orders/
-│   ├── marketing/        # promotions, gifts
-│   ├── inventory/
-│   └── reports/
-├── hooks/
-├── services/
-└── types/
+app/admin/
+├── layout.tsx            # AdminLayout + sidebar
+├── page.tsx               # Dashboard
+├── products/              # catalog: products, categories
+├── orders/
+├── promotions/            # marketing: promotions, gifts
+├── inventory/
+└── reports/
+services/admin*.service.ts
+hooks/useAdmin*.ts
 ```
 
-Routes: `/admin/*` — lazy load; guard `AdminRoute`.
+Routes: `/admin/*` — guarded by role check against `constants/roles.ts`.
 
 ## Seed / test account
 

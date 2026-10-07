@@ -9,11 +9,11 @@ Synthesized from:
 
 ## Resolved decisions
 
-- Database: **SQL Server only** (PostgreSQL excluded)
+- Database: **PostgreSQL only** (migrated from SQL Server, 2026-10; SQL Server excluded)
 - Categories: **sub-domain of Products**
 
 ## Authority
 
 When sources conflict with `.ai/context/*` or [CLAUDE.md](../../CLAUDE.md), **CLAUDE.md + `.ai/context/` win**.
 
-*Last updated: 2026-05-17*
+*Last updated: 2026-10-07*

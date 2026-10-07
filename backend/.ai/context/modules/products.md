@@ -24,9 +24,9 @@ Products, SKUs, **Categories**, product images, brands. Search engine = Phase 4.
 
 `ProductsDbContext` — schema `products`
 
-## FE module
+## FE module (ZION_FE)
 
-`frontend/src/modules/products/` — listing, detail, category nav.
+`app/(shop)/products/` — listing, detail, category nav; `services/products.service.ts`, `hooks/useProducts.ts`.
 
 ## Docs to load
 
