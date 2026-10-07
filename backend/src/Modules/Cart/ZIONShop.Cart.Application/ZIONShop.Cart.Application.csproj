@@ -6,7 +6,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\ZIONShop.Cart.Domain\ZIONShop.Cart.Domain.csproj" />
-    <ProjectReference Include="..\..\Products\ZIONShop.Products.Application\ZIONShop.Products.Application.csproj" />
+    <ProjectReference Include="..\..\..\BuildingBlocks\ZIONShop.Contracts\ZIONShop.Contracts.csproj" />
     <ProjectReference Include="..\..\..\BuildingBlocks\ZIONShop.SharedKernel\ZIONShop.SharedKernel.csproj" />
   </ItemGroup>
 </Project>

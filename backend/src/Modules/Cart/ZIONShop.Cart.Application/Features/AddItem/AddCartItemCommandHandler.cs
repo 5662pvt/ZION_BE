@@ -4,7 +4,7 @@ using ZIONShop.Cart.Application.Interfaces;
 using ZIONShop.Cart.Application.Mappings;
 using ZIONShop.Cart.Domain.Exceptions;
 using ZIONShop.Cart.Domain.Repositories;
-using ZIONShop.Products.Application.Interfaces;
+using ZIONShop.Contracts.Products;
 using ZIONShop.SharedKernel.Results;
 using DomainCart = ZIONShop.Cart.Domain.Entities.Cart;
 

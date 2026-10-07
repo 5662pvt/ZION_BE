@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using ZIONShop.Contracts.Products;
 using ZIONShop.Products.Application.Interfaces;
 using ZIONShop.Products.Domain.Repositories;
 using ZIONShop.Products.Infrastructure.Persistence;

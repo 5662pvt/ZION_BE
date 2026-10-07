@@ -1,5 +1,5 @@
 using Microsoft.EntityFrameworkCore;
-using ZIONShop.Products.Application.Interfaces;
+using ZIONShop.Contracts.Products;
 using ZIONShop.Products.Domain.Enums;
 using ZIONShop.Products.Infrastructure.Persistence;
 

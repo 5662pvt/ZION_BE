@@ -1,4 +1,4 @@
-namespace ZIONShop.Products.Application.Interfaces;
+namespace ZIONShop.Contracts.Products;
 
 public record ProductPriceInfo(Guid ProductId, string Name, decimal UnitPrice, string Currency, bool IsAvailable);
 
