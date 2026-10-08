@@ -22,9 +22,9 @@ public class GetCategoriesQueryHandler : IRequestHandler<GetCategoriesQuery, Res
 
     private static IReadOnlyList<CategoryTreeNodeDto> BuildTree(List<Category> all, Guid? parentId) =>
         all.Where(c => c.ParentId == parentId)
-            .Select(c => new CategoryTreeNodeDto(c.Id, c.Name, c.Slug, c.DisplayOrder, BuildTree(all, c.Id)))
+            .Select(c => new CategoryTreeNodeDto(c.Id, c.Name, c.Slug, c.Description, c.DisplayOrder, BuildTree(all, c.Id)))
             .ToList();
 
     private static CategoryTreeNodeDto MapFlat(Category c) =>
-        new(c.Id, c.Name, c.Slug, c.DisplayOrder, Array.Empty<CategoryTreeNodeDto>());
+        new(c.Id, c.Name, c.Slug, c.Description, c.DisplayOrder, Array.Empty<CategoryTreeNodeDto>());
 }

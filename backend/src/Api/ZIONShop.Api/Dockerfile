@@ -17,5 +17,6 @@ RUN dotnet publish backend/src/Api/ZIONShop.Api/ZIONShop.Api.csproj -c Release -
 
 FROM base AS final
 WORKDIR /app
+RUN mkdir -p /app/App_Data/uploads
 COPY --from=build /app/publish .
 ENTRYPOINT ["dotnet", "ZIONShop.Api.dll"]

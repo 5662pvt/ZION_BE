@@ -11,4 +11,7 @@ public static class ProductsErrors
     public static readonly Error CategorySlugAlreadyExists = Error.Conflict("Products.CategorySlugAlreadyExists", "Category slug already exists");
     public static readonly Error CategoryHasChildren = Error.Conflict("Products.CategoryHasChildren", "Category has child categories");
     public static readonly Error CategoryHasProducts = Error.Conflict("Products.CategoryHasProducts", "Category has products assigned");
+    public static readonly Error ImageNotFound = Error.NotFound("Products.ImageNotFound", "Product image not found");
+    public static readonly Error InvalidImageOrder = Error.Validation("Products.InvalidImageOrder", "Image order must contain exactly the product's current image ids");
+    public static readonly Error InvalidImageUpload = Error.Validation("Products.InvalidImageUpload", "Image upload failed");
 }

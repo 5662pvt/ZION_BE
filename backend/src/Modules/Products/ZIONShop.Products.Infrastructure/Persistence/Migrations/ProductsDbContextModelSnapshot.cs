@@ -149,6 +149,10 @@ namespace ZIONShop.Products.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("ProductId")
                         .HasColumnType("uuid");
 
+                    b.Property<string>("PublicId")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
                     b.Property<string>("Url")
                         .IsRequired()
                         .HasMaxLength(2048)

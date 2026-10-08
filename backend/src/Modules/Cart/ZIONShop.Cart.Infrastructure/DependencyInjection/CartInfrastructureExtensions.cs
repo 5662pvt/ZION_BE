@@ -4,7 +4,9 @@ using Microsoft.Extensions.DependencyInjection;
 using ZIONShop.Cart.Application.Interfaces;
 using ZIONShop.Cart.Domain.Repositories;
 using ZIONShop.Cart.Infrastructure.Persistence;
+using ZIONShop.Cart.Infrastructure.Readers;
 using ZIONShop.Cart.Infrastructure.Repositories;
+using ZIONShop.Contracts.Cart;
 
 namespace ZIONShop.Cart.Infrastructure.DependencyInjection;
 
@@ -18,6 +20,7 @@ public static class CartInfrastructureExtensions
 
         services.AddScoped<ICartRepository, CartRepository>();
         services.AddScoped<ICartUnitOfWork>(sp => sp.GetRequiredService<CartDbContext>());
+        services.AddScoped<ICartReader, CartReader>();
         return services;
     }
 }

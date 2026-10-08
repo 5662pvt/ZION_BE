@@ -22,12 +22,12 @@ public class RabbitMqEventBus : IEventBus
 
     public Task PublishAsync<TEvent>(TEvent @event, CancellationToken cancellationToken = default) where TEvent : IntegrationEvent
     {
+        var routingKey = typeof(TEvent).Name;
         try
         {
             using var channel = _connection.GetConnection().CreateModel();
             channel.ExchangeDeclare(_options.Exchange, ExchangeType.Topic, durable: true);
 
-            var routingKey = typeof(TEvent).Name;
             var body = Encoding.UTF8.GetBytes(JsonSerializer.Serialize<object>(@event));
 
             var props = channel.CreateBasicProperties();
@@ -40,7 +40,8 @@ public class RabbitMqEventBus : IEventBus
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to publish {EventType}; falling back silently", typeof(TEvent).Name);
+            _logger.LogError(ex, "Failed to publish {EventType}; rethrowing so the outbox can retry", routingKey);
+            throw;
         }
         return Task.CompletedTask;
     }

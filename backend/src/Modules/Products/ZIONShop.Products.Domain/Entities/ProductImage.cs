@@ -10,13 +10,17 @@ public class ProductImage : BaseEntity
     public string Url { get; private set; } = string.Empty;
     public string? Alt { get; private set; }
     public int DisplayOrder { get; private set; }
+    public string? PublicId { get; private set; }
 
-    public static ProductImage Create(Guid productId, string url, string? alt, int displayOrder) => new()
+    public static ProductImage Create(Guid productId, string url, string? alt, int displayOrder, string? publicId = null) => new()
     {
         Id = Guid.NewGuid(),
         ProductId = productId,
         Url = url,
         Alt = alt,
-        DisplayOrder = displayOrder
+        DisplayOrder = displayOrder,
+        PublicId = publicId
     };
+
+    public void UpdateDisplayOrder(int displayOrder) => DisplayOrder = displayOrder;
 }

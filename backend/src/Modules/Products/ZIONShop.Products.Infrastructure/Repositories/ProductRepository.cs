@@ -31,5 +31,7 @@ public class ProductRepository : IProductRepository
 
     public void Update(Product product) => _db.Products.Update(product);
 
+    public void AddImage(ProductImage image) => _db.ProductImages.Add(image);
+
     public IQueryable<Product> Query() => _db.Products.AsQueryable();
 }

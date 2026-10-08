@@ -11,5 +11,6 @@ public interface IProductRepository
     Task<bool> SlugExistsAsync(string slug, CancellationToken cancellationToken = default);
     Task AddAsync(Product product, CancellationToken cancellationToken = default);
     void Update(Product product);
+    void AddImage(ProductImage image);
     IQueryable<Product> Query();
 }

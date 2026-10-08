@@ -12,4 +12,5 @@ public class RabbitMqOptions
     public string Exchange { get; set; } = "zionshop.events";
     public string QueueName { get; set; } = "zionshop.api";
     public int RetryCount { get; set; } = 5;
+    public int OutboxPollSeconds { get; set; } = 2;
 }

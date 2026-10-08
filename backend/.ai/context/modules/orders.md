@@ -41,6 +41,19 @@ Publish after commit:
   `Cancelled` khi: reservation thất bại, payment thất bại, khách hủy trước khi ship, hoặc reservation hết hạn sau 15 phút.
 - Integration event publish qua transactional outbox (BuildingBlocks) — sẽ xây ở W3.
 
+## REST contract (W4/W5)
+
+- `POST /api/v1/orders` `[Authorize]` — body `{ addressId, paymentMethod: "COD"|"Online", note? }` → `OrderDto`:
+  `{ id, code, status, paymentMethod, subtotal, shippingFee, total, currency, createdAt, shippingAddress: AddressSnapshot, lines: [{ productId, productName, unitPrice, quantity, lineTotal }] }`
+- `GET /api/v1/orders/{id}` `[Authorize]` → `OrderDto`
+- `GET /api/v1/orders/mine?page&pageSize&status` `[Authorize]` → paged `OrderSummaryDto { id, code, status, total, currency, createdAt, itemCount }`
+- `POST /api/v1/orders/{id}/cancel` `[Authorize]` — body `{ reason? }`
+- Admin `[StaffOrAdmin]`:
+  - `GET /api/v1/orders?page&pageSize&status&from&to&keyword`
+  - `POST /api/v1/orders/{id}/confirm|ship|complete`
+
+Status values: `PendingStock`, `AwaitingPayment`, `Confirmed`, `Paid`, `Shipped`, `Completed`, `Cancelled`.
+
 ## Docs to load
 
 `10-event-driven`, `11-inventory`, `08-api`, `05-module-layout`

@@ -13,10 +13,15 @@ public static class EventBusExtensions
         services.Configure<RabbitMqOptions>(configuration.GetSection(RabbitMqOptions.SectionName));
         var provider = configuration.GetSection(RabbitMqOptions.SectionName)["Provider"] ?? "InMemory";
 
+        // Ensures the registry exists even if no module has registered a handler yet via
+        // AddIntegrationEventHandler<,>(), so the RabbitMQ consumer can always resolve it.
+        IntegrationEventHandlerExtensions.GetOrCreateRegistry(services);
+
         if (string.Equals(provider, "RabbitMq", StringComparison.OrdinalIgnoreCase))
         {
             services.AddSingleton<RabbitMqConnection>();
             services.AddSingleton<IEventBus, RabbitMqEventBus>();
+            services.AddHostedService<RabbitMqConsumerService>();
         }
         else
         {

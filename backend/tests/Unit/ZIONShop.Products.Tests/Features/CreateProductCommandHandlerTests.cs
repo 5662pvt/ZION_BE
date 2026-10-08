@@ -22,7 +22,7 @@ public class CreateProductCommandHandlerTests
     }
 
     [Fact]
-    public async Task Handle_Should_CreatePublishedProduct_When_PayloadValid()
+    public async Task Handle_Should_CreateDraftProduct_When_PayloadValid()
     {
         var (db, products, categories) = BuildScope();
         var category = Category.Create("Electronics", "electronics");
@@ -36,7 +36,7 @@ public class CreateProductCommandHandlerTests
 
         result.IsSuccess.Should().BeTrue();
         result.Value.Sku.Should().Be("TST-001");
-        result.Value.Status.Should().Be("Published");
+        result.Value.Status.Should().Be("Draft");
     }
 
     [Fact]

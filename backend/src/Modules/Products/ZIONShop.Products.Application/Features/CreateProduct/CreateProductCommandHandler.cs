@@ -51,7 +51,6 @@ public class CreateProductCommandHandler : IRequestHandler<CreateProductCommand,
             foreach (var img in request.Images)
                 product.AddImage(img.Url, img.Alt, img.DisplayOrder);
         }
-        product.Publish();
 
         await _products.AddAsync(product, cancellationToken);
         await _uow.SaveChangesAsync(cancellationToken);

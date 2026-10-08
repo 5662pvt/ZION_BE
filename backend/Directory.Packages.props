@@ -59,6 +59,7 @@
 
     <!-- Misc -->
     <PackageVersion Include="System.Linq.Dynamic.Core" Version="1.4.7" />
+    <PackageVersion Include="CloudinaryDotNet" Version="1.26.1" />
 
     <!-- Test stack -->
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />

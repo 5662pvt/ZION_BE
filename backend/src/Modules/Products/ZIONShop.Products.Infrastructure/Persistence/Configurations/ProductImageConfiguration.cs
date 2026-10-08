@@ -14,5 +14,6 @@ public class ProductImageConfiguration : IEntityTypeConfiguration<ProductImage>
         builder.Property(i => i.Url).IsRequired().HasMaxLength(2048);
         builder.Property(i => i.Alt).HasMaxLength(256);
         builder.Property(i => i.DisplayOrder);
+        builder.Property(i => i.PublicId).HasMaxLength(300);
     }
 }

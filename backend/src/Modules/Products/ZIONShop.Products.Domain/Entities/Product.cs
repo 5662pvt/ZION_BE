@@ -1,7 +1,9 @@
 using ZIONShop.Products.Domain.Enums;
 using ZIONShop.Products.Domain.Events;
+using ZIONShop.Products.Domain.Exceptions;
 using ZIONShop.Products.Domain.ValueObjects;
 using ZIONShop.SharedKernel.Entities;
+using ZIONShop.SharedKernel.Results;
 
 namespace ZIONShop.Products.Domain.Entities;
 
@@ -53,4 +55,33 @@ public class Product : AggregateRoot
 
     public void AddImage(string url, string? alt, int displayOrder)
         => _images.Add(ProductImage.Create(Id, url, alt, displayOrder));
+
+    public ProductImage AddImage(string url, string? alt, string? publicId)
+    {
+        var nextOrder = _images.Count == 0 ? 0 : _images.Max(i => i.DisplayOrder) + 1;
+        var image = ProductImage.Create(Id, url, alt, nextOrder, publicId);
+        _images.Add(image);
+        return image;
+    }
+
+    public Result<ProductImage> RemoveImage(Guid imageId)
+    {
+        var image = _images.FirstOrDefault(i => i.Id == imageId);
+        if (image is null) return Result.Failure<ProductImage>(ProductsErrors.ImageNotFound);
+
+        _images.Remove(image);
+        return Result.Success(image);
+    }
+
+    public Result ReorderImages(IReadOnlyList<Guid> imageIds)
+    {
+        var currentIds = _images.Select(i => i.Id).ToHashSet();
+        if (imageIds.Count != currentIds.Count || !currentIds.SetEquals(imageIds))
+            return Result.Failure(ProductsErrors.InvalidImageOrder);
+
+        for (var i = 0; i < imageIds.Count; i++)
+            _images.First(img => img.Id == imageIds[i]).UpdateDisplayOrder(i);
+
+        return Result.Success();
+    }
 }

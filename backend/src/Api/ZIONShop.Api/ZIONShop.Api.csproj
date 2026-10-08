@@ -52,5 +52,7 @@
   </ItemGroup>
   <ItemGroup>
     <Content Update="appsettings*.json" CopyToOutputDirectory="PreserveNewest" />
+    <Content Remove="App_Data\**" />
+    <None Remove="App_Data\**" />
   </ItemGroup>
 </Project>

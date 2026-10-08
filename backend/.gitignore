@@ -44,6 +44,9 @@ docker-compose.override.yml
 *.mdf
 *.ldf
 
+# Local uploaded product images (LocalImageStorage fallback)
+**/App_Data/
+
 # Agent/local tooling
 .agents/
 .cursor/

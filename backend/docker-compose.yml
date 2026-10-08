@@ -83,6 +83,8 @@ services:
       Cors__AllowedOrigins__1: "http://localhost"
     ports:
       - "8080:8080"
+    volumes:
+      - api-uploads:/app/App_Data/uploads
     depends_on:
       postgres:
         condition: service_healthy
@@ -116,3 +118,4 @@ services:
 volumes:
   postgres-data:
   seq-data:
+  api-uploads:

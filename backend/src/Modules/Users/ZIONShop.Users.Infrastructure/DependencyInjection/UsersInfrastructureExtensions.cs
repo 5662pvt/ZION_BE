@@ -1,9 +1,11 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using ZIONShop.Contracts.Users;
 using ZIONShop.Users.Application.Interfaces;
 using ZIONShop.Users.Domain.Repositories;
 using ZIONShop.Users.Infrastructure.Persistence;
+using ZIONShop.Users.Infrastructure.Readers;
 using ZIONShop.Users.Infrastructure.Repositories;
 
 namespace ZIONShop.Users.Infrastructure.DependencyInjection;
@@ -18,6 +20,7 @@ public static class UsersInfrastructureExtensions
 
         services.AddScoped<IUserProfileRepository, UserProfileRepository>();
         services.AddScoped<IUsersUnitOfWork>(sp => sp.GetRequiredService<UsersDbContext>());
+        services.AddScoped<IUserAddressReader, UserAddressReader>();
         return services;
     }
 }

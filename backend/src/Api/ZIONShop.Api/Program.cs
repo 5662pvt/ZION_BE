@@ -1,4 +1,6 @@
 using Asp.Versioning;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.FileProviders;
 using Microsoft.OpenApi.Models;
 using Serilog;
 using System.Reflection;
@@ -13,12 +15,15 @@ using ZIONShop.Caching.DependencyInjection;
 using ZIONShop.Cart.Application.DependencyInjection;
 using ZIONShop.Cart.Infrastructure.DependencyInjection;
 using ZIONShop.Cart.Infrastructure.Persistence;
+using ZIONShop.Common.Api;
 using ZIONShop.Common.Behaviors;
 using ZIONShop.Common.Exceptions;
 using ZIONShop.EventBus.DependencyInjection;
 using ZIONShop.Logging.Middleware;
 using ZIONShop.Logging.Serilog;
 using ZIONShop.Products.Application.DependencyInjection;
+using ZIONShop.Products.Application.Interfaces;
+using ZIONShop.Products.Application.Options;
 using ZIONShop.Products.Infrastructure.DependencyInjection;
 using ZIONShop.Products.Infrastructure.Persistence;
 using ZIONShop.Users.Application.DependencyInjection;
@@ -47,6 +52,22 @@ builder.UseZionSerilog();
 // Controllers + API versioning
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
+builder.Services.Configure<ApiBehaviorOptions>(options =>
+{
+    options.InvalidModelStateResponseFactory = context =>
+    {
+        var errors = context.ModelState
+            .Where(kvp => kvp.Value is not null && kvp.Value.Errors.Count > 0)
+            .SelectMany(kvp => kvp.Value!.Errors.Select(e => new ErrorDetail
+            {
+                Field = kvp.Key.StartsWith("$.") ? kvp.Key[2..] : kvp.Key,
+                Message = e.ErrorMessage
+            }))
+            .ToList();
+
+        return new BadRequestObjectResult(ApiResponse.Fail("Validation failed", errors));
+    };
+});
 builder.Services.AddApiVersioning(o =>
 {
     o.DefaultApiVersion = new ApiVersion(1, 0);
@@ -148,6 +169,14 @@ app.UseSerilogRequestLogging();
 app.UseMiddleware<CorrelationIdMiddleware>();
 app.UseExceptionHandler();
 app.UseCors();
+
+var uploadsRoot = app.Services.GetRequiredService<IUploadsRootProvider>().RootPath;
+Directory.CreateDirectory(uploadsRoot);
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new PhysicalFileProvider(uploadsRoot),
+    RequestPath = $"/{ImageStorageOptions.UploadsFolderName}"
+});
 
 if (app.Environment.IsDevelopment())
 {
