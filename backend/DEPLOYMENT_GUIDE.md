@@ -2,7 +2,7 @@
 
 Guide nay di theo huong hien tai cua du an:
 
-- Backend: .NET 8, Docker, PostgreSQL. (Repo nay la `ZION_BE`.)
+- Backend: .NET 8, Docker, PostgreSQL. (Repo nay la `ZION_BE`.) Build voi .NET SDK 10.x (`global.json`, `rollForward: latestFeature`); runtime/target van la .NET 8.
 - Frontend: Next.js 16 (App Router) + antd 5 — repo rieng `ZION_FE` (sibling repo, khong phai `ZION_BE/frontend` — thu muc do rong/khong dung).
 - Database cloud: PostgreSQL managed service, vi du Neon, Supabase, Render PostgreSQL.
 - CI/CD: GitHub Actions.

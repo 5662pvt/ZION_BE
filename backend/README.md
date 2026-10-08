@@ -29,7 +29,7 @@ ZION_BE/ (this repo)
 
 ## Prerequisites
 
-- .NET 8 SDK/runtime
+- .NET SDK 10.x (build; see `global.json`, `rollForward: latestFeature`) + .NET 8 runtime (target framework)
 - Node 20+
 - Docker Desktop
 

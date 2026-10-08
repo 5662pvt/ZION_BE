@@ -30,6 +30,17 @@ Publish after commit:
 
 `app/(shop)/orders/`, `app/(shop)/checkout/`, `services/orders.service.ts`, `hooks/useOrders.ts`
 
+## Quyết định checkout MVP (2026-10-08)
+
+- Yêu cầu đăng nhập (login required) để checkout.
+- Phương thức thanh toán: `COD` | `Online` (Online đi qua `IPaymentGateway`, MVP dùng `FakePaymentGateway`).
+- Phí ship cấu hình qua `Checkout:ShippingFee` = 30000 VND, `Checkout:FreeShippingThreshold` = 500000 VND (subtotal >= ngưỡng → phí ship = 0).
+- Address snapshot lấy từ address book của user; giá snapshot vào `OrderLine` tại thời điểm đặt hàng (không tham chiếu giá sống của Products).
+- Luồng event bất đồng bộ:
+  `PendingStock` → (`InventoryReserved`) → `AwaitingPayment` [Online] / `Confirmed` [COD] → `Paid` → `Shipped` → `Completed`.
+  `Cancelled` khi: reservation thất bại, payment thất bại, khách hủy trước khi ship, hoặc reservation hết hạn sau 15 phút.
+- Integration event publish qua transactional outbox (BuildingBlocks) — sẽ xây ở W3.
+
 ## Docs to load
 
 `10-event-driven`, `11-inventory`, `08-api`, `05-module-layout`

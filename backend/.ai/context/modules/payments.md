@@ -19,6 +19,10 @@ Payment intents, provider webhooks, payment status.
 - Consume: `PaymentRequestedIntegrationEvent` (or triggered after inventory reserved)
 - Publish: `PaymentCompletedIntegrationEvent`, `PaymentFailedIntegrationEvent`
 
+## Quyết định checkout MVP (2026-10-08)
+
+MVP dùng `FakePaymentGateway` (giả lập online payment) + webhook ký HMAC; endpoint simulate chỉ bật ở Development. Chi tiết luồng checkout: [modules/orders.md](orders.md).
+
 ## Security
 
 Webhook signature validation; idempotency keys — see [09-security.md](../09-security.md)

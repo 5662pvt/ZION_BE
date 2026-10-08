@@ -6,7 +6,7 @@ Read this file first. Detailed agent context now lives in `backend/.ai/context/`
 
 ZIONShop is an ecommerce platform with:
 
-- Backend: .NET 8 modular monolith, Clean Architecture, CQRS, MediatR, EF Core, PostgreSQL (Npgsql; Neon for cloud).
+- Backend: .NET 8 modular monolith, Clean Architecture, CQRS, MediatR, EF Core, PostgreSQL (Npgsql; Neon for cloud). Build with .NET SDK 10.x (`global.json`, `rollForward: latestFeature`); runtime/target remains .NET 8.
 - Frontend: Next.js 16 App Router + TypeScript + antd 5 + TanStack Query — separate sibling repo `../ZION_FE` (this repo's own `frontend/` folder is an empty, unused placeholder).
 - Infrastructure: Docker Compose and nginx under `backend/`.
 

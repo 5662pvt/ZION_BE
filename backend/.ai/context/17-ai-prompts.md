@@ -12,14 +12,9 @@ ZIONShop: .NET8 + Next.js (ZION_FE) + PostgreSQL. Đọc CLAUDE.md + các file R
 
 ---
 
-## Trạng thái (2026-05)
+## Trạng thái
 
-| Xong | Thiếu |
-|------|--------|
-| Auth, Users, Products, Cart, FE storefront | RevokeToken, MergeCart, Update/Delete Category, Account forms |
-| Plan admin A0–A7 | Admin UI, Orders, Inventory, Payments, Promotions |
-
-**Tiếp theo:** Phase 1 gaps → Admin A0–A2 → Phase 2 (Inventory→Orders→Payments→Checkout).
+Nguồn canonical duy nhất: [`backend-implementation-status.md`](backend-implementation-status.md). Đọc file đó để biết việc đã xong / đang làm / còn thiếu — không duy trì bảng trạng thái riêng ở đây nữa.
 
 ---
 

@@ -23,6 +23,10 @@ Full rules: [11-inventory.md](../11-inventory.md)
 - Consume: `OrderCreatedIntegrationEvent`
 - Publish: `InventoryReservedIntegrationEvent`, `InventoryReservationFailedIntegrationEvent`
 
+## Quyết định checkout MVP (2026-10-08)
+
+Stock khóa theo `ProductId` (chưa có variant). Chi tiết luồng checkout: [modules/orders.md](orders.md).
+
 ## DbContext
 
 `InventoryDbContext` — schema `inventory`

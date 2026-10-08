@@ -233,7 +233,7 @@
 | Unit tests | IN PROGRESS | Auth, Users, and Products tests exist | Add Cart tests and broader Products tests. |
 | Integration tests | TODO | No `tests/Integration` found | Add API + PostgreSQL (Testcontainers) integration test project. |
 | CI/CD | TODO | No workflow file found | Add GitHub Actions workflow. |
-| SDK pinning | DONE | `global.json` pins SDK `8.0.423`, `rollForward: latestFeature` | None. |
+| SDK pinning | DONE | `global.json` pins SDK `10.0.100`, `rollForward: latestFeature`; build with .NET SDK 10.x, runtime/target remains .NET 8 | None. |
 | Warning policy | RISK | `TreatWarningsAsErrors=false` | Enable in CI/Release if team agrees. |
 | Secrets/config | DONE in W0 (2026-10-07) | `appsettings.json` DB password and JWT `SigningKey` replaced with placeholders; real values only in gitignored `appsettings.Development.json` (local docker values, expected) | Keep placeholders in sync when adding new secrets. |
 
@@ -253,7 +253,7 @@
 | Users unit tests | Add/update/set-default/remove address behavior is covered. |
 | Products unit tests | Two Products test files exist. |
 | Local infrastructure compose | PostgreSQL, Redis, RabbitMQ, Seq, API, nginx are defined in `docker-compose.yml`. |
-| SDK pin | `global.json` pins .NET SDK `8.0.423` (`rollForward: latestFeature`). |
+| SDK pin | `global.json` pins .NET SDK `10.0.100` (`rollForward: latestFeature`); build with .NET SDK 10.x, runtime/target remains .NET 8. |
 
 ---
 
