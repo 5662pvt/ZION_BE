@@ -4,6 +4,9 @@
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\ZIONShop.Payments.Application\ZIONShop.Payments.Application.csproj" />
     <ProjectReference Include="..\ZIONShop.Payments.Domain\ZIONShop.Payments.Domain.csproj" />
+    <ProjectReference Include="..\..\..\BuildingBlocks\ZIONShop.Contracts\ZIONShop.Contracts.csproj" />
+    <ProjectReference Include="..\..\..\BuildingBlocks\ZIONShop.EventBus\ZIONShop.EventBus.csproj" />
   </ItemGroup>
 </Project>
