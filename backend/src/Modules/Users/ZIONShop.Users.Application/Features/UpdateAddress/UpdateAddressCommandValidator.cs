@@ -1,4 +1,5 @@
 using FluentValidation;
+using ZIONShop.Users.Application.Validation;
 
 namespace ZIONShop.Users.Application.Features.UpdateAddress;
 
@@ -7,11 +8,11 @@ public class UpdateAddressCommandValidator : AbstractValidator<UpdateAddressComm
     public UpdateAddressCommandValidator()
     {
         RuleFor(x => x.AddressId).NotEmpty();
-        RuleFor(x => x.Line1).NotEmpty().MaximumLength(256);
-        RuleFor(x => x.Line2).MaximumLength(256);
-        RuleFor(x => x.City).NotEmpty().MaximumLength(128);
-        RuleFor(x => x.State).MaximumLength(128);
-        RuleFor(x => x.Country).NotEmpty().MaximumLength(64);
-        RuleFor(x => x.PostalCode).NotEmpty().MaximumLength(16);
+        RuleFor(x => x.RecipientName).NotEmpty().MaximumLength(100);
+        RuleFor(x => x.PhoneNumber).NotEmpty().MaximumLength(15).Must(VietnamesePhoneNumber.IsValid)
+            .WithMessage("Phone number must be a valid Vietnamese mobile or landline number");
+        RuleFor(x => x.Province).NotEmpty().MaximumLength(100);
+        RuleFor(x => x.Ward).NotEmpty().MaximumLength(100);
+        RuleFor(x => x.StreetAddress).NotEmpty().MaximumLength(255);
     }
 }

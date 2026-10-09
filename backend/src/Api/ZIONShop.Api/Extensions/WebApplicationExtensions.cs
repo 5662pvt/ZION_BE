@@ -1,6 +1,9 @@
 using Microsoft.EntityFrameworkCore;
 using ZIONShop.Auth.Infrastructure.Persistence;
 using ZIONShop.Cart.Infrastructure.Persistence;
+using ZIONShop.Contracts.Products;
+using ZIONShop.Inventory.Infrastructure.Persistence;
+using ZIONShop.Orders.Infrastructure.Persistence;
 using ZIONShop.Products.Infrastructure.Persistence;
 using ZIONShop.Users.Infrastructure.Persistence;
 
@@ -26,6 +29,11 @@ public static class WebApplicationExtensions
             await ProductsDbSeeder.SeedAsync(sp.GetRequiredService<ProductsDbContext>());
 
             await sp.GetRequiredService<CartDbContext>().Database.MigrateAsync();
+
+            await sp.GetRequiredService<OrdersDbContext>().Database.MigrateAsync();
+
+            await sp.GetRequiredService<InventoryDbContext>().Database.MigrateAsync();
+            await InventoryDbSeeder.SeedAsync(sp.GetRequiredService<InventoryDbContext>(), sp.GetRequiredService<IProductCatalogReader>());
         }
         catch (Exception ex)
         {

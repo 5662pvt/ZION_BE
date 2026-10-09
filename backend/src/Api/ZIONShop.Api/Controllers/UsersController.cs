@@ -31,14 +31,14 @@ public class UsersController : ControllerBase
     public async Task<IActionResult> Me(CancellationToken ct)
     {
         if (_currentUser.UserId is null) return Unauthorized(ApiResponse.Fail("Unauthorized"));
-        return (await _mediator.Send(new GetUserProfileQuery(_currentUser.UserId.Value), ct)).ToActionResult();
+        return (await _mediator.Send(new GetUserProfileQuery(_currentUser.UserId.Value, _currentUser.Email!), ct)).ToActionResult();
     }
 
     [HttpPut("me")]
     public async Task<IActionResult> UpdateMe([FromBody] UpdateProfileRequest body, CancellationToken ct)
     {
         if (_currentUser.UserId is null) return Unauthorized(ApiResponse.Fail("Unauthorized"));
-        var cmd = new UpdateUserProfileCommand(_currentUser.UserId.Value, body.FullName, body.PhoneNumber, body.DateOfBirth);
+        var cmd = new UpdateUserProfileCommand(_currentUser.UserId.Value, _currentUser.Email!, body.FullName, body.PhoneNumber, body.DateOfBirth);
         return (await _mediator.Send(cmd, ct)).ToActionResult("Profile updated");
     }
 
@@ -46,14 +46,14 @@ public class UsersController : ControllerBase
     public async Task<IActionResult> ListAddresses(CancellationToken ct)
     {
         if (_currentUser.UserId is null) return Unauthorized(ApiResponse.Fail("Unauthorized"));
-        return (await _mediator.Send(new ListAddressesQuery(_currentUser.UserId.Value), ct)).ToActionResult();
+        return (await _mediator.Send(new ListAddressesQuery(_currentUser.UserId.Value, _currentUser.Email!), ct)).ToActionResult();
     }
 
     [HttpPost("me/addresses")]
     public async Task<IActionResult> AddAddress([FromBody] AddAddressRequest body, CancellationToken ct)
     {
         if (_currentUser.UserId is null) return Unauthorized(ApiResponse.Fail("Unauthorized"));
-        var cmd = new AddAddressCommand(_currentUser.UserId.Value, body.Line1, body.Line2, body.City, body.State, body.Country, body.PostalCode, body.IsDefault);
+        var cmd = new AddAddressCommand(_currentUser.UserId.Value, _currentUser.Email!, body.RecipientName, body.PhoneNumber, body.Province, body.Ward, body.StreetAddress, body.IsDefault);
         return (await _mediator.Send(cmd, ct)).ToActionResult("Address added");
     }
 
@@ -61,7 +61,7 @@ public class UsersController : ControllerBase
     public async Task<IActionResult> UpdateAddress(Guid addressId, [FromBody] UpdateAddressRequest body, CancellationToken ct)
     {
         if (_currentUser.UserId is null) return Unauthorized(ApiResponse.Fail("Unauthorized"));
-        var cmd = new UpdateAddressCommand(_currentUser.UserId.Value, addressId, body.Line1, body.Line2, body.City, body.State, body.Country, body.PostalCode, body.IsDefault);
+        var cmd = new UpdateAddressCommand(_currentUser.UserId.Value, addressId, body.RecipientName, body.PhoneNumber, body.Province, body.Ward, body.StreetAddress, body.IsDefault);
         return (await _mediator.Send(cmd, ct)).ToActionResult("Address updated");
     }
 
@@ -81,5 +81,5 @@ public class UsersController : ControllerBase
 }
 
 public record UpdateProfileRequest(string? FullName, string? PhoneNumber, DateTime? DateOfBirth);
-public record AddAddressRequest(string Line1, string? Line2, string City, string? State, string Country, string PostalCode, bool IsDefault);
-public record UpdateAddressRequest(string Line1, string? Line2, string City, string? State, string Country, string PostalCode, bool IsDefault);
+public record AddAddressRequest(string RecipientName, string PhoneNumber, string Province, string Ward, string StreetAddress, bool IsDefault);
+public record UpdateAddressRequest(string RecipientName, string PhoneNumber, string Province, string Ward, string StreetAddress, bool IsDefault);

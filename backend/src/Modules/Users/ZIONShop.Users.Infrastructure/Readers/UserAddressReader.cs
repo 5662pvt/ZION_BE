@@ -16,8 +16,6 @@ public class UserAddressReader : IUserAddressReader
             .Where(p => p.AuthUserId == userId)
             .Select(p => new
             {
-                p.FullName,
-                p.PhoneNumber,
                 Address = p.Addresses.FirstOrDefault(a => a.Id == addressId)
             })
             .FirstOrDefaultAsync(cancellationToken);
@@ -27,13 +25,10 @@ public class UserAddressReader : IUserAddressReader
         var address = row.Address;
         return new AddressSnapshot(
             address.Id,
-            string.IsNullOrWhiteSpace(row.FullName) ? "N/A" : row.FullName!,
-            row.PhoneNumber,
-            address.Line1,
-            address.Line2,
-            address.City,
-            address.State,
-            address.Country,
-            address.PostalCode);
+            address.RecipientName,
+            address.PhoneNumber,
+            address.Province,
+            address.Ward,
+            address.StreetAddress);
     }
 }

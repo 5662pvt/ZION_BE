@@ -2,26 +2,24 @@ using AutoMapper;
 using MediatR;
 using ZIONShop.SharedKernel.Results;
 using ZIONShop.Users.Application.DTOs;
-using ZIONShop.Users.Domain.Exceptions;
-using ZIONShop.Users.Domain.Repositories;
+using ZIONShop.Users.Application.Services;
 
 namespace ZIONShop.Users.Application.Features.GetProfile;
 
 public class GetUserProfileQueryHandler : IRequestHandler<GetUserProfileQuery, Result<UserProfileDto>>
 {
-    private readonly IUserProfileRepository _profiles;
+    private readonly IUserProfileProvisioner _provisioner;
     private readonly IMapper _mapper;
 
-    public GetUserProfileQueryHandler(IUserProfileRepository profiles, IMapper mapper)
+    public GetUserProfileQueryHandler(IUserProfileProvisioner provisioner, IMapper mapper)
     {
-        _profiles = profiles;
+        _provisioner = provisioner;
         _mapper = mapper;
     }
 
     public async Task<Result<UserProfileDto>> Handle(GetUserProfileQuery request, CancellationToken cancellationToken)
     {
-        var profile = await _profiles.GetByAuthUserIdAsync(request.AuthUserId, cancellationToken);
-        if (profile is null) return Result.Failure<UserProfileDto>(UsersErrors.ProfileNotFound);
+        var profile = await _provisioner.EnsureAsync(request.AuthUserId, request.Email, cancellationToken: cancellationToken);
         return Result.Success(_mapper.Map<UserProfileDto>(profile));
     }
 }

@@ -31,7 +31,7 @@ public class UserProfile : AggregateRoot
         DateOfBirth = dateOfBirth;
     }
 
-    public Address AddAddress(string line1, string? line2, string city, string? state, string country, string postalCode, bool isDefault)
+    public Address AddAddress(string recipientName, string phoneNumber, string province, string ward, string streetAddress, bool isDefault)
     {
         if (isDefault)
         {
@@ -41,17 +41,17 @@ public class UserProfile : AggregateRoot
         {
             isDefault = true;
         }
-        var address = Address.Create(Id, line1, line2, city, state, country, postalCode, isDefault);
+        var address = Address.Create(Id, recipientName, phoneNumber, province, ward, streetAddress, isDefault);
         _addresses.Add(address);
         return address;
     }
 
-    public Address? UpdateAddress(Guid addressId, string line1, string? line2, string city, string? state, string country, string postalCode, bool isDefault)
+    public Address? UpdateAddress(Guid addressId, string recipientName, string phoneNumber, string province, string ward, string streetAddress, bool isDefault)
     {
         var address = _addresses.FirstOrDefault(a => a.Id == addressId);
         if (address is null) return null;
 
-        address.Update(line1, line2, city, state, country, postalCode);
+        address.Update(recipientName, phoneNumber, province, ward, streetAddress);
         if (isDefault) SetDefaultAddress(addressId);
         return address;
     }

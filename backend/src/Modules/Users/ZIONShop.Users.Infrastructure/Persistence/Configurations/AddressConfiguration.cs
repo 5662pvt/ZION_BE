@@ -11,12 +11,11 @@ public class AddressConfiguration : IEntityTypeConfiguration<Address>
         builder.ToTable("Addresses");
         builder.HasKey(a => a.Id);
         builder.Property(a => a.UserProfileId).IsRequired();
-        builder.Property(a => a.Line1).IsRequired().HasMaxLength(256);
-        builder.Property(a => a.Line2).HasMaxLength(256);
-        builder.Property(a => a.City).IsRequired().HasMaxLength(128);
-        builder.Property(a => a.State).HasMaxLength(128);
-        builder.Property(a => a.Country).IsRequired().HasMaxLength(64);
-        builder.Property(a => a.PostalCode).IsRequired().HasMaxLength(16);
+        builder.Property(a => a.RecipientName).IsRequired().HasMaxLength(100);
+        builder.Property(a => a.PhoneNumber).IsRequired().HasMaxLength(15);
+        builder.Property(a => a.Province).IsRequired().HasMaxLength(100);
+        builder.Property(a => a.Ward).IsRequired().HasMaxLength(100);
+        builder.Property(a => a.StreetAddress).IsRequired().HasMaxLength(255);
         builder.Property(a => a.IsDefault).IsRequired();
     }
 }

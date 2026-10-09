@@ -1,12 +1,15 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using ZIONShop.Cart.Application.IntegrationEvents;
 using ZIONShop.Cart.Application.Interfaces;
 using ZIONShop.Cart.Domain.Repositories;
 using ZIONShop.Cart.Infrastructure.Persistence;
 using ZIONShop.Cart.Infrastructure.Readers;
 using ZIONShop.Cart.Infrastructure.Repositories;
 using ZIONShop.Contracts.Cart;
+using ZIONShop.Contracts.Orders;
+using ZIONShop.EventBus.DependencyInjection;
 
 namespace ZIONShop.Cart.Infrastructure.DependencyInjection;
 
@@ -21,6 +24,9 @@ public static class CartInfrastructureExtensions
         services.AddScoped<ICartRepository, CartRepository>();
         services.AddScoped<ICartUnitOfWork>(sp => sp.GetRequiredService<CartDbContext>());
         services.AddScoped<ICartReader, CartReader>();
+
+        services.AddIntegrationEventHandler<OrderCreatedIntegrationEvent, OrderCreatedClearCartHandler>();
+
         return services;
     }
 }

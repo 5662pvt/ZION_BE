@@ -5,6 +5,7 @@ using ZIONShop.Users.Application.Features.RemoveAddress;
 using ZIONShop.Users.Application.Features.SetDefaultAddress;
 using ZIONShop.Users.Application.Features.UpdateAddress;
 using ZIONShop.Users.Application.Mappings;
+using ZIONShop.Users.Application.Services;
 using ZIONShop.Users.Domain.Entities;
 using ZIONShop.Users.Infrastructure.Persistence;
 using ZIONShop.Users.Infrastructure.Repositories;
@@ -16,14 +17,14 @@ public class AddressCommandHandlerTests
     [Fact]
     public async Task AddAddress_Should_SetFirstAddressAsDefault_When_IsDefaultFalse()
     {
-        var (db, profiles, mapper) = BuildScope();
+        var (db, profiles, provisioner, mapper) = BuildScope();
         var profile = UserProfile.Create(Guid.NewGuid(), "user@zionshop.local", "User");
         await db.UserProfiles.AddAsync(profile);
         await db.SaveChangesAsync();
 
-        var handler = new AddAddressCommandHandler(profiles, db, mapper);
+        var handler = new AddAddressCommandHandler(provisioner, profiles, db, mapper);
 
-        var result = await handler.Handle(new AddAddressCommand(profile.AuthUserId, "1 Main", null, "HCMC", null, "VN", "70000", false), CancellationToken.None);
+        var result = await handler.Handle(new AddAddressCommand(profile.AuthUserId, profile.Email, "Nguyen Van A", "0901234567", "TP.HCM", "Phuong Ben Nghe", "123 Main St", false), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
         result.Value.IsDefault.Should().BeTrue();
@@ -32,19 +33,19 @@ public class AddressCommandHandlerTests
     [Fact]
     public async Task UpdateAddress_Should_UpdateAddressAndMakeItDefault_When_IsDefaultTrue()
     {
-        var (db, profiles, mapper) = BuildScope();
+        var (db, profiles, _, mapper) = BuildScope();
         var profile = UserProfile.Create(Guid.NewGuid(), "user@zionshop.local", "User");
-        var first = profile.AddAddress("1 Main", null, "HCMC", null, "VN", "70000", true);
-        var second = profile.AddAddress("2 Main", null, "Hanoi", null, "VN", "10000", false);
+        var first = profile.AddAddress("Nguyen Van A", "0901111111", "TP.HCM", "Phuong Ben Nghe", "1 Main St", true);
+        var second = profile.AddAddress("Nguyen Van B", "0902222222", "Ha Noi", "Phuong Hoan Kiem", "2 Main St", false);
         await db.UserProfiles.AddAsync(profile);
         await db.SaveChangesAsync();
 
         var handler = new UpdateAddressCommandHandler(profiles, db, mapper);
 
-        var result = await handler.Handle(new UpdateAddressCommand(profile.AuthUserId, second.Id, "2 Updated", "Apt 1", "Da Nang", "DN", "VN", "55000", true), CancellationToken.None);
+        var result = await handler.Handle(new UpdateAddressCommand(profile.AuthUserId, second.Id, "Nguyen Van B Updated", "0903333333", "Da Nang", "Phuong Hai Chau", "2 Updated St", true), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
-        result.Value.Line1.Should().Be("2 Updated");
+        result.Value.StreetAddress.Should().Be("2 Updated St");
         result.Value.IsDefault.Should().BeTrue();
 
         var saved = await db.UserProfiles.Include(p => p.Addresses).SingleAsync(p => p.Id == profile.Id);
@@ -55,10 +56,10 @@ public class AddressCommandHandlerTests
     [Fact]
     public async Task SetDefaultAddress_Should_UnsetOtherDefaults_When_AddressExists()
     {
-        var (db, profiles, mapper) = BuildScope();
+        var (db, profiles, _, mapper) = BuildScope();
         var profile = UserProfile.Create(Guid.NewGuid(), "user@zionshop.local", "User");
-        var first = profile.AddAddress("1 Main", null, "HCMC", null, "VN", "70000", true);
-        var second = profile.AddAddress("2 Main", null, "Hanoi", null, "VN", "10000", false);
+        var first = profile.AddAddress("Nguyen Van A", "0901111111", "TP.HCM", "Phuong Ben Nghe", "1 Main St", true);
+        var second = profile.AddAddress("Nguyen Van B", "0902222222", "Ha Noi", "Phuong Hoan Kiem", "2 Main St", false);
         await db.UserProfiles.AddAsync(profile);
         await db.SaveChangesAsync();
 
@@ -78,10 +79,10 @@ public class AddressCommandHandlerTests
     [Fact]
     public async Task RemoveAddress_Should_RemoveAddressAndPromoteAnotherDefault_When_RemovedAddressWasDefault()
     {
-        var (db, profiles, mapper) = BuildScope();
+        var (db, profiles, _, mapper) = BuildScope();
         var profile = UserProfile.Create(Guid.NewGuid(), "user@zionshop.local", "User");
-        var first = profile.AddAddress("1 Main", null, "HCMC", null, "VN", "70000", true);
-        var second = profile.AddAddress("2 Main", null, "Hanoi", null, "VN", "10000", false);
+        var first = profile.AddAddress("Nguyen Van A", "0901111111", "TP.HCM", "Phuong Ben Nghe", "1 Main St", true);
+        var second = profile.AddAddress("Nguyen Van B", "0902222222", "Ha Noi", "Phuong Hoan Kiem", "2 Main St", false);
         await db.UserProfiles.AddAsync(profile);
         await db.SaveChangesAsync();
 
@@ -97,14 +98,15 @@ public class AddressCommandHandlerTests
         saved.Addresses.Single().IsDefault.Should().BeTrue();
     }
 
-    private static (UsersDbContext db, UserProfileRepository profiles, IMapper mapper) BuildScope()
+    private static (UsersDbContext db, UserProfileRepository profiles, IUserProfileProvisioner provisioner, IMapper mapper) BuildScope()
     {
         var options = new DbContextOptionsBuilder<UsersDbContext>()
             .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
             .Options;
         var db = new UsersDbContext(options);
         var mapper = new MapperConfiguration(cfg => cfg.AddProfile<UsersMappingProfile>()).CreateMapper();
+        var profiles = new UserProfileRepository(db);
 
-        return (db, new UserProfileRepository(db), mapper);
+        return (db, profiles, new UserProfileProvisioner(profiles, db), mapper);
     }
 }

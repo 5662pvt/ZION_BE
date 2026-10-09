@@ -7,10 +7,9 @@ namespace ZIONShop.Users.Application.Features.UpdateAddress;
 public record UpdateAddressCommand(
     Guid AuthUserId,
     Guid AddressId,
-    string Line1,
-    string? Line2,
-    string City,
-    string? State,
-    string Country,
-    string PostalCode,
+    string RecipientName,
+    string PhoneNumber,
+    string Province,
+    string Ward,
+    string StreetAddress,
     bool IsDefault) : IRequest<Result<AddressDto>>;

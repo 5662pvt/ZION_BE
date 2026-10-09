@@ -28,12 +28,11 @@ public class UpdateAddressCommandHandler : IRequestHandler<UpdateAddressCommand,
 
         var address = profile.UpdateAddress(
             request.AddressId,
-            request.Line1,
-            request.Line2,
-            request.City,
-            request.State,
-            request.Country,
-            request.PostalCode,
+            request.RecipientName,
+            request.PhoneNumber,
+            request.Province,
+            request.Ward,
+            request.StreetAddress,
             request.IsDefault);
 
         if (address is null) return Result.Failure<AddressDto>(UsersErrors.AddressNotFound);

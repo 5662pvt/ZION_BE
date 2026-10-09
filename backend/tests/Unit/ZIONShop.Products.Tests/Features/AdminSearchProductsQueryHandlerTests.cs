@@ -53,4 +53,16 @@ public class AdminSearchProductsQueryHandlerTests
         result.IsSuccess.Should().BeTrue();
         result.Value.TotalCount.Should().Be(2);
     }
+
+    [Fact]
+    public async Task Handle_Should_FindProduct_When_KeywordCaseDiffersFromStoredSku()
+    {
+        var (_, products, categories) = await SeedAsync();
+        var handler = new AdminSearchProductsQueryHandler(products, categories);
+
+        var result = await handler.Handle(new AdminSearchProductsQuery(1, 20, "sku-p01", null, null), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Items.Should().ContainSingle(p => p.Sku == "SKU-P01");
+    }
 }

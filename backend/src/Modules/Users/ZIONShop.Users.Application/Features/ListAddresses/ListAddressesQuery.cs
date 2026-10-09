@@ -4,4 +4,4 @@ using ZIONShop.Users.Application.DTOs;
 
 namespace ZIONShop.Users.Application.Features.ListAddresses;
 
-public record ListAddressesQuery(Guid AuthUserId) : IRequest<Result<IReadOnlyList<AddressDto>>>;
+public record ListAddressesQuery(Guid AuthUserId, string Email) : IRequest<Result<IReadOnlyList<AddressDto>>>;

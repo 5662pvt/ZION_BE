@@ -25,8 +25,8 @@ public class AdminSearchProductsQueryHandler : IRequestHandler<AdminSearchProduc
 
         if (!string.IsNullOrWhiteSpace(request.Keyword))
         {
-            var kw = request.Keyword.Trim();
-            query = query.Where(p => EF.Functions.Like(p.Name, $"%{kw}%") || EF.Functions.Like(p.Sku.Value, $"%{kw}%"));
+            var kw = EscapeLikePattern(request.Keyword.Trim()).ToUpperInvariant();
+            query = query.Where(p => EF.Functions.Like(p.Name.ToUpper(), $"%{kw}%") || EF.Functions.Like(p.Sku.Value.ToUpper(), $"%{kw}%"));
         }
 
         if (request.CategoryId.HasValue)
@@ -72,4 +72,7 @@ public class AdminSearchProductsQueryHandler : IRequestHandler<AdminSearchProduc
 
         return Result.Success(PagedResult<ProductSummaryDto>.Create(dtos, page, pageSize, total));
     }
+
+    private static string EscapeLikePattern(string value) =>
+        value.Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_");
 }
