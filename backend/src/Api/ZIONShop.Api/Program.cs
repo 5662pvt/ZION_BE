@@ -151,12 +151,13 @@ builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 builder.Services.AddProblemDetails();
 
 // Rate limiting (auth endpoints)
+var authPermitLimit = builder.Configuration.GetValue("RateLimiting:AuthPermitLimit", 20);
 builder.Services.AddRateLimiter(opts =>
 {
     opts.AddFixedWindowLimiter("auth", o =>
     {
         o.Window = TimeSpan.FromMinutes(1);
-        o.PermitLimit = 20;
+        o.PermitLimit = authPermitLimit;
         o.QueueLimit = 0;
     });
 });

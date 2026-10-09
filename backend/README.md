@@ -63,6 +63,27 @@ Open <http://localhost:8080/swagger>.
 
 Frontend is the separate repo `ZION_FE` (Next.js 16). See `ZION_FE/README.md` for setup; point it at this API via `NEXT_PUBLIC_API_URL`.
 
+## Email (SMTP)
+
+`appsettings.json` ships with `Email:Host` empty, which makes `AuthInfrastructureExtensions` register `LoggingEmailSender` — OTP/verification codes are written to the log instead of sent. To send real email via SMTP, set `Email:Host`/`Email:UserName`/`Email:Password` (and optionally `Email:Port`, `Email:UseSsl`, `Email:FromAddress`, `Email:FromName`) through user-secrets or environment variables — never commit real credentials into `appsettings*.json`.
+
+User secrets (local dev):
+
+```powershell
+cd backend\src\Api\ZIONShop.Api
+dotnet user-secrets set "Email:Host" "smtp.gmail.com"
+dotnet user-secrets set "Email:UserName" "you@example.com"
+dotnet user-secrets set "Email:Password" "<app-password>"
+```
+
+Environment variables (e.g. Docker/CI):
+
+```text
+Email__Host=smtp.gmail.com
+Email__UserName=you@example.com
+Email__Password=<app-password>
+```
+
 ## Testing
 
 ```powershell
