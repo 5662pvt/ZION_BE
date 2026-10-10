@@ -52,4 +52,30 @@ public class SearchOrdersQueryHandlerTests
         result.IsSuccess.Should().BeTrue();
         result.Value.Items.Should().BeEmpty();
     }
+
+    [Fact]
+    public async Task Handle_Should_FindOrder_When_KeywordMatchesPhoneNumber()
+    {
+        var (orders, seeded) = await SeedAsync();
+        var handler = new SearchOrdersQueryHandler(orders);
+
+        var result = await handler.Handle(new SearchOrdersQuery(1, 20, null, null, null, "0900000000"), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Items.Should().ContainSingle(o => o.Code == seeded.Code);
+    }
+
+    [Fact]
+    public async Task Handle_Should_FindOrder_When_KeywordMatchesRecipientNameCaseInsensitive()
+    {
+        var (orders, seeded) = await SeedAsync();
+        var handler = new SearchOrdersQueryHandler(orders);
+
+        var result = await handler.Handle(new SearchOrdersQuery(1, 20, null, null, null, "nguyen van a"), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Items.Should().ContainSingle(o => o.Code == seeded.Code);
+        result.Value.Items.Single().RecipientName.Should().Be("Nguyen Van A");
+        result.Value.Items.Single().PhoneNumber.Should().Be("0900000000");
+    }
 }

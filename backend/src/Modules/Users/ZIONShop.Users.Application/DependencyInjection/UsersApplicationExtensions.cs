@@ -2,7 +2,7 @@ using FluentValidation;
 using Microsoft.Extensions.DependencyInjection;
 using System.Reflection;
 using ZIONShop.Contracts.Auth;
-using ZIONShop.EventBus.Abstractions;
+using ZIONShop.EventBus.DependencyInjection;
 using ZIONShop.Users.Application.IntegrationEventHandlers;
 using ZIONShop.Users.Application.Services;
 
@@ -16,7 +16,7 @@ public static class UsersApplicationExtensions
         services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(assembly));
         services.AddValidatorsFromAssembly(assembly, includeInternalTypes: true);
         services.AddAutoMapper(assembly);
-        services.AddScoped<IIntegrationEventHandler<UserRegisteredIntegrationEvent>, UserRegisteredIntegrationEventHandler>();
+        services.AddIntegrationEventHandler<UserRegisteredIntegrationEvent, UserRegisteredIntegrationEventHandler>();
         services.AddScoped<IUserProfileProvisioner, UserProfileProvisioner>();
         return services;
     }

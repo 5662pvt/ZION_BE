@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using ZIONShop.Cart.Application.Features.RemoveItem;
 using ZIONShop.Cart.Infrastructure.Persistence;
 using ZIONShop.Cart.Infrastructure.Repositories;
+using ZIONShop.Cart.Tests.Fakes;
 using DomainCart = ZIONShop.Cart.Domain.Entities.Cart;
 
 namespace ZIONShop.Cart.Tests.Features;
@@ -28,7 +29,7 @@ public class RemoveCartItemCommandHandlerTests
         await carts.AddAsync(cart, CancellationToken.None);
         await db.SaveChangesAsync(CancellationToken.None);
 
-        var handler = new RemoveCartItemCommandHandler(carts, db);
+        var handler = new RemoveCartItemCommandHandler(carts, db, new FakeProductPriceLookup());
         var result = await handler.Handle(new RemoveCartItemCommand(userId, null, item.Id), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
@@ -44,7 +45,7 @@ public class RemoveCartItemCommandHandlerTests
         await carts.AddAsync(cart, CancellationToken.None);
         await db.SaveChangesAsync(CancellationToken.None);
 
-        var handler = new RemoveCartItemCommandHandler(carts, db);
+        var handler = new RemoveCartItemCommandHandler(carts, db, new FakeProductPriceLookup());
         var result = await handler.Handle(new RemoveCartItemCommand(userId, null, Guid.NewGuid()), CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
@@ -55,7 +56,7 @@ public class RemoveCartItemCommandHandlerTests
     public async Task Handle_Should_ReturnFailure_When_CartNotFound()
     {
         var (db, carts) = BuildScope();
-        var handler = new RemoveCartItemCommandHandler(carts, db);
+        var handler = new RemoveCartItemCommandHandler(carts, db, new FakeProductPriceLookup());
 
         var result = await handler.Handle(new RemoveCartItemCommand(Guid.NewGuid(), null, Guid.NewGuid()), CancellationToken.None);
 

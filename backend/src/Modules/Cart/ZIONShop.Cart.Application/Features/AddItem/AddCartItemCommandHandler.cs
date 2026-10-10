@@ -61,6 +61,6 @@ public class AddCartItemCommandHandler : IRequestHandler<AddCartItemCommand, Res
             _carts.Update(cart);
 
         await _uow.SaveChangesAsync(cancellationToken);
-        return Result.Success(cart.ToDto());
+        return Result.Success(await cart.ToEnrichedDtoAsync(_prices, cancellationToken));
     }
 }

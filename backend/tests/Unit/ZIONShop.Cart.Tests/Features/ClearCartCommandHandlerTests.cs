@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using ZIONShop.Cart.Application.Features.ClearCart;
 using ZIONShop.Cart.Infrastructure.Persistence;
 using ZIONShop.Cart.Infrastructure.Repositories;
+using ZIONShop.Cart.Tests.Fakes;
 using DomainCart = ZIONShop.Cart.Domain.Entities.Cart;
 
 namespace ZIONShop.Cart.Tests.Features;
@@ -29,7 +30,7 @@ public class ClearCartCommandHandlerTests
         await carts.AddAsync(cart, CancellationToken.None);
         await db.SaveChangesAsync(CancellationToken.None);
 
-        var handler = new ClearCartCommandHandler(carts, db);
+        var handler = new ClearCartCommandHandler(carts, db, new FakeProductPriceLookup());
         var result = await handler.Handle(new ClearCartCommand(userId, null), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
@@ -41,7 +42,7 @@ public class ClearCartCommandHandlerTests
     public async Task Handle_Should_ReturnFailure_When_CartNotFound()
     {
         var (db, carts) = BuildScope();
-        var handler = new ClearCartCommandHandler(carts, db);
+        var handler = new ClearCartCommandHandler(carts, db, new FakeProductPriceLookup());
 
         var result = await handler.Handle(new ClearCartCommand(Guid.NewGuid(), null), CancellationToken.None);
 

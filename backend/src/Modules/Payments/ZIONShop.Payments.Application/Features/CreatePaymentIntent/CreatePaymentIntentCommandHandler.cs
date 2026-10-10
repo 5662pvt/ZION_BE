@@ -38,7 +38,9 @@ public class CreatePaymentIntentCommandHandler : IRequestHandler<CreatePaymentIn
         if (existingByKey is not null) return Result.Success(existingByKey.ToDto(_gateway));
 
         var payableOrder = await _payableOrders.GetByOrderIdAsync(request.OrderId, cancellationToken);
-        if (payableOrder is null || payableOrder.UserId != request.UserId)
+        if (payableOrder is null)
+            return Result.Failure<PaymentIntentDto>(PaymentsErrors.OrderNotPayable);
+        if (payableOrder.UserId != request.UserId)
             return Result.Failure<PaymentIntentDto>(PaymentsErrors.OrderNotFound);
 
         var stateError = payableOrder.State switch

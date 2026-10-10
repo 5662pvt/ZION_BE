@@ -13,7 +13,10 @@ public record OrderDto(
     string? Note,
     string? CancelReason,
     ShippingAddressDto ShippingAddress,
-    IReadOnlyList<OrderLineDto> Lines);
+    IReadOnlyList<OrderLineDto> Lines,
+    IReadOnlyList<OrderStatusHistoryDto> History);
+
+public record OrderStatusHistoryDto(string Status, DateTime At, string? Note);
 
 public record ShippingAddressDto(
     Guid AddressId,
@@ -26,3 +29,15 @@ public record ShippingAddressDto(
 public record OrderLineDto(Guid ProductId, string ProductName, decimal UnitPrice, int Quantity, decimal LineTotal);
 
 public record OrderSummaryDto(Guid Id, string Code, string Status, decimal Total, string Currency, DateTime CreatedAt, int ItemCount);
+
+public record AdminOrderSummaryDto(
+    Guid Id,
+    string Code,
+    string Status,
+    string PaymentMethod,
+    decimal Total,
+    string Currency,
+    DateTime CreatedAt,
+    int ItemCount,
+    string RecipientName,
+    string PhoneNumber);

@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using ZIONShop.Cart.Application.Features.MergeGuestCart;
 using ZIONShop.Cart.Infrastructure.Persistence;
 using ZIONShop.Cart.Infrastructure.Repositories;
+using ZIONShop.Cart.Tests.Fakes;
 using DomainCart = ZIONShop.Cart.Domain.Entities.Cart;
 
 namespace ZIONShop.Cart.Tests.Features;
@@ -29,7 +30,7 @@ public class MergeGuestCartCommandHandlerTests
         await carts.AddAsync(guestCart, CancellationToken.None);
         await db.SaveChangesAsync(CancellationToken.None);
 
-        var handler = new MergeGuestCartCommandHandler(carts, db);
+        var handler = new MergeGuestCartCommandHandler(carts, db, new FakeProductPriceLookup());
         var result = await handler.Handle(new MergeGuestCartCommand(userId, anonymousId), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
@@ -62,7 +63,7 @@ public class MergeGuestCartCommandHandlerTests
         await carts.AddAsync(guestCart, CancellationToken.None);
         await db.SaveChangesAsync(CancellationToken.None);
 
-        var handler = new MergeGuestCartCommandHandler(carts, db);
+        var handler = new MergeGuestCartCommandHandler(carts, db, new FakeProductPriceLookup());
         var result = await handler.Handle(new MergeGuestCartCommand(userId, anonymousId), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
@@ -84,7 +85,7 @@ public class MergeGuestCartCommandHandlerTests
         await carts.AddAsync(userCart, CancellationToken.None);
         await db.SaveChangesAsync(CancellationToken.None);
 
-        var handler = new MergeGuestCartCommandHandler(carts, db);
+        var handler = new MergeGuestCartCommandHandler(carts, db, new FakeProductPriceLookup());
         var result = await handler.Handle(new MergeGuestCartCommand(userId, null), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();

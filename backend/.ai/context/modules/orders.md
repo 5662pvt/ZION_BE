@@ -44,12 +44,13 @@ Publish after commit:
 ## REST contract (W4/W5)
 
 - `POST /api/v1/orders` `[Authorize]` — body `{ addressId, paymentMethod: "COD"|"Online", note? }` → `OrderDto`:
-  `{ id, code, status, paymentMethod, subtotal, shippingFee, total, currency, createdAt, shippingAddress: AddressSnapshot, lines: [{ productId, productName, unitPrice, quantity, lineTotal }] }`
+  `{ id, code, status, paymentMethod, subtotal, shippingFee, total, currency, createdAt, shippingAddress: AddressSnapshot, lines: [{ productId, productName, unitPrice, quantity, lineTotal }], history: [{ status, at, note }] }`
+  (`history` added W6 — ordered by `at` ascending, sourced from `Order.StatusHistory`, already eager-loaded by `IOrderRepository.GetByIdAsync`.)
 - `GET /api/v1/orders/{id}` `[Authorize]` → `OrderDto` (owner or `StaffOrAdmin`, else 404)
 - `GET /api/v1/orders/mine?page&pageSize&status` `[Authorize]` → paged `OrderSummaryDto { id, code, status, total, currency, createdAt, itemCount }`
 - `POST /api/v1/orders/{id}/cancel` `[Authorize]` — body `{ reason? }`. Owner: allowed up to `Confirmed` (`PendingStock|AwaitingPayment|Confirmed`). `StaffOrAdmin`: allowed on **any** order up to `Paid` (adds `Paid`), i.e. anything before `Shipped`.
 - Admin `[StaffOrAdmin]`:
-  - `GET /api/v1/orders?page&pageSize&status&from&to&keyword` (keyword matches order `Code` only — no email join in W4)
+  - `GET /api/v1/orders?page&pageSize&status&from&to&keyword` → paged `AdminOrderSummaryDto { id, code, status, paymentMethod, total, currency, createdAt, itemCount, recipientName, phoneNumber }` (W6 — `OrderSummaryDto` was used here through W5; `GET /orders/mine` is unaffected and still returns `OrderSummaryDto`). `keyword` matches `Code` OR `ShippingAddress.RecipientName` OR `ShippingAddress.PhoneNumber` (case-insensitive contains, same `UPPER` + `LIKE` + escape approach as before). `from`/`to` are inclusive day-range filters on `CreatedDate` (UTC): `from.Date <= CreatedDate < to.Date + 1 day`. `SearchOrdersQueryValidator` rejects `from > to`.
   - `POST /api/v1/orders/{id}/ship` (`Confirmed|Paid` → `Shipped`)
   - `POST /api/v1/orders/{id}/complete` (`Shipped` → `Completed`)
 

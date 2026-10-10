@@ -3,6 +3,7 @@ using ZIONShop.Cart.Application.DTOs;
 using ZIONShop.Cart.Application.Interfaces;
 using ZIONShop.Cart.Application.Mappings;
 using ZIONShop.Cart.Domain.Repositories;
+using ZIONShop.Contracts.Products;
 using ZIONShop.SharedKernel.Results;
 using DomainCart = ZIONShop.Cart.Domain.Entities.Cart;
 
@@ -12,11 +13,13 @@ public class GetCartQueryHandler : IRequestHandler<GetCartQuery, Result<CartDto>
 {
     private readonly ICartRepository _carts;
     private readonly ICartUnitOfWork _uow;
+    private readonly IProductPriceLookup _prices;
 
-    public GetCartQueryHandler(ICartRepository carts, ICartUnitOfWork uow)
+    public GetCartQueryHandler(ICartRepository carts, ICartUnitOfWork uow, IProductPriceLookup prices)
     {
         _carts = carts;
         _uow = uow;
+        _prices = prices;
     }
 
     public async Task<Result<CartDto>> Handle(GetCartQuery request, CancellationToken cancellationToken)
@@ -49,6 +52,6 @@ public class GetCartQueryHandler : IRequestHandler<GetCartQuery, Result<CartDto>
             await _uow.SaveChangesAsync(cancellationToken);
         }
 
-        return Result.Success(cart.ToDto());
+        return Result.Success(await cart.ToEnrichedDtoAsync(_prices, cancellationToken));
     }
 }

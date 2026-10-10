@@ -16,4 +16,6 @@ public record CartItemDto(
     int Quantity,
     decimal UnitPrice,
     decimal Subtotal,
-    string Currency);
+    string Currency,
+    string? ProductSlug,
+    string? ImageUrl);

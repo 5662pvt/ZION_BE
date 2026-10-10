@@ -4,6 +4,7 @@ using ZIONShop.Cart.Application.Interfaces;
 using ZIONShop.Cart.Application.Mappings;
 using ZIONShop.Cart.Domain.Exceptions;
 using ZIONShop.Cart.Domain.Repositories;
+using ZIONShop.Contracts.Products;
 using ZIONShop.SharedKernel.Results;
 using DomainCart = ZIONShop.Cart.Domain.Entities.Cart;
 
@@ -13,11 +14,13 @@ public class MergeGuestCartCommandHandler : IRequestHandler<MergeGuestCartComman
 {
     private readonly ICartRepository _carts;
     private readonly ICartUnitOfWork _uow;
+    private readonly IProductPriceLookup _prices;
 
-    public MergeGuestCartCommandHandler(ICartRepository carts, ICartUnitOfWork uow)
+    public MergeGuestCartCommandHandler(ICartRepository carts, ICartUnitOfWork uow, IProductPriceLookup prices)
     {
         _carts = carts;
         _uow = uow;
+        _prices = prices;
     }
 
     public async Task<Result<CartDto>> Handle(MergeGuestCartCommand request, CancellationToken cancellationToken)
@@ -25,14 +28,14 @@ public class MergeGuestCartCommandHandler : IRequestHandler<MergeGuestCartComman
         var userCart = await EnsureUserCartAsync(request.UserId, cancellationToken);
 
         if (string.IsNullOrWhiteSpace(request.AnonymousId))
-            return Result.Success(userCart.ToDto());
+            return Result.Success(await userCart.ToEnrichedDtoAsync(_prices, cancellationToken));
 
         var guestCart = await _carts.GetByAnonymousIdAsync(request.AnonymousId.Trim(), cancellationToken);
         if (guestCart is null || guestCart.Items.Count == 0)
-            return Result.Success(userCart.ToDto());
+            return Result.Success(await userCart.ToEnrichedDtoAsync(_prices, cancellationToken));
 
         if (guestCart.UserId == request.UserId)
-            return Result.Success(guestCart.ToDto());
+            return Result.Success(await guestCart.ToEnrichedDtoAsync(_prices, cancellationToken));
 
         var existingUserCart = await _carts.GetByUserIdAsync(request.UserId, cancellationToken);
         if (existingUserCart is null || existingUserCart.Items.Count == 0)
@@ -47,7 +50,7 @@ public class MergeGuestCartCommandHandler : IRequestHandler<MergeGuestCartComman
                 _carts.Update(guestCart);
 
             await _uow.SaveChangesAsync(cancellationToken);
-            return Result.Success(guestCart.ToDto());
+            return Result.Success(await guestCart.ToEnrichedDtoAsync(_prices, cancellationToken));
         }
 
         try
@@ -62,7 +65,7 @@ public class MergeGuestCartCommandHandler : IRequestHandler<MergeGuestCartComman
         _carts.Update(existingUserCart);
         _carts.Remove(guestCart);
         await _uow.SaveChangesAsync(cancellationToken);
-        return Result.Success(existingUserCart.ToDto());
+        return Result.Success(await existingUserCart.ToEnrichedDtoAsync(_prices, cancellationToken));
     }
 
     private async Task<DomainCart> EnsureUserCartAsync(Guid userId, CancellationToken cancellationToken)

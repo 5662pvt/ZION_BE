@@ -32,6 +32,10 @@ public class InventoryItemConfiguration : IEntityTypeConfiguration<InventoryItem
 
         // PostgreSQL optimistic concurrency via the system xmin column — no extra column needed,
         // and it's what protects the "last unit, two concurrent reservations" race in Reserve/Commit.
-        builder.UseXminAsConcurrencyToken();
+        builder.Property<uint>("xmin")
+            .HasColumnName("xmin")
+            .HasColumnType("xid")
+            .ValueGeneratedOnAddOrUpdate()
+            .IsRowVersion();
     }
 }

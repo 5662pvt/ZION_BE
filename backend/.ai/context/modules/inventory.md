@@ -42,6 +42,11 @@ Stock khóa theo `ProductId` (chưa có variant). Chi tiết luồng checkout: [
 - `GET /api/v1/inventory/products/{productId}/movements?page&pageSize` `[StaffOrAdmin]` → paged `StockMovementDto { id, productId, type, quantity, reference, createdAt, createdBy }`
 - `POST /api/v1/inventory/products/{productId}/adjust` `[AdminOnly]` — body `{ delta, reason }` → `InventoryItemDto`; 409 on concurrent adjust conflict.
 
+## REST contract — batch availability (W6)
+
+- `GET /api/v1/inventory/availability?productIds=<comma-separated guids>` `[AllowAnonymous]` → `AvailabilityDto[] { productId, available, inStock }`.
+  Parsing (invalid GUID → 400, > 100 ids → 400, dedupe) is done in `InventoryController.GetAvailabilityBatch` before dispatch; `GetAvailabilityBatchQuery`/`Handler` (new `Features/GetAvailabilityBatch`, Application-only — no Domain/Infrastructure change needed since it reuses `IInventoryItemRepository.Query()`) resolves each id against `InventoryItem`, returning `{ available: 0, inStock: false }` for unknown product ids. `GetAvailabilityBatchQueryValidator` also caps `ProductIds.Count <= 100` as a defensive second layer.
+
 ## DbContext
 
 `InventoryDbContext` — schema `inventory`, migration `InitialInventory` (tables `InventoryItems`, `StockReservations`, `StockMovements`, `outbox_messages`).

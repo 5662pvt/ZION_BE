@@ -36,6 +36,23 @@ public class AddCartItemCommandHandlerTests
     }
 
     [Fact]
+    public async Task Handle_Should_EnrichItem_With_ProductSlugAndImageUrl()
+    {
+        var (db, carts) = BuildScope();
+        var productId = Guid.NewGuid();
+        var prices = new FakeProductPriceLookup().Add(productId, "Widget", 10m, slug: "widget", primaryImageUrl: "https://cdn/widget.png");
+        var handler = new AddCartItemCommandHandler(carts, db, prices);
+        var userId = Guid.NewGuid();
+
+        var result = await handler.Handle(new AddCartItemCommand(userId, null, productId, 1), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Items.Should().ContainSingle();
+        result.Value.Items[0].ProductSlug.Should().Be("widget");
+        result.Value.Items[0].ImageUrl.Should().Be("https://cdn/widget.png");
+    }
+
+    [Fact]
     public async Task Handle_Should_IncrementQuantity_When_SameProductAddedAgain()
     {
         var (db, carts) = BuildScope();

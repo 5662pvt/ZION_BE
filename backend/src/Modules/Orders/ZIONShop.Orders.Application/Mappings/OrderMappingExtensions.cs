@@ -24,7 +24,11 @@ public static class OrderMappingExtensions
             order.ShippingAddress.Province,
             order.ShippingAddress.Ward,
             order.ShippingAddress.StreetAddress),
-        order.Lines.Select(l => new OrderLineDto(l.ProductId, l.ProductName, l.UnitPrice, l.Quantity, l.LineTotal)).ToList());
+        order.Lines.Select(l => new OrderLineDto(l.ProductId, l.ProductName, l.UnitPrice, l.Quantity, l.LineTotal)).ToList(),
+        order.StatusHistory
+            .OrderBy(h => h.At)
+            .Select(h => new OrderStatusHistoryDto(h.Status.ToString(), h.At, h.Note))
+            .ToList());
 
     public static OrderSummaryDto ToSummaryDto(this Order order) => new(
         order.Id, order.Code, order.Status.ToString(), order.Total, order.Currency, order.CreatedDate, order.Lines.Count);

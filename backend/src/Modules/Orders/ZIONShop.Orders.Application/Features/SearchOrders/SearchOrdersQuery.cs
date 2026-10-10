@@ -11,4 +11,4 @@ public record SearchOrdersQuery(
     string? Status,
     DateTime? From,
     DateTime? To,
-    string? Keyword) : IRequest<Result<PagedResult<OrderSummaryDto>>>;
+    string? Keyword) : IRequest<Result<PagedResult<AdminOrderSummaryDto>>>;

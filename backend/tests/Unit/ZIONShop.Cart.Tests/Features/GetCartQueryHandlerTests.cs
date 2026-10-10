@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using ZIONShop.Cart.Application.Features.GetCart;
 using ZIONShop.Cart.Infrastructure.Persistence;
 using ZIONShop.Cart.Infrastructure.Repositories;
+using ZIONShop.Cart.Tests.Fakes;
 
 namespace ZIONShop.Cart.Tests.Features;
 
@@ -21,7 +22,7 @@ public class GetCartQueryHandlerTests
     public async Task Handle_Should_ReturnEmptyCart_When_UserHasNoCart()
     {
         var (db, carts) = BuildScope();
-        var handler = new GetCartQueryHandler(carts, db);
+        var handler = new GetCartQueryHandler(carts, db, new FakeProductPriceLookup());
         var userId = Guid.NewGuid();
 
         var result = await handler.Handle(new GetCartQuery(userId, null), CancellationToken.None);
@@ -36,7 +37,7 @@ public class GetCartQueryHandlerTests
     public async Task Handle_Should_CreateGuestCart_When_AnonymousIdHasNoCart()
     {
         var (db, carts) = BuildScope();
-        var handler = new GetCartQueryHandler(carts, db);
+        var handler = new GetCartQueryHandler(carts, db, new FakeProductPriceLookup());
         var anonymousId = Guid.NewGuid().ToString("N");
 
         var result = await handler.Handle(new GetCartQuery(null, anonymousId), CancellationToken.None);

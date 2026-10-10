@@ -159,7 +159,7 @@ public class CreatePaymentIntentCommandHandlerTests
     }
 
     [Fact]
-    public async Task Handle_Should_ReturnNotFound_When_ProjectionDoesNotExist()
+    public async Task Handle_Should_ReturnConflict_When_ProjectionDoesNotExist()
     {
         var (db, payments, payableOrders, _) = PaymentsTestFactory.BuildScope();
         var uow = new FakePaymentsUnitOfWork(db);
@@ -169,6 +169,6 @@ public class CreatePaymentIntentCommandHandlerTests
         var result = await handler.Handle(new CreatePaymentIntentCommand(Guid.NewGuid(), Guid.NewGuid(), "idem-key-1"), CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
-        result.Error.Code.Should().Be("Payments.OrderNotFound");
+        result.Error.Code.Should().Be("Payments.OrderNotPayable");
     }
 }

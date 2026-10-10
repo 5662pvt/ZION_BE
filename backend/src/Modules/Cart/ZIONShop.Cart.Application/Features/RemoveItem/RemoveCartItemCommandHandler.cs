@@ -4,6 +4,7 @@ using ZIONShop.Cart.Application.Interfaces;
 using ZIONShop.Cart.Application.Mappings;
 using ZIONShop.Cart.Domain.Exceptions;
 using ZIONShop.Cart.Domain.Repositories;
+using ZIONShop.Contracts.Products;
 using ZIONShop.SharedKernel.Results;
 using DomainCart = ZIONShop.Cart.Domain.Entities.Cart;
 
@@ -13,11 +14,13 @@ public class RemoveCartItemCommandHandler : IRequestHandler<RemoveCartItemComman
 {
     private readonly ICartRepository _carts;
     private readonly ICartUnitOfWork _uow;
+    private readonly IProductPriceLookup _prices;
 
-    public RemoveCartItemCommandHandler(ICartRepository carts, ICartUnitOfWork uow)
+    public RemoveCartItemCommandHandler(ICartRepository carts, ICartUnitOfWork uow, IProductPriceLookup prices)
     {
         _carts = carts;
         _uow = uow;
+        _prices = prices;
     }
 
     public async Task<Result<CartDto>> Handle(RemoveCartItemCommand request, CancellationToken cancellationToken)
@@ -30,6 +33,6 @@ public class RemoveCartItemCommandHandler : IRequestHandler<RemoveCartItemComman
         if (!cart.RemoveItem(request.ItemId)) return Result.Failure<CartDto>(CartErrors.ItemNotFound);
         _carts.Update(cart);
         await _uow.SaveChangesAsync(cancellationToken);
-        return Result.Success(cart.ToDto());
+        return Result.Success(await cart.ToEnrichedDtoAsync(_prices, cancellationToken));
     }
 }

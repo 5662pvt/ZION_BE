@@ -9,7 +9,9 @@ public record AvailabilityData(Guid ProductId, int Available, bool InStock);
 public record InventoryItemData(Guid ProductId, string Sku, string ProductName, int OnHand, int Reserved, int Available, int LowStockThreshold, bool IsLowStock);
 public record ShippingAddressData(Guid AddressId, string RecipientName, string PhoneNumber, string Province, string Ward, string StreetAddress);
 public record OrderLineData(Guid ProductId, string ProductName, decimal UnitPrice, int Quantity, decimal LineTotal);
-public record OrderData(Guid Id, string Code, string Status, string PaymentMethod, decimal Subtotal, decimal ShippingFee, decimal Total, string Currency, DateTime CreatedAt, string? Note, string? CancelReason, ShippingAddressData ShippingAddress, List<OrderLineData> Lines);
+public record OrderStatusHistoryData(string Status, DateTime At, string? Note);
+public record OrderData(Guid Id, string Code, string Status, string PaymentMethod, decimal Subtotal, decimal ShippingFee, decimal Total, string Currency, DateTime CreatedAt, string? Note, string? CancelReason, ShippingAddressData ShippingAddress, List<OrderLineData> Lines, List<OrderStatusHistoryData> History);
+public record AdminOrderSummaryData(Guid Id, string Code, string Status, string PaymentMethod, decimal Total, string Currency, DateTime CreatedAt, int ItemCount, string RecipientName, string PhoneNumber);
 public record CartItemData(Guid Id, Guid ProductId, string ProductName, int Quantity, decimal UnitPrice, decimal Subtotal, string Currency);
 public record CartData(Guid Id, Guid? UserId, string? AnonymousId, decimal Subtotal, string Currency, int TotalQuantity, List<CartItemData> Items);
 
@@ -121,6 +123,31 @@ public static class CheckoutTestHelpers
 
     public static async Task<HttpResponseMessage> GetOrderRawAsync(HttpClient client, Guid orderId)
         => await client.GetAsync($"/api/v1/orders/{orderId}");
+
+    public static async Task<List<AdminOrderSummaryData>> AdminSearchOrdersAsync(
+        HttpClient admin, string? keyword = null, string? status = null, DateTime? from = null, DateTime? to = null)
+    {
+        var query = new List<string>();
+        if (!string.IsNullOrWhiteSpace(keyword)) query.Add($"keyword={Uri.EscapeDataString(keyword)}");
+        if (!string.IsNullOrWhiteSpace(status)) query.Add($"status={Uri.EscapeDataString(status)}");
+        if (from.HasValue) query.Add($"from={Uri.EscapeDataString(from.Value.ToString("O"))}");
+        if (to.HasValue) query.Add($"to={Uri.EscapeDataString(to.Value.ToString("O"))}");
+        var qs = query.Count > 0 ? "?" + string.Join("&", query) : string.Empty;
+
+        var response = await admin.GetAsync($"/api/v1/orders{qs}");
+        response.EnsureSuccessStatusCode();
+        var envelope = await response.Content.ReadFromJsonAsync<ApiEnvelope<List<AdminOrderSummaryData>>>(ApiEnvelopeJson.Options);
+        return envelope!.Data!;
+    }
+
+    public static async Task<List<AvailabilityData>> GetAvailabilityBatchAsync(HttpClient client, IEnumerable<Guid> productIds)
+    {
+        var qs = string.Join(",", productIds);
+        var response = await client.GetAsync($"/api/v1/inventory/availability?productIds={qs}");
+        response.EnsureSuccessStatusCode();
+        var envelope = await response.Content.ReadFromJsonAsync<ApiEnvelope<List<AvailabilityData>>>(ApiEnvelopeJson.Options);
+        return envelope!.Data!;
+    }
 
     public static async Task<HttpResponseMessage> CancelOrderRawAsync(HttpClient client, Guid orderId, string? reason = null)
         => await client.PostAsJsonAsync($"/api/v1/orders/{orderId}/cancel", new { reason });

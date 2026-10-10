@@ -9,13 +9,13 @@ using ZIONShop.SharedKernel.Results;
 
 namespace ZIONShop.Orders.Application.Features.SearchOrders;
 
-public class SearchOrdersQueryHandler : IRequestHandler<SearchOrdersQuery, Result<PagedResult<OrderSummaryDto>>>
+public class SearchOrdersQueryHandler : IRequestHandler<SearchOrdersQuery, Result<PagedResult<AdminOrderSummaryDto>>>
 {
     private readonly IOrderRepository _orders;
 
     public SearchOrdersQueryHandler(IOrderRepository orders) => _orders = orders;
 
-    public async Task<Result<PagedResult<OrderSummaryDto>>> Handle(SearchOrdersQuery request, CancellationToken cancellationToken)
+    public async Task<Result<PagedResult<AdminOrderSummaryDto>>> Handle(SearchOrdersQuery request, CancellationToken cancellationToken)
     {
         IQueryable<Order> query = _orders.Query().AsNoTracking();
 
@@ -23,15 +23,18 @@ public class SearchOrdersQueryHandler : IRequestHandler<SearchOrdersQuery, Resul
             query = query.Where(o => o.Status == status);
 
         if (request.From.HasValue)
-            query = query.Where(o => o.CreatedDate >= request.From.Value);
+            query = query.Where(o => o.CreatedDate >= request.From.Value.Date);
 
         if (request.To.HasValue)
-            query = query.Where(o => o.CreatedDate <= request.To.Value);
+            query = query.Where(o => o.CreatedDate < request.To.Value.Date.AddDays(1));
 
         if (!string.IsNullOrWhiteSpace(request.Keyword))
         {
             var kw = EscapeLikePattern(request.Keyword.Trim()).ToUpperInvariant();
-            query = query.Where(o => EF.Functions.Like(o.Code.ToUpper(), $"%{kw}%"));
+            query = query.Where(o =>
+                EF.Functions.Like(o.Code.ToUpper(), $"%{kw}%") ||
+                EF.Functions.Like(o.ShippingAddress.RecipientName.ToUpper(), $"%{kw}%") ||
+                EF.Functions.Like(o.ShippingAddress.PhoneNumber.ToUpper(), $"%{kw}%"));
         }
 
         query = query.OrderByDescending(o => o.CreatedDate);
@@ -43,10 +46,20 @@ public class SearchOrdersQueryHandler : IRequestHandler<SearchOrdersQuery, Resul
         var items = await query
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
-            .Select(o => new OrderSummaryDto(o.Id, o.Code, o.Status.ToString(), o.Total, o.Currency, o.CreatedDate, o.Lines.Count))
+            .Select(o => new AdminOrderSummaryDto(
+                o.Id,
+                o.Code,
+                o.Status.ToString(),
+                o.PaymentMethod.ToString(),
+                o.Total,
+                o.Currency,
+                o.CreatedDate,
+                o.Lines.Count,
+                o.ShippingAddress.RecipientName,
+                o.ShippingAddress.PhoneNumber))
             .ToListAsync(cancellationToken);
 
-        return Result.Success(PagedResult<OrderSummaryDto>.Create(items, page, pageSize, total));
+        return Result.Success(PagedResult<AdminOrderSummaryDto>.Create(items, page, pageSize, total));
     }
 
     private static string EscapeLikePattern(string value) =>
