@@ -1,5 +1,19 @@
-﻿using Microsoft.Extensions.Configuration;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using ZIONShop.Contracts.Orders;
+using ZIONShop.Contracts.Promotions;
+using ZIONShop.EventBus.DependencyInjection;
+using ZIONShop.EventBus.Outbox;
+using ZIONShop.Promotions.Application.IntegrationEvents;
+using ZIONShop.Promotions.Application.Interfaces;
+using ZIONShop.Promotions.Application.Services;
+using ZIONShop.Promotions.Domain.Repositories;
+using ZIONShop.Promotions.Infrastructure.BackgroundServices;
+using ZIONShop.Promotions.Infrastructure.Persistence;
+using ZIONShop.Promotions.Infrastructure.Repositories;
+using ZIONShop.Promotions.Infrastructure.Services;
 
 namespace ZIONShop.Promotions.Infrastructure.DependencyInjection;
 
@@ -7,7 +21,26 @@ public static class PromotionsInfrastructureExtensions
 {
     public static IServiceCollection AddPromotionsInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
-        // TODO: register DbContext and repositories when this module is implemented.
+        services.AddDbContext<PromotionsDbContext>(options =>
+            options.UseNpgsql(configuration.GetConnectionString("DefaultConnection"),
+                npgsql => npgsql.MigrationsHistoryTable("__EFMigrationsHistory", PromotionsDbContext.Schema)));
+
+        services.TryAddSingleton(TimeProvider.System);
+
+        services.AddScoped<IPromotionRepository, PromotionRepository>();
+        services.AddScoped<ICouponCodeRepository, CouponCodeRepository>();
+        services.AddScoped<ICouponRedemptionRepository, CouponRedemptionRepository>();
+        services.AddScoped<IPromotionsUnitOfWork>(sp => sp.GetRequiredService<PromotionsDbContext>());
+        services.AddScoped<IPromotionEvaluator, PromotionEvaluator>();
+
+        services.AddScoped<StaleReservationReleaseProcessor>();
+        services.AddHostedService<StaleReservationReleaseBackgroundService>();
+
+        services.AddOutbox<PromotionsDbContext>();
+
+        services.AddIntegrationEventHandler<OrderConfirmedIntegrationEvent, OrderConfirmedIntegrationEventHandler>();
+        services.AddIntegrationEventHandler<OrderCancelledIntegrationEvent, OrderCancelledIntegrationEventHandler>();
+
         return services;
     }
 }

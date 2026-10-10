@@ -11,5 +11,6 @@ public class PlaceOrderCommandValidator : AbstractValidator<PlaceOrderCommand>
         RuleFor(x => x.PaymentMethod).NotEmpty().Must(m => m is "COD" or "Online")
             .WithMessage("PaymentMethod must be 'COD' or 'Online'.");
         RuleFor(x => x.Note).MaximumLength(1000);
+        RuleFor(x => x.CouponCode).MaximumLength(30);
     }
 }

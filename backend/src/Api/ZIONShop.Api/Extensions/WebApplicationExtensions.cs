@@ -3,9 +3,11 @@ using ZIONShop.Auth.Infrastructure.Persistence;
 using ZIONShop.Cart.Infrastructure.Persistence;
 using ZIONShop.Contracts.Products;
 using ZIONShop.Inventory.Infrastructure.Persistence;
+using ZIONShop.Notifications.Infrastructure.Persistence;
 using ZIONShop.Orders.Infrastructure.Persistence;
 using ZIONShop.Payments.Infrastructure.Persistence;
 using ZIONShop.Products.Infrastructure.Persistence;
+using ZIONShop.Promotions.Infrastructure.Persistence;
 using ZIONShop.Users.Infrastructure.Persistence;
 
 namespace ZIONShop.Api.Extensions;
@@ -37,6 +39,10 @@ public static class WebApplicationExtensions
             await InventoryDbSeeder.SeedAsync(sp.GetRequiredService<InventoryDbContext>(), sp.GetRequiredService<IProductCatalogReader>());
 
             await sp.GetRequiredService<PaymentsDbContext>().Database.MigrateAsync();
+
+            await sp.GetRequiredService<PromotionsDbContext>().Database.MigrateAsync();
+
+            await sp.GetRequiredService<NotificationsDbContext>().Database.MigrateAsync();
         }
         catch (Exception ex)
         {

@@ -19,21 +19,22 @@ Modules/Promotions/
 
 `PromotionsDbContext` — schema `promotions`
 
-## Key entities (suggested)
+## Key entities (implemented — coupons only; gifts still pending, see Current status)
 
 | Entity | Mô tả |
 |--------|--------|
-| `Promotion` | Campaign: name, type, value, date range, active |
-| `CouponCode` | Mã coupon thuộc promotion; usage limit |
-| `PromotionTarget` | ProductIds / CategoryIds (GUID list, no cross-DB FK) |
-| `GiftRule` | Mua đủ X → tặng product Y (quantity) |
+| `Promotion` | Campaign: name, type, value, date range, active, UsageLimit/PerUserLimit/UsedCount (atomic, xmin-guarded) |
+| `CouponCode` | Mã coupon thuộc promotion (unique, uppercase); own UsedCount (xmin-guarded) |
+| `CouponRedemption` | Reserved/Committed/Released ledger row per OrderId (unique); drives usage-limit/per-user-limit counts |
+| `PromotionTarget` | not implemented — out of W7 scope |
+| `GiftRule` | not implemented — out of W7 scope |
 
-### Promotion types (enum)
+### Promotion types (enum) — implemented
 
 - `PercentageOff`
 - `FixedAmountOff`
-- `FreeShipping` (sau)
-- `GiftWithPurchase` (liên kết `GiftRule`)
+
+Not yet implemented: `FreeShipping`, `GiftWithPurchase`/`GiftRule`.
 
 ## Features — backend (MVP)
 
@@ -102,4 +103,6 @@ Hoặc nested: `/api/v1/promotions/{id}/gift-rules` — chọn một convention 
 
 ## Current status
 
-**Skeleton only** — implement theo template Auth/Products trước khi làm admin UI A4/A5.
+**Coupons implemented (W7)** — `Promotion` + `CouponCode` + `CouponRedemption`, `PromotionsDbContext` (schema `promotions`), `PromotionEvaluator : IPromotionEvaluator` (xmin optimistic-concurrency retry ×3 on Reserve/Release), `PromotionsController` (admin CRUD/activate/deactivate/coupons + storefront `coupons/validate`), `OrderConfirmedIntegrationEventHandler`/`OrderCancelledIntegrationEventHandler` consumers, `StaleReservationReleaseBackgroundService` (releases Reserved redemptions older than 30 min, every 5 min). Migration `InitialPromotions` hand-authored (no `dotnet-ef` tooling available in the implementing session — regenerate/verify with `dotnet ef migrations add` before relying on it for a real deploy).
+
+**Gifts (A5) not implemented** — `GiftRule`, `PromotionTarget`, `FreeShipping`/`GiftWithPurchase` types, and the gift-rules API/admin screens are still pending; implement per the original sketch above when that phase starts.

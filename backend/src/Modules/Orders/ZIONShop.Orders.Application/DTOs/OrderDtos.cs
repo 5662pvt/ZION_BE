@@ -7,6 +7,8 @@ public record OrderDto(
     string PaymentMethod,
     decimal Subtotal,
     decimal ShippingFee,
+    string? CouponCode,
+    decimal DiscountAmount,
     decimal Total,
     string Currency,
     DateTime CreatedAt,

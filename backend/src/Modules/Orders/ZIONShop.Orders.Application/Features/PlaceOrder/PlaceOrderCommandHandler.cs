@@ -3,6 +3,7 @@ using Microsoft.Extensions.Options;
 using ZIONShop.Contracts.Cart;
 using ZIONShop.Contracts.Orders;
 using ZIONShop.Contracts.Products;
+using ZIONShop.Contracts.Promotions;
 using ZIONShop.Contracts.Users;
 using ZIONShop.Orders.Application.DTOs;
 using ZIONShop.Orders.Application.Interfaces;
@@ -24,6 +25,7 @@ public class PlaceOrderCommandHandler : IRequestHandler<PlaceOrderCommand, Resul
     private readonly ICartReader _cartReader;
     private readonly IUserAddressReader _addresses;
     private readonly IProductPriceLookup _prices;
+    private readonly IPromotionEvaluator _promotions;
     private readonly CheckoutOptions _checkout;
 
     public PlaceOrderCommandHandler(
@@ -32,6 +34,7 @@ public class PlaceOrderCommandHandler : IRequestHandler<PlaceOrderCommand, Resul
         ICartReader cartReader,
         IUserAddressReader addresses,
         IProductPriceLookup prices,
+        IPromotionEvaluator promotions,
         IOptions<CheckoutOptions> checkout)
     {
         _orders = orders;
@@ -39,6 +42,7 @@ public class PlaceOrderCommandHandler : IRequestHandler<PlaceOrderCommand, Resul
         _cartReader = cartReader;
         _addresses = addresses;
         _prices = prices;
+        _promotions = promotions;
         _checkout = checkout.Value;
     }
 
@@ -84,17 +88,37 @@ public class PlaceOrderCommandHandler : IRequestHandler<PlaceOrderCommand, Resul
         var order = DomainOrder.Place(
             request.UserId, paymentMethod, currency ?? _checkout.Currency, shippingFee, shippingAddress, lines, request.Note);
 
-        await _orders.AddAsync(order, cancellationToken);
+        var hasCoupon = !string.IsNullOrWhiteSpace(request.CouponCode);
+        if (hasCoupon)
+        {
+            var (quote, error) = await _promotions.ReserveAsync(request.CouponCode!, request.UserId, order.Id, subtotal, cancellationToken);
+            if (error is not null)
+                return Result.Failure<OrderDto>(OrdersErrors.InvalidCoupon(error.Message));
 
-        _uow.AddOutboxEvent(new OrderCreatedIntegrationEvent(
-            order.Id,
-            order.UserId,
-            order.Total,
-            order.Lines.Select(l => new OrderLine(l.ProductId, l.Quantity, l.UnitPrice)).ToList(),
-            order.PaymentMethod.ToString(),
-            order.Currency));
+            order.ApplyCoupon(quote!.Code, quote.DiscountAmount);
+        }
 
-        await _uow.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await _orders.AddAsync(order, cancellationToken);
+
+            _uow.AddOutboxEvent(new OrderCreatedIntegrationEvent(
+                order.Id,
+                order.UserId,
+                order.Total,
+                order.Lines.Select(l => new OrderLine(l.ProductId, l.Quantity, l.UnitPrice)).ToList(),
+                order.PaymentMethod.ToString(),
+                order.Currency));
+
+            await _uow.SaveChangesAsync(cancellationToken);
+        }
+        catch
+        {
+            if (hasCoupon)
+                await _promotions.ReleaseAsync(order.Id, cancellationToken);
+            throw;
+        }
+
         return Result.Success(order.ToDto());
     }
 }

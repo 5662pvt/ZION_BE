@@ -6,5 +6,7 @@
   <ItemGroup>
     <ProjectReference Include="..\ZIONShop.Notifications.Domain\ZIONShop.Notifications.Domain.csproj" />
     <ProjectReference Include="..\ZIONShop.Notifications.Application\ZIONShop.Notifications.Application.csproj" />
+    <ProjectReference Include="..\..\..\BuildingBlocks\ZIONShop.Contracts\ZIONShop.Contracts.csproj" />
+    <ProjectReference Include="..\..\..\BuildingBlocks\ZIONShop.EventBus\ZIONShop.EventBus.csproj" />
   </ItemGroup>
 </Project>

@@ -13,4 +13,7 @@ public static class OrdersErrors
 
     public static Error ProductUnavailable(string productNames) =>
         Error.Conflict("Orders.ProductUnavailable", $"Sản phẩm không khả dụng: {productNames}");
+
+    public static Error InvalidCoupon(string message) =>
+        Error.Validation("Orders.InvalidCoupon", message);
 }

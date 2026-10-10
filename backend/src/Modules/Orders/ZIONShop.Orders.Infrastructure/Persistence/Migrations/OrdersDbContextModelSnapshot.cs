@@ -73,6 +73,10 @@ namespace ZIONShop.Orders.Infrastructure.Persistence.Migrations
                         .HasMaxLength(16)
                         .HasColumnType("character varying(16)");
 
+                    b.Property<string>("CouponCode")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
                     b.Property<string>("CreatedBy")
                         .HasMaxLength(128)
                         .HasColumnType("character varying(128)");
@@ -84,6 +88,11 @@ namespace ZIONShop.Orders.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasMaxLength(3)
                         .HasColumnType("character varying(3)");
+
+                    b.Property<decimal>("DiscountAmount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("decimal(18,2)")
+                        .HasDefaultValue(0m);
 
                     b.Property<bool>("IsDeleted")
                         .ValueGeneratedOnAdd()

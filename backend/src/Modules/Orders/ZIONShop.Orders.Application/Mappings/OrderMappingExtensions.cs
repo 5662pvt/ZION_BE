@@ -12,6 +12,8 @@ public static class OrderMappingExtensions
         order.PaymentMethod.ToString(),
         order.Subtotal,
         order.ShippingFee,
+        order.CouponCode,
+        order.DiscountAmount,
         order.Total,
         order.Currency,
         order.CreatedDate,

@@ -33,7 +33,7 @@ public class OrdersController : ControllerBase
     [HttpPost]
     public async Task<IActionResult> Place([FromBody] PlaceOrderBody body, CancellationToken ct)
     {
-        var cmd = new PlaceOrderCommand(_currentUser.UserId!.Value, body.AddressId, body.PaymentMethod, body.Note);
+        var cmd = new PlaceOrderCommand(_currentUser.UserId!.Value, body.AddressId, body.PaymentMethod, body.Note, body.CouponCode);
         return (await _mediator.Send(cmd, ct)).ToActionResult("Order placed");
     }
 
@@ -71,7 +71,7 @@ public class OrdersController : ControllerBase
         => (await _mediator.Send(new CompleteOrderCommand(id), ct)).ToActionResult("Order completed");
 }
 
-public record PlaceOrderBody(Guid AddressId, string PaymentMethod, string? Note);
+public record PlaceOrderBody(Guid AddressId, string PaymentMethod, string? Note, string? CouponCode = null);
 public record CancelOrderBody(string? Reason);
 public record GetMyOrdersRequest(int Page = 1, int PageSize = 20, string? Status = null);
 public record AdminSearchOrdersRequest(int Page = 1, int PageSize = 20, string? Status = null, DateTime? From = null, DateTime? To = null, string? Keyword = null);

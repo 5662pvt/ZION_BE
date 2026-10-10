@@ -22,7 +22,9 @@ public class Order : AggregateRoot
     public string Currency { get; private set; } = "VND";
     public decimal Subtotal { get; private set; }
     public decimal ShippingFee { get; private set; }
-    public decimal Total => Subtotal + ShippingFee;
+    public string? CouponCode { get; private set; }
+    public decimal DiscountAmount { get; private set; }
+    public decimal Total => Subtotal - DiscountAmount + ShippingFee;
     public string? Note { get; private set; }
     public string? CancelReason { get; private set; }
     public ShippingAddress ShippingAddress { get; private set; } = default!;
@@ -66,6 +68,12 @@ public class Order : AggregateRoot
             .Select(_ => CodeAlphabet[Random.Shared.Next(CodeAlphabet.Length)])
             .ToArray());
         return $"ZS{DateTime.UtcNow:yyMMdd}{suffix}";
+    }
+
+    public void ApplyCoupon(string code, decimal discountAmount)
+    {
+        CouponCode = code;
+        DiscountAmount = Math.Clamp(discountAmount, 0m, Subtotal);
     }
 
     public Result ConfirmReservation()

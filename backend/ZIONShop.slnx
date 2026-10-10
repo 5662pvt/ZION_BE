@@ -74,9 +74,11 @@
     <Project Path="tests/Unit/ZIONShop.Cart.Tests/ZIONShop.Cart.Tests.csproj" />
     <Project Path="tests/Unit/ZIONShop.EventBus.Tests/ZIONShop.EventBus.Tests.csproj" />
     <Project Path="tests/Unit/ZIONShop.Inventory.Tests/ZIONShop.Inventory.Tests.csproj" />
+    <Project Path="tests/Unit/ZIONShop.Notifications.Tests/ZIONShop.Notifications.Tests.csproj" />
     <Project Path="tests/Unit/ZIONShop.Orders.Tests/ZIONShop.Orders.Tests.csproj" />
     <Project Path="tests/Unit/ZIONShop.Payments.Tests/ZIONShop.Payments.Tests.csproj" />
     <Project Path="tests/Unit/ZIONShop.Products.Tests/ZIONShop.Products.Tests.csproj" />
+    <Project Path="tests/Unit/ZIONShop.Promotions.Tests/ZIONShop.Promotions.Tests.csproj" />
     <Project Path="tests/Unit/ZIONShop.Users.Tests/ZIONShop.Users.Tests.csproj" />
   </Folder>
   <Folder Name="/tests/Integration/">

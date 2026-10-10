@@ -10,7 +10,7 @@ public record InventoryItemData(Guid ProductId, string Sku, string ProductName, 
 public record ShippingAddressData(Guid AddressId, string RecipientName, string PhoneNumber, string Province, string Ward, string StreetAddress);
 public record OrderLineData(Guid ProductId, string ProductName, decimal UnitPrice, int Quantity, decimal LineTotal);
 public record OrderStatusHistoryData(string Status, DateTime At, string? Note);
-public record OrderData(Guid Id, string Code, string Status, string PaymentMethod, decimal Subtotal, decimal ShippingFee, decimal Total, string Currency, DateTime CreatedAt, string? Note, string? CancelReason, ShippingAddressData ShippingAddress, List<OrderLineData> Lines, List<OrderStatusHistoryData> History);
+public record OrderData(Guid Id, string Code, string Status, string PaymentMethod, decimal Subtotal, decimal ShippingFee, string? CouponCode, decimal DiscountAmount, decimal Total, string Currency, DateTime CreatedAt, string? Note, string? CancelReason, ShippingAddressData ShippingAddress, List<OrderLineData> Lines, List<OrderStatusHistoryData> History);
 public record AdminOrderSummaryData(Guid Id, string Code, string Status, string PaymentMethod, decimal Total, string Currency, DateTime CreatedAt, int ItemCount, string RecipientName, string PhoneNumber);
 public record CartItemData(Guid Id, Guid ProductId, string ProductName, int Quantity, decimal UnitPrice, decimal Subtotal, string Currency);
 public record CartData(Guid Id, Guid? UserId, string? AnonymousId, decimal Subtotal, string Currency, int TotalQuantity, List<CartItemData> Items);
@@ -110,12 +110,12 @@ public static class CheckoutTestHelpers
         return envelope!.Data!;
     }
 
-    public static async Task<HttpResponseMessage> PlaceOrderRawAsync(HttpClient client, Guid addressId, string paymentMethod, string? note = null)
-        => await client.PostAsJsonAsync("/api/v1/orders", new { addressId, paymentMethod, note });
+    public static async Task<HttpResponseMessage> PlaceOrderRawAsync(HttpClient client, Guid addressId, string paymentMethod, string? note = null, string? couponCode = null)
+        => await client.PostAsJsonAsync("/api/v1/orders", new { addressId, paymentMethod, note, couponCode });
 
-    public static async Task<OrderData> PlaceOrderAsync(HttpClient client, Guid addressId, string paymentMethod, string? note = null)
+    public static async Task<OrderData> PlaceOrderAsync(HttpClient client, Guid addressId, string paymentMethod, string? note = null, string? couponCode = null)
     {
-        var response = await PlaceOrderRawAsync(client, addressId, paymentMethod, note);
+        var response = await PlaceOrderRawAsync(client, addressId, paymentMethod, note, couponCode);
         response.EnsureSuccessStatusCode();
         var envelope = await response.Content.ReadFromJsonAsync<ApiEnvelope<OrderData>>(ApiEnvelopeJson.Options);
         return envelope!.Data!;

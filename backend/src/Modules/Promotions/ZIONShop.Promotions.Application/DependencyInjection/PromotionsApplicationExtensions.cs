@@ -1,4 +1,6 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+using System.Reflection;
+using FluentValidation;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace ZIONShop.Promotions.Application.DependencyInjection;
 
@@ -6,7 +8,9 @@ public static class PromotionsApplicationExtensions
 {
     public static IServiceCollection AddPromotionsApplication(this IServiceCollection services)
     {
-        // TODO: register MediatR/Validators/AutoMapper when this module is implemented.
+        var assembly = Assembly.GetExecutingAssembly();
+        services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(assembly));
+        services.AddValidatorsFromAssembly(assembly, includeInternalTypes: true);
         return services;
     }
 }
