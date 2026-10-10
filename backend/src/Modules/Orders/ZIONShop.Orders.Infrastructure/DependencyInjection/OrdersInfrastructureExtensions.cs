@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using ZIONShop.Contracts.Inventory;
+using ZIONShop.Contracts.Orders;
 using ZIONShop.Contracts.Payments;
 using ZIONShop.EventBus.DependencyInjection;
 using ZIONShop.EventBus.Outbox;
@@ -10,6 +11,7 @@ using ZIONShop.Orders.Application.Interfaces;
 using ZIONShop.Orders.Application.Options;
 using ZIONShop.Orders.Domain.Repositories;
 using ZIONShop.Orders.Infrastructure.Persistence;
+using ZIONShop.Orders.Infrastructure.Readers;
 using ZIONShop.Orders.Infrastructure.Repositories;
 
 namespace ZIONShop.Orders.Infrastructure.DependencyInjection;
@@ -26,6 +28,7 @@ public static class OrdersInfrastructureExtensions
 
         services.AddScoped<IOrderRepository, OrderRepository>();
         services.AddScoped<IOrdersUnitOfWork>(sp => sp.GetRequiredService<OrdersDbContext>());
+        services.AddScoped<IOrderDetailsReader, OrderDetailsReader>();
 
         services.AddOutbox<OrdersDbContext>();
 

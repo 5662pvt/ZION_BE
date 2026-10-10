@@ -1,10 +1,9 @@
 using Microsoft.Extensions.Logging;
-using ZIONShop.Auth.Application.Interfaces;
 
-namespace ZIONShop.Auth.Infrastructure.Email;
+namespace ZIONShop.Common.Email;
 
 /// <summary>
-/// Development fallback when Email:Host is not configured. OTP codes appear in the API console.
+/// Development fallback when Email:Host is not configured. OTP codes and other emails appear in the API console.
 /// </summary>
 public class LoggingEmailSender : IEmailSender
 {

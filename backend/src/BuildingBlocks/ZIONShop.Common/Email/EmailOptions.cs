@@ -1,4 +1,4 @@
-namespace ZIONShop.Auth.Application.Options;
+namespace ZIONShop.Common.Email;
 
 public class EmailOptions
 {

@@ -3,10 +3,8 @@ using MailKit.Security;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using MimeKit;
-using ZIONShop.Auth.Application.Interfaces;
-using ZIONShop.Auth.Application.Options;
 
-namespace ZIONShop.Auth.Infrastructure.Email;
+namespace ZIONShop.Common.Email;
 
 public class SmtpEmailSender : IEmailSender
 {

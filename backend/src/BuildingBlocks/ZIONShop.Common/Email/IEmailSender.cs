@@ -1,4 +1,4 @@
-namespace ZIONShop.Auth.Application.Interfaces;
+namespace ZIONShop.Common.Email;
 
 public interface IEmailSender
 {

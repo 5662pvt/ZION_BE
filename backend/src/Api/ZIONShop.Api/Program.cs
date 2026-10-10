@@ -17,6 +17,7 @@ using ZIONShop.Cart.Infrastructure.DependencyInjection;
 using ZIONShop.Cart.Infrastructure.Persistence;
 using ZIONShop.Common.Api;
 using ZIONShop.Common.Behaviors;
+using ZIONShop.Common.Email;
 using ZIONShop.Common.Exceptions;
 using ZIONShop.EventBus.DependencyInjection;
 using ZIONShop.Logging.Middleware;
@@ -115,6 +116,7 @@ builder.Services.AddCors(opts => opts.AddDefaultPolicy(p => p
 // Building blocks
 builder.Services.AddZionAuth(builder.Configuration);
 builder.Services.AddZionEventBus(builder.Configuration);
+builder.Services.AddZionEmail(builder.Configuration);
 if (!builder.Environment.IsEnvironment("Testing"))
 {
     try { builder.Services.AddZionCaching(builder.Configuration); }

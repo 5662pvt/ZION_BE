@@ -2,6 +2,7 @@ using ZIONShop.Auth.Application.Interfaces;
 using ZIONShop.Auth.Domain.Entities;
 using ZIONShop.Auth.Domain.Enums;
 using ZIONShop.Auth.Domain.Repositories;
+using ZIONShop.Common.Email;
 
 namespace ZIONShop.Auth.Application.Services;
 
