@@ -10,9 +10,9 @@ public class FakePromotionEvaluator : IPromotionEvaluator
     public List<(string Code, Guid UserId, Guid OrderId, decimal Subtotal)> ReserveCalls { get; } = new();
     public List<Guid> ReleasedOrderIds { get; } = new();
 
-    public FakePromotionEvaluator WithQuote(string code, decimal discountAmount, string promotionName = "Promo", Guid? promotionId = null)
+    public FakePromotionEvaluator WithQuote(string code, decimal discountAmount, string promotionName = "Promo", Guid? promotionId = null, string discountTarget = "Items")
     {
-        _quotes[code] = new CouponQuote(code, promotionId ?? Guid.NewGuid(), promotionName, discountAmount, "Items");
+        _quotes[code] = new CouponQuote(code, promotionId ?? Guid.NewGuid(), promotionName, discountAmount, discountTarget);
         return this;
     }
 

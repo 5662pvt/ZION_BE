@@ -27,7 +27,7 @@ public static class OrderEmailTemplates
         sb.Append(SummaryRow("Tạm tính", FormatMoney(order.Subtotal)));
         if (order.DiscountAmount > 0)
         {
-            var label = string.IsNullOrWhiteSpace(order.CouponCode) ? "Giảm giá" : $"Giảm giá ({Encode(order.CouponCode)})";
+            var label = BuildDiscountLabel(order.CouponCode, order.DiscountTarget);
             sb.Append(SummaryRow(label, "-" + FormatMoney(order.DiscountAmount)));
         }
         sb.Append(SummaryRow("Phí vận chuyển", FormatMoney(order.ShippingFee)));
@@ -93,6 +93,12 @@ public static class OrderEmailTemplates
         var labelContent = emphasize ? $"<strong>{label}</strong>" : label;
         var valueContent = emphasize ? $"<strong>{value}</strong>" : value;
         return $"<tr><td style=\"padding:4px 6px;\">{labelContent}</td><td style=\"padding:4px 6px;text-align:right;\">{valueContent}</td></tr>";
+    }
+
+    private static string BuildDiscountLabel(string? couponCode, string? discountTarget)
+    {
+        var prefix = discountTarget == "Shipping" ? "Giảm phí vận chuyển" : "Giảm giá";
+        return string.IsNullOrWhiteSpace(couponCode) ? prefix : $"{prefix} ({Encode(couponCode)})";
     }
 
     private static string BuildAddressBlock(OrderDetails order) =>

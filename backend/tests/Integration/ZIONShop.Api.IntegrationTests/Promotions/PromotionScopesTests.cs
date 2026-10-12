@@ -112,7 +112,11 @@ public class PromotionScopesTests
         placed.Subtotal.Should().Be(199000m);
         placed.ShippingFee.Should().Be(30000m);
         placed.DiscountAmount.Should().Be(30000m);
+        placed.DiscountTarget.Should().Be("Shipping");
         placed.Total.Should().Be(placed.Subtotal);
+
+        var fetched = await GetOrderAsync(customer, placed.Id);
+        fetched.DiscountTarget.Should().Be("Shipping");
     }
 
     [Fact]

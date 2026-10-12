@@ -31,6 +31,7 @@ public class OrderDetailsReader : IOrderDetailsReader
             order.Subtotal,
             order.DiscountAmount,
             order.CouponCode,
+            order.DiscountTarget,
             order.ShippingFee,
             order.Total,
             order.Currency,

@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace ZIONShop.Reviews.Infrastructure.Migrations
+namespace ZIONShop.Reviews.Infrastructure.Persistence.Migrations
 {
     /// <inheritdoc />
     public partial class InitialReviews : Migration

@@ -9,6 +9,7 @@ public record OrderDto(
     decimal ShippingFee,
     string? CouponCode,
     decimal DiscountAmount,
+    string? DiscountTarget,
     decimal Total,
     string Currency,
     DateTime CreatedAt,

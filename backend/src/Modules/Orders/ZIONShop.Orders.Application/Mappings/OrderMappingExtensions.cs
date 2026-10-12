@@ -14,6 +14,7 @@ public static class OrderMappingExtensions
         order.ShippingFee,
         order.CouponCode,
         order.DiscountAmount,
+        order.DiscountTarget,
         order.Total,
         order.Currency,
         order.CreatedDate,

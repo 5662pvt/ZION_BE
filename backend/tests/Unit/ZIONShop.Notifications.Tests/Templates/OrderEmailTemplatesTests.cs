@@ -5,9 +5,9 @@ namespace ZIONShop.Notifications.Tests.Templates;
 
 public class OrderEmailTemplatesTests
 {
-    private static OrderDetails BuildOrder(decimal discount = 0, string? couponCode = null, string? cancelReason = null) => new(
+    private static OrderDetails BuildOrder(decimal discount = 0, string? couponCode = null, string? cancelReason = null, string? discountTarget = null) => new(
         Guid.NewGuid(), Guid.NewGuid(), "ZS0001", "Confirmed", "COD",
-        200000m, discount, couponCode, 30000m, 230000m - discount, "VND",
+        200000m, discount, couponCode, discountTarget, 30000m, 230000m - discount, "VND",
         "<b>Nguyen Van A</b>", "0900000000", "123 <script>alert(1)</script>", cancelReason, DateTime.UtcNow,
         new[] { new OrderDetailsLine("Widget <3", 2, 100000m, 200000m) });
 
@@ -30,6 +30,17 @@ public class OrderEmailTemplatesTests
 
         body.Should().Contain("SALE10");
         body.Should().Contain("20.000");
+        body.Should().Contain("Giảm giá (SALE10)");
+    }
+
+    [Fact]
+    public void BuildConfirmedBody_Should_LabelAsShippingDiscount_When_DiscountTargetIsShipping()
+    {
+        var order = BuildOrder(discount: 30000m, couponCode: "FREESHIP", discountTarget: "Shipping");
+        var body = OrderEmailTemplates.BuildConfirmedBody(null, order, "http://localhost:3000");
+
+        body.Should().Contain("Giảm phí vận chuyển (FREESHIP)");
+        body.Should().NotContain("Giảm giá (FREESHIP)");
     }
 
     [Fact]

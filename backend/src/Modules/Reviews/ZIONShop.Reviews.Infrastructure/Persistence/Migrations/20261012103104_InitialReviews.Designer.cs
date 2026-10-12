@@ -9,7 +9,7 @@ using ZIONShop.Reviews.Infrastructure.Persistence;
 
 #nullable disable
 
-namespace ZIONShop.Reviews.Infrastructure.Migrations
+namespace ZIONShop.Reviews.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(ReviewsDbContext))]
     [Migration("20261012103104_InitialReviews")]

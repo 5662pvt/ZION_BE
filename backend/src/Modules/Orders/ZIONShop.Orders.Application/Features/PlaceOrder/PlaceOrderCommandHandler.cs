@@ -100,7 +100,7 @@ public class PlaceOrderCommandHandler : IRequestHandler<PlaceOrderCommand, Resul
             if (error is not null)
                 return Result.Failure<OrderDto>(OrdersErrors.InvalidCoupon(error.Message));
 
-            order.ApplyCoupon(quote!.Code, quote.DiscountAmount);
+            order.ApplyCoupon(quote!.Code, quote.DiscountAmount, quote.DiscountTarget);
         }
 
         try

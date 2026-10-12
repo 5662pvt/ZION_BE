@@ -8,7 +8,7 @@ using ZIONShop.Reviews.Infrastructure.Persistence;
 
 #nullable disable
 
-namespace ZIONShop.Reviews.Infrastructure.Migrations
+namespace ZIONShop.Reviews.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(ReviewsDbContext))]
     partial class ReviewsDbContextModelSnapshot : ModelSnapshot

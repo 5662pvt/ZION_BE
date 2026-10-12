@@ -24,6 +24,7 @@ public class Order : AggregateRoot
     public decimal ShippingFee { get; private set; }
     public string? CouponCode { get; private set; }
     public decimal DiscountAmount { get; private set; }
+    public string? DiscountTarget { get; private set; }
     public decimal Total => Subtotal - DiscountAmount + ShippingFee;
     public string? Note { get; private set; }
     public string? CancelReason { get; private set; }
@@ -70,10 +71,11 @@ public class Order : AggregateRoot
         return $"ZS{DateTime.UtcNow:yyMMdd}{suffix}";
     }
 
-    public void ApplyCoupon(string code, decimal discountAmount)
+    public void ApplyCoupon(string code, decimal discountAmount, string discountTarget)
     {
         CouponCode = code;
         DiscountAmount = Math.Clamp(discountAmount, 0m, Subtotal);
+        DiscountTarget = discountTarget is "Items" or "Shipping" ? discountTarget : "Items";
     }
 
     public Result ConfirmReservation()

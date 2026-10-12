@@ -26,7 +26,7 @@ public class OrderConfirmedIntegrationEventHandlerTests
 
     private static OrderDetails BuildOrder(Guid orderId, Guid userId, decimal discount = 0, string? couponCode = null) => new(
         orderId, userId, "ZS0001", "Confirmed", "COD",
-        200000m, discount, couponCode, 30000m, 230000m - discount, "VND",
+        200000m, discount, couponCode, null, 30000m, 230000m - discount, "VND",
         "Nguyen Van A", "0900000000", "123 Đường ABC, Cầu Giấy, Hà Nội", null, DateTime.UtcNow,
         new[] { new OrderDetailsLine("Widget", 2, 100000m, 200000m) });
 
