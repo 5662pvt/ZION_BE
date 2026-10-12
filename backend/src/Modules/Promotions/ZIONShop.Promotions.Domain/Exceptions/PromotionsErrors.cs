@@ -5,7 +5,8 @@ namespace ZIONShop.Promotions.Domain.Exceptions;
 public static class PromotionsErrors
 {
     public static readonly Error PromotionNotFound = Error.NotFound("Promotions.PromotionNotFound", "Khuyến mãi không tồn tại");
-    public static readonly Error InvalidPromotionType = Error.Validation("Promotions.InvalidPromotionType", "'type' phải là 'PercentageOff' hoặc 'FixedAmountOff'");
+    public static readonly Error InvalidPromotionType = Error.Validation("Promotions.InvalidPromotionType", "'type' phải là 'PercentageOff', 'FixedAmountOff' hoặc 'FreeShipping'");
+    public static readonly Error InvalidPromotionScope = Error.Validation("Promotions.InvalidPromotionScope", "'scope' phải là 'Order', 'Products' hoặc 'Categories'");
     public static readonly Error CouponNotFound = Error.NotFound("Promotions.CouponNotFound", "Mã coupon không tồn tại");
     public static readonly Error AlreadyActive = Error.Conflict("Promotions.AlreadyActive", "Khuyến mãi đã được kích hoạt");
     public static readonly Error AlreadyInactive = Error.Conflict("Promotions.AlreadyInactive", "Khuyến mãi đã bị tắt");
@@ -21,6 +22,8 @@ public static class PromotionsErrors
     public static readonly Error CouponExpired = Error.Validation("Promotions.CouponExpired", "Mã giảm giá đã hết hạn");
     public static readonly Error CouponUsageLimitReached = Error.Validation("Promotions.CouponUsageLimitReached", "Mã giảm giá đã hết lượt sử dụng");
     public static readonly Error CouponPerUserLimitReached = Error.Validation("Promotions.CouponPerUserLimitReached", "Bạn đã sử dụng hết lượt cho mã này");
+    public static readonly Error CouponNotApplicable = Error.Validation("Promotions.CouponNotApplicable", "Mã giảm giá không áp dụng cho sản phẩm trong giỏ");
+    public static readonly Error CouponAlreadyFreeShipping = Error.Validation("Promotions.CouponAlreadyFreeShipping", "Đơn hàng đã được miễn phí vận chuyển");
 
     public static Error CouponMinSubtotalNotMet(decimal minOrderSubtotal) =>
         Error.Validation("Promotions.CouponMinSubtotalNotMet", $"Đơn hàng chưa đạt giá trị tối thiểu {minOrderSubtotal.ToString("N0", System.Globalization.CultureInfo.InvariantCulture)}");

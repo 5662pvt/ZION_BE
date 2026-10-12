@@ -14,7 +14,10 @@ public record PromotionSummaryDto(
     int? UsageLimit,
     int? PerUserLimit,
     int UsedCount,
-    int CouponCount);
+    int CouponCount,
+    string Scope,
+    IReadOnlyList<Guid> TargetProductIds,
+    IReadOnlyList<Guid> TargetCategoryIds);
 
 public record PromotionDto(
     Guid Id,
@@ -32,6 +35,9 @@ public record PromotionDto(
     int? PerUserLimit,
     int UsedCount,
     int CouponCount,
+    string Scope,
+    IReadOnlyList<Guid> TargetProductIds,
+    IReadOnlyList<Guid> TargetCategoryIds,
     IReadOnlyList<CouponDto> Coupons);
 
 public record CouponDto(Guid Id, string Code, bool IsActive, int UsedCount, DateTime CreatedAt);

@@ -19,7 +19,10 @@ public static class PromotionMappingExtensions
         promotion.UsageLimit,
         promotion.PerUserLimit,
         promotion.UsedCount,
-        couponCount);
+        couponCount,
+        promotion.Scope.ToString(),
+        promotion.TargetProductIds,
+        promotion.TargetCategoryIds);
 
     public static PromotionDto ToDto(this Promotion promotion, IReadOnlyList<CouponCode> coupons, DateTime utcNow) => new(
         promotion.Id,
@@ -37,6 +40,9 @@ public static class PromotionMappingExtensions
         promotion.PerUserLimit,
         promotion.UsedCount,
         coupons.Count,
+        promotion.Scope.ToString(),
+        promotion.TargetProductIds,
+        promotion.TargetCategoryIds,
         coupons.Select(c => c.ToDto()).ToList());
 
     public static CouponDto ToDto(this CouponCode coupon) => new(coupon.Id, coupon.Code, coupon.IsActive, coupon.UsedCount, coupon.CreatedAt);

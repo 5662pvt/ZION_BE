@@ -28,9 +28,16 @@ public class CreatePromotionCommandHandler : IRequestHandler<CreatePromotionComm
         if (!Enum.TryParse<PromotionType>(request.Type, ignoreCase: true, out var type))
             return Result.Failure<PromotionDto>(PromotionsErrors.InvalidPromotionType);
 
+        if (!Enum.TryParse<PromotionScope>(request.Scope, ignoreCase: true, out var scope))
+            return Result.Failure<PromotionDto>(PromotionsErrors.InvalidPromotionScope);
+
+        var value = type == PromotionType.FreeShipping ? 0m : request.Value;
+        var maxDiscountAmount = type == PromotionType.FreeShipping ? null : request.MaxDiscountAmount;
+
         var promotion = Promotion.Create(
-            request.Name, request.Description, type, request.Value, request.MaxDiscountAmount,
-            request.MinOrderSubtotal, request.StartsAt, request.EndsAt, request.UsageLimit, request.PerUserLimit);
+            request.Name, request.Description, type, value, maxDiscountAmount,
+            request.MinOrderSubtotal, request.StartsAt, request.EndsAt, request.UsageLimit, request.PerUserLimit,
+            scope, request.TargetProductIds, request.TargetCategoryIds);
 
         await _promotions.AddAsync(promotion, cancellationToken);
         await _uow.SaveChangesAsync(cancellationToken);

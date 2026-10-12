@@ -32,9 +32,16 @@ public class UpdatePromotionCommandHandler : IRequestHandler<UpdatePromotionComm
         if (!Enum.TryParse<PromotionType>(request.Type, ignoreCase: true, out var type))
             return Result.Failure<PromotionDto>(PromotionsErrors.InvalidPromotionType);
 
+        if (!Enum.TryParse<PromotionScope>(request.Scope, ignoreCase: true, out var scope))
+            return Result.Failure<PromotionDto>(PromotionsErrors.InvalidPromotionScope);
+
+        var value = type == PromotionType.FreeShipping ? 0m : request.Value;
+        var maxDiscountAmount = type == PromotionType.FreeShipping ? null : request.MaxDiscountAmount;
+
         var result = promotion.Update(
-            request.Name, request.Description, type, request.Value, request.MaxDiscountAmount,
-            request.MinOrderSubtotal, request.StartsAt, request.EndsAt, request.UsageLimit, request.PerUserLimit);
+            request.Name, request.Description, type, value, maxDiscountAmount,
+            request.MinOrderSubtotal, request.StartsAt, request.EndsAt, request.UsageLimit, request.PerUserLimit,
+            scope, request.TargetProductIds, request.TargetCategoryIds);
         if (result.IsFailure) return Result.Failure<PromotionDto>(result.Error);
 
         _promotions.Update(promotion);

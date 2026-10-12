@@ -43,7 +43,7 @@ public class PromotionsController : ControllerBase
     {
         var cmd = new CreatePromotionCommand(
             body.Name, body.Description, body.Type, body.Value, body.MaxDiscountAmount, body.MinOrderSubtotal,
-            body.StartsAt, body.EndsAt, body.UsageLimit, body.PerUserLimit);
+            body.StartsAt, body.EndsAt, body.UsageLimit, body.PerUserLimit, body.Scope, body.TargetProductIds, body.TargetCategoryIds);
         return (await _mediator.Send(cmd, ct)).ToActionResult("Promotion created");
     }
 
@@ -52,7 +52,7 @@ public class PromotionsController : ControllerBase
     {
         var cmd = new UpdatePromotionCommand(
             id, body.Name, body.Description, body.Type, body.Value, body.MaxDiscountAmount, body.MinOrderSubtotal,
-            body.StartsAt, body.EndsAt, body.UsageLimit, body.PerUserLimit);
+            body.StartsAt, body.EndsAt, body.UsageLimit, body.PerUserLimit, body.Scope, body.TargetProductIds, body.TargetCategoryIds);
         return (await _mediator.Send(cmd, ct)).ToActionResult("Promotion updated");
     }
 
@@ -89,7 +89,10 @@ public record PromotionUpsertRequest(
     DateTime StartsAt,
     DateTime EndsAt,
     int? UsageLimit,
-    int? PerUserLimit);
+    int? PerUserLimit,
+    string Scope = "Order",
+    Guid[]? TargetProductIds = null,
+    Guid[]? TargetCategoryIds = null);
 
 public record CreateCouponBody(string Code);
 public record GenerateCouponsBody(string Prefix, int Count);

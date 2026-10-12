@@ -134,4 +134,62 @@ public class PromotionTests
 
         promotion.UsedCount.Should().Be(0);
     }
+
+    [Fact]
+    public void Create_Should_DefaultToOrderScope_When_ScopeNotSpecified()
+    {
+        var promotion = CreateFixed(1000m, DateTime.UtcNow.AddDays(-1), DateTime.UtcNow.AddDays(1));
+
+        promotion.Scope.Should().Be(PromotionScope.Order);
+        promotion.TargetProductIds.Should().BeEmpty();
+        promotion.TargetCategoryIds.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void IsLineEligible_Should_ReturnTrue_When_ScopeIsOrder()
+    {
+        var promotion = CreateFixed(1000m, DateTime.UtcNow.AddDays(-1), DateTime.UtcNow.AddDays(1));
+
+        promotion.IsLineEligible(Guid.NewGuid(), null).Should().BeTrue();
+    }
+
+    [Fact]
+    public void IsLineEligible_Should_ReturnTrue_When_ScopeIsProductsAndProductIdMatches()
+    {
+        var productId = Guid.NewGuid();
+        var promotion = Promotion.Create("Sale", null, PromotionType.FixedAmountOff, 1000m, null, 0m,
+            DateTime.UtcNow.AddDays(-1), DateTime.UtcNow.AddDays(1), null, null,
+            PromotionScope.Products, new[] { productId });
+
+        promotion.IsLineEligible(productId, null).Should().BeTrue();
+        promotion.IsLineEligible(Guid.NewGuid(), null).Should().BeFalse();
+    }
+
+    [Fact]
+    public void IsLineEligible_Should_ReturnTrue_When_ScopeIsCategoriesAndCategoryIdMatches()
+    {
+        var categoryId = Guid.NewGuid();
+        var promotion = Promotion.Create("Sale", null, PromotionType.FixedAmountOff, 1000m, null, 0m,
+            DateTime.UtcNow.AddDays(-1), DateTime.UtcNow.AddDays(1), null, null,
+            PromotionScope.Categories, targetCategoryIds: new[] { categoryId });
+
+        promotion.IsLineEligible(Guid.NewGuid(), categoryId).Should().BeTrue();
+        promotion.IsLineEligible(Guid.NewGuid(), Guid.NewGuid()).Should().BeFalse();
+        promotion.IsLineEligible(Guid.NewGuid(), null).Should().BeFalse();
+    }
+
+    [Fact]
+    public void Update_Should_ReplaceScopeAndTargets()
+    {
+        var promotion = CreateFixed(1000m, DateTime.UtcNow.AddDays(-1), DateTime.UtcNow.AddDays(1));
+        var categoryId = Guid.NewGuid();
+
+        var result = promotion.Update("Sale", null, PromotionType.FixedAmountOff, 1000m, null, 0m,
+            DateTime.UtcNow.AddDays(-1), DateTime.UtcNow.AddDays(1), null, null,
+            PromotionScope.Categories, targetCategoryIds: new[] { categoryId });
+
+        result.IsSuccess.Should().BeTrue();
+        promotion.Scope.Should().Be(PromotionScope.Categories);
+        promotion.TargetCategoryIds.Should().ContainSingle().Which.Should().Be(categoryId);
+    }
 }

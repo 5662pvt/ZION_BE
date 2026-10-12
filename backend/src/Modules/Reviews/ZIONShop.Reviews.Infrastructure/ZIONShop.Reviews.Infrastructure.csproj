@@ -2,8 +2,14 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.EntityFrameworkCore" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
   </ItemGroup>
   <ItemGroup>
-<ProjectReference Include="..\ZIONShop.Reviews.Application\ZIONShop.Reviews.Application.csproj" />
+    <ProjectReference Include="..\ZIONShop.Reviews.Domain\ZIONShop.Reviews.Domain.csproj" />
+    <ProjectReference Include="..\ZIONShop.Reviews.Application\ZIONShop.Reviews.Application.csproj" />
+    <ProjectReference Include="..\..\..\BuildingBlocks\ZIONShop.Contracts\ZIONShop.Contracts.csproj" />
   </ItemGroup>
 </Project>

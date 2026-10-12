@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using ZIONShop.Contracts.Products;
 using ZIONShop.Contracts.Promotions;
 using ZIONShop.Promotions.Application.Interfaces;
 using ZIONShop.Promotions.Domain.Entities;
@@ -24,19 +25,22 @@ public class PromotionEvaluator : IPromotionEvaluator
     private readonly ICouponRedemptionRepository _redemptions;
     private readonly IPromotionsUnitOfWork _uow;
     private readonly TimeProvider _timeProvider;
+    private readonly IProductCatalogReader _catalogReader;
 
     public PromotionEvaluator(
         IPromotionRepository promotions,
         ICouponCodeRepository coupons,
         ICouponRedemptionRepository redemptions,
         IPromotionsUnitOfWork uow,
-        TimeProvider timeProvider)
+        TimeProvider timeProvider,
+        IProductCatalogReader catalogReader)
     {
         _promotions = promotions;
         _coupons = coupons;
         _redemptions = redemptions;
         _uow = uow;
         _timeProvider = timeProvider;
+        _catalogReader = catalogReader;
     }
 
     public async Task<(CouponQuote? Quote, CouponError? Error)> QuoteAsync(CouponRequest request, CancellationToken ct = default)
@@ -52,8 +56,10 @@ public class PromotionEvaluator : IPromotionEvaluator
         var error = await ValidateAsync(coupon, promotion, request.UserId, request.Subtotal, now, ct);
         if (error is not null) return (null, error);
 
-        var discount = promotion.CalculateDiscount(request.Subtotal);
-        return (new CouponQuote(coupon.Code, promotion.Id, promotion.Name, discount, "Items"), null);
+        var (discount, target, discountError) = await ComputeDiscountAsync(promotion, request, ct);
+        if (discountError is not null) return (null, discountError);
+
+        return (new CouponQuote(coupon.Code, promotion.Id, promotion.Name, discount, target), null);
     }
 
     public async Task<(CouponQuote? Quote, CouponError? Error)> ReserveAsync(CouponRequest request, Guid orderId, CancellationToken ct = default)
@@ -63,7 +69,8 @@ public class PromotionEvaluator : IPromotionEvaluator
         {
             var existingPromotion = await _promotions.GetByIdAsync(existing.PromotionId, ct);
             var existingCoupon = await _coupons.GetByIdAsync(existing.CouponCodeId, ct);
-            return (new CouponQuote(existingCoupon?.Code ?? request.Code, existing.PromotionId, existingPromotion?.Name ?? string.Empty, existing.DiscountAmount, "Items"), null);
+            var existingTarget = existingPromotion?.Type == PromotionType.FreeShipping ? "Shipping" : "Items";
+            return (new CouponQuote(existingCoupon?.Code ?? request.Code, existing.PromotionId, existingPromotion?.Name ?? string.Empty, existing.DiscountAmount, existingTarget), null);
         }
 
         var normalizedCode = Normalize(request.Code);
@@ -79,7 +86,9 @@ public class PromotionEvaluator : IPromotionEvaluator
             var error = await ValidateAsync(coupon, promotion, request.UserId, request.Subtotal, now, ct);
             if (error is not null) return (null, error);
 
-            var discount = promotion.CalculateDiscount(request.Subtotal);
+            var (discount, target, discountError) = await ComputeDiscountAsync(promotion, request, ct);
+            if (discountError is not null) return (null, discountError);
+
             promotion.IncrementUsage();
             coupon.IncrementUsage();
 
@@ -95,7 +104,7 @@ public class PromotionEvaluator : IPromotionEvaluator
             try
             {
                 await _uow.SaveChangesAsync(ct);
-                return (new CouponQuote(coupon.Code, promotion.Id, promotion.Name, discount, "Items"), null);
+                return (new CouponQuote(coupon.Code, promotion.Id, promotion.Name, discount, target), null);
             }
             catch (DbUpdateConcurrencyException ex)
             {
@@ -163,6 +172,57 @@ public class PromotionEvaluator : IPromotionEvaluator
         }
 
         return null;
+    }
+
+    /// <summary>
+    /// Resolves the eligible base amount for Scope (Order = the whole order's Subtotal, independent of
+    /// Lines so callers that only pass Subtotal keep working; Products/Categories = sum of matching
+    /// CouponLines) then computes the discount for the promotion's Type.
+    /// </summary>
+    private async Task<(decimal Discount, string Target, CouponError? Error)> ComputeDiscountAsync(Promotion promotion, CouponRequest request, CancellationToken ct)
+    {
+        var (eligibleBase, hasEligible) = await ResolveEligibleBaseAsync(promotion, request, ct);
+        if (!hasEligible)
+            return (0m, string.Empty, ToCouponError(PromotionsErrors.CouponNotApplicable));
+
+        if (promotion.Type == PromotionType.FreeShipping)
+        {
+            if (request.ShippingFee <= 0m)
+                return (0m, string.Empty, ToCouponError(PromotionsErrors.CouponAlreadyFreeShipping));
+            return (request.ShippingFee, "Shipping", null);
+        }
+
+        return (promotion.CalculateDiscount(eligibleBase), "Items", null);
+    }
+
+    private async Task<(decimal EligibleBase, bool HasEligible)> ResolveEligibleBaseAsync(Promotion promotion, CouponRequest request, CancellationToken ct)
+    {
+        if (promotion.Scope == PromotionScope.Order)
+            return (request.Subtotal, true);
+
+        var categoryCache = new Dictionary<Guid, Guid?>();
+        decimal eligibleBase = 0m;
+        var hasEligible = false;
+
+        foreach (var line in request.Lines)
+        {
+            Guid? categoryId = null;
+            if (promotion.Scope == PromotionScope.Categories)
+            {
+                if (!categoryCache.TryGetValue(line.ProductId, out categoryId))
+                {
+                    categoryId = (await _catalogReader.GetAsync(line.ProductId, ct))?.CategoryId;
+                    categoryCache[line.ProductId] = categoryId;
+                }
+            }
+
+            if (!promotion.IsLineEligible(line.ProductId, categoryId)) continue;
+
+            eligibleBase += line.LineTotal;
+            hasEligible = true;
+        }
+
+        return (eligibleBase, hasEligible);
     }
 
     private static string Normalize(string code) => code.Trim().ToUpperInvariant();

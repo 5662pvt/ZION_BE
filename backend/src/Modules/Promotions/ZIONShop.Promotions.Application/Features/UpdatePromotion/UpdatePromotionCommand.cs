@@ -15,4 +15,7 @@ public record UpdatePromotionCommand(
     DateTime StartsAt,
     DateTime EndsAt,
     int? UsageLimit,
-    int? PerUserLimit) : IRequest<Result<PromotionDto>>;
+    int? PerUserLimit,
+    string Scope = "Order",
+    IReadOnlyList<Guid>? TargetProductIds = null,
+    IReadOnlyList<Guid>? TargetCategoryIds = null) : IRequest<Result<PromotionDto>>;

@@ -21,6 +21,9 @@ public class Promotion : AggregateRoot
     public int? UsageLimit { get; private set; }
     public int? PerUserLimit { get; private set; }
     public int UsedCount { get; private set; }
+    public PromotionScope Scope { get; private set; } = PromotionScope.Order;
+    public Guid[] TargetProductIds { get; private set; } = Array.Empty<Guid>();
+    public Guid[] TargetCategoryIds { get; private set; } = Array.Empty<Guid>();
 
     public static Promotion Create(
         string name,
@@ -32,7 +35,10 @@ public class Promotion : AggregateRoot
         DateTime startsAt,
         DateTime endsAt,
         int? usageLimit,
-        int? perUserLimit)
+        int? perUserLimit,
+        PromotionScope scope = PromotionScope.Order,
+        IReadOnlyList<Guid>? targetProductIds = null,
+        IReadOnlyList<Guid>? targetCategoryIds = null)
     {
         return new Promotion
         {
@@ -48,7 +54,10 @@ public class Promotion : AggregateRoot
             UsageLimit = usageLimit,
             PerUserLimit = perUserLimit,
             IsActive = false,
-            UsedCount = 0
+            UsedCount = 0,
+            Scope = scope,
+            TargetProductIds = targetProductIds?.ToArray() ?? Array.Empty<Guid>(),
+            TargetCategoryIds = targetCategoryIds?.ToArray() ?? Array.Empty<Guid>()
         };
     }
 
@@ -62,7 +71,10 @@ public class Promotion : AggregateRoot
         DateTime startsAt,
         DateTime endsAt,
         int? usageLimit,
-        int? perUserLimit)
+        int? perUserLimit,
+        PromotionScope scope = PromotionScope.Order,
+        IReadOnlyList<Guid>? targetProductIds = null,
+        IReadOnlyList<Guid>? targetCategoryIds = null)
     {
         if (usageLimit.HasValue && usageLimit.Value < UsedCount)
             return Result.Failure(PromotionsErrors.UsageLimitBelowUsedCount);
@@ -77,8 +89,19 @@ public class Promotion : AggregateRoot
         EndsAt = endsAt;
         UsageLimit = usageLimit;
         PerUserLimit = perUserLimit;
+        Scope = scope;
+        TargetProductIds = targetProductIds?.ToArray() ?? Array.Empty<Guid>();
+        TargetCategoryIds = targetCategoryIds?.ToArray() ?? Array.Empty<Guid>();
         return Result.Success();
     }
+
+    /// <summary>Pure containment check against Scope/targets; Categories needs the caller to resolve a productId's CategoryId first (I/O lives in the evaluator).</summary>
+    public bool IsLineEligible(Guid productId, Guid? categoryId) => Scope switch
+    {
+        PromotionScope.Products => TargetProductIds.Contains(productId),
+        PromotionScope.Categories => categoryId.HasValue && TargetCategoryIds.Contains(categoryId.Value),
+        _ => true
+    };
 
     public Result Activate()
     {

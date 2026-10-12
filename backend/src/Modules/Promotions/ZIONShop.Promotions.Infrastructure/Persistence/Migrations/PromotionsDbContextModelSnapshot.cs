@@ -196,8 +196,27 @@ namespace ZIONShop.Promotions.Infrastructure.Persistence.Migrations
                     b.Property<int?>("PerUserLimit")
                         .HasColumnType("integer");
 
+                    b.Property<string>("Scope")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasDefaultValue("Order");
+
                     b.Property<DateTime>("StartsAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid[]>("TargetCategoryIds")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid[]")
+                        .HasDefaultValueSql("'{}'");
+
+                    b.Property<Guid[]>("TargetProductIds")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid[]")
+                        .HasDefaultValueSql("'{}'");
 
                     b.Property<string>("Type")
                         .IsRequired()

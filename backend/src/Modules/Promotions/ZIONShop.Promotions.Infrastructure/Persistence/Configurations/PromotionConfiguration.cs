@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using ZIONShop.Promotions.Domain.Entities;
+using ZIONShop.Promotions.Domain.Enums;
 
 namespace ZIONShop.Promotions.Infrastructure.Persistence.Configurations;
 
@@ -23,6 +24,9 @@ public class PromotionConfiguration : IEntityTypeConfiguration<Promotion>
         builder.Property(p => p.UsageLimit);
         builder.Property(p => p.PerUserLimit);
         builder.Property(p => p.UsedCount).IsRequired().HasDefaultValue(0);
+        builder.Property(p => p.Scope).HasConversion<string>().HasMaxLength(16).IsRequired().HasDefaultValue(PromotionScope.Order);
+        builder.Property(p => p.TargetProductIds).HasColumnType("uuid[]").IsRequired().HasDefaultValueSql("'{}'");
+        builder.Property(p => p.TargetCategoryIds).HasColumnType("uuid[]").IsRequired().HasDefaultValueSql("'{}'");
         builder.HasIndex(p => p.IsActive);
 
         builder.Property(p => p.CreatedDate).IsRequired();

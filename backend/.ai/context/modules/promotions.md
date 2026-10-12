@@ -23,18 +23,20 @@ Modules/Promotions/
 
 | Entity | Mô tả |
 |--------|--------|
-| `Promotion` | Campaign: name, type, value, date range, active, UsageLimit/PerUserLimit/UsedCount (atomic, xmin-guarded) |
+| `Promotion` | Campaign: name, type, value, date range, active, UsageLimit/PerUserLimit/UsedCount (atomic, xmin-guarded), `Scope` (Order/Products/Categories) + `TargetProductIds`/`TargetCategoryIds` |
 | `CouponCode` | Mã coupon thuộc promotion (unique, uppercase); own UsedCount (xmin-guarded) |
 | `CouponRedemption` | Reserved/Committed/Released ledger row per OrderId (unique); drives usage-limit/per-user-limit counts |
-| `PromotionTarget` | not implemented — out of W7 scope |
-| `GiftRule` | not implemented — out of W7 scope |
+| `GiftRule` | not implemented — out of W8 scope |
+
+`TargetProductIds`/`TargetCategoryIds` are `Guid[]` columns on `Promotion` (Postgres `uuid[]`, mapped directly — chosen over a child `PromotionTarget` table since targets are always read/written as a whole with their promotion, never queried independently). `Scope` gates which is used: `Order` ignores both (whole-order subtotal eligible), `Products` requires `TargetProductIds` non-empty, `Categories` requires `TargetCategoryIds` non-empty. Category membership is resolved per distinct `ProductId` in the cart via `IProductCatalogReader.GetAsync` (no Products DbContext access — see Rules).
 
 ### Promotion types (enum) — implemented
 
 - `PercentageOff`
 - `FixedAmountOff`
+- `FreeShipping` (W8) — `Value`/`MaxDiscountAmount` forced to `0`/`null` regardless of request; discount = the order's shipping fee, `DiscountTarget` = `"Shipping"`. Already-free orders (shipping fee already 0) return `Promotions.CouponAlreadyFreeShipping` instead of a 0 discount.
 
-Not yet implemented: `FreeShipping`, `GiftWithPurchase`/`GiftRule`.
+Not yet implemented: `GiftWithPurchase`/`GiftRule`.
 
 ## Features — backend (MVP)
 
@@ -105,4 +107,7 @@ Hoặc nested: `/api/v1/promotions/{id}/gift-rules` — chọn một convention 
 
 **Coupons implemented (W7)** — `Promotion` + `CouponCode` + `CouponRedemption`, `PromotionsDbContext` (schema `promotions`), `PromotionEvaluator : IPromotionEvaluator` (xmin optimistic-concurrency retry ×3 on Reserve/Release), `PromotionsController` (admin CRUD/activate/deactivate/coupons + storefront `coupons/validate`), `OrderConfirmedIntegrationEventHandler`/`OrderCancelledIntegrationEventHandler` consumers, `StaleReservationReleaseBackgroundService` (releases Reserved redemptions older than 30 min, every 5 min). Migration `InitialPromotions` hand-authored (no `dotnet-ef` tooling available in the implementing session — regenerate/verify with `dotnet ef migrations add` before relying on it for a real deploy).
 
-**Gifts (A5) not implemented** — `GiftRule`, `PromotionTarget`, `FreeShipping`/`GiftWithPurchase` types, and the gift-rules API/admin screens are still pending; implement per the original sketch above when that phase starts.
+**Scopes + FreeShipping implemented (W8)** — `Promotion.Scope`/`TargetProductIds`/`TargetCategoryIds` (migration `PromotionScopes`, hand-authored same as `InitialPromotions` — verify with `dotnet ef migrations has-pending-model-changes`), `PromotionType.FreeShipping`, `Promotion.IsLineEligible(productId, categoryId)` (pure domain rule), `PromotionEvaluator.ResolveEligibleBaseAsync`/`ComputeDiscountAsync` (Infrastructure — the only place that calls `IProductCatalogReader`). New error `Promotions.CouponNotApplicable` ("Mã giảm giá không áp dụng cho sản phẩm trong giỏ") when a Products/Categories-scoped coupon matches no cart line; `Promotions.CouponAlreadyFreeShipping` for a FreeShipping coupon on an order whose shipping is already free.
+**Known gap — `PromotionsController` not yet wired for Scope/targets.** `CreatePromotionCommand`/`UpdatePromotionCommand` gained `Scope`/`TargetProductIds`/`TargetCategoryIds` with back-compat defaults (`"Order"`/empty) so the existing controller (outside this track's allowed files) still compiles unchanged — but it does not read those fields off `PromotionUpsertRequest` yet, so admin-created promotions are always `Order`-scoped until `PromotionsController.Create`/`Update` and `PromotionUpsertRequest` are updated to pass them through. The W8 integration tests exercise Products/Categories/FreeShipping by seeding `Promotion`/`CouponCode` directly via `PromotionsDbContext` (see `PromotionsTestHelpers.SeedScopedPromotionAsync`), not through that HTTP endpoint.
+
+**Gifts (A5) not implemented** — `GiftRule`, `GiftWithPurchase`, and the gift-rules API/admin screens are still pending; implement per the original sketch above when that phase starts.

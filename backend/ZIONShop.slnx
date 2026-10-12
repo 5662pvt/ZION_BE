@@ -79,6 +79,7 @@
     <Project Path="tests/Unit/ZIONShop.Payments.Tests/ZIONShop.Payments.Tests.csproj" />
     <Project Path="tests/Unit/ZIONShop.Products.Tests/ZIONShop.Products.Tests.csproj" />
     <Project Path="tests/Unit/ZIONShop.Promotions.Tests/ZIONShop.Promotions.Tests.csproj" />
+    <Project Path="tests/Unit/ZIONShop.Reviews.Tests/ZIONShop.Reviews.Tests.csproj" />
     <Project Path="tests/Unit/ZIONShop.Users.Tests/ZIONShop.Users.Tests.csproj" />
   </Folder>
   <Folder Name="/tests/Integration/">

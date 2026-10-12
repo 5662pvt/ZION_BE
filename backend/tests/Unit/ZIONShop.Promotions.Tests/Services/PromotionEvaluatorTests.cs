@@ -14,18 +14,20 @@ public class PromotionEvaluatorTests
     private static PromotionsDbContext CreateDb(string name) =>
         new(new DbContextOptionsBuilder<PromotionsDbContext>().UseInMemoryDatabase(name).Options);
 
-    private static PromotionEvaluator CreateEvaluator(PromotionsDbContext db, DateTimeOffset now) =>
-        new(new PromotionRepository(db), new CouponCodeRepository(db), new CouponRedemptionRepository(db), db, new FakeTimeProvider(now));
+    private static PromotionEvaluator CreateEvaluator(PromotionsDbContext db, DateTimeOffset now, FakeProductCatalogReader? catalogReader = null) =>
+        new(new PromotionRepository(db), new CouponCodeRepository(db), new CouponRedemptionRepository(db), db, new FakeTimeProvider(now), catalogReader ?? new FakeProductCatalogReader());
 
-    private static CouponRequest Req(string code, Guid userId, decimal subtotal) =>
-        new(code, userId, Array.Empty<CouponLine>(), subtotal, ShippingFee: 0m);
+    private static CouponRequest Req(string code, Guid userId, decimal subtotal, IReadOnlyList<CouponLine>? lines = null, decimal shippingFee = 0m) =>
+        new(code, userId, lines ?? Array.Empty<CouponLine>(), subtotal, shippingFee);
 
     private static async Task<(Promotion Promotion, CouponCode Coupon)> SeedActivePromotionWithCouponAsync(
         PromotionsDbContext db, DateTime now, decimal value = 10m, decimal? maxDiscount = null,
-        decimal minOrderSubtotal = 0m, int? usageLimit = null, int? perUserLimit = null, string code = "SALE10")
+        decimal minOrderSubtotal = 0m, int? usageLimit = null, int? perUserLimit = null, string code = "SALE10",
+        PromotionType type = PromotionType.PercentageOff, PromotionScope scope = PromotionScope.Order,
+        IReadOnlyList<Guid>? targetProductIds = null, IReadOnlyList<Guid>? targetCategoryIds = null)
     {
-        var promotion = Promotion.Create("Sale", null, PromotionType.PercentageOff, value, maxDiscount, minOrderSubtotal,
-            now.AddDays(-1), now.AddDays(1), usageLimit, perUserLimit);
+        var promotion = Promotion.Create("Sale", null, type, value, maxDiscount, minOrderSubtotal,
+            now.AddDays(-1), now.AddDays(1), usageLimit, perUserLimit, scope, targetProductIds, targetCategoryIds);
         promotion.Activate();
         await db.Promotions.AddAsync(promotion);
 
@@ -309,5 +311,119 @@ public class PromotionEvaluatorTests
         var evaluator = CreateEvaluator(db, now);
 
         await evaluator.ReleaseAsync(Guid.NewGuid());
+    }
+
+    [Fact]
+    public async Task QuoteAsync_Should_DiscountOnlyMatchingLine_When_ScopeIsProducts()
+    {
+        var dbName = Guid.NewGuid().ToString("N");
+        var now = DateTimeOffset.UtcNow;
+        var matchingProductId = Guid.NewGuid();
+        var otherProductId = Guid.NewGuid();
+        using var db = CreateDb(dbName);
+        await SeedActivePromotionWithCouponAsync(db, now.UtcDateTime, value: 10m, scope: PromotionScope.Products, targetProductIds: new[] { matchingProductId });
+
+        var lines = new[]
+        {
+            new CouponLine(matchingProductId, 1, 100000m),
+            new CouponLine(otherProductId, 1, 100000m)
+        };
+        var evaluator = CreateEvaluator(db, now);
+        var (quote, error) = await evaluator.QuoteAsync(Req("SALE10", Guid.NewGuid(), 200000m, lines));
+
+        error.Should().BeNull();
+        quote!.DiscountAmount.Should().Be(10000m);
+        quote.DiscountTarget.Should().Be("Items");
+    }
+
+    [Fact]
+    public async Task QuoteAsync_Should_ReturnNotApplicable_When_ScopeIsProductsAndNoLineMatches()
+    {
+        var dbName = Guid.NewGuid().ToString("N");
+        var now = DateTimeOffset.UtcNow;
+        using var db = CreateDb(dbName);
+        await SeedActivePromotionWithCouponAsync(db, now.UtcDateTime, value: 10m, scope: PromotionScope.Products, targetProductIds: new[] { Guid.NewGuid() });
+
+        var lines = new[] { new CouponLine(Guid.NewGuid(), 1, 100000m) };
+        var evaluator = CreateEvaluator(db, now);
+        var (quote, error) = await evaluator.QuoteAsync(Req("SALE10", Guid.NewGuid(), 100000m, lines));
+
+        quote.Should().BeNull();
+        error!.Message.Should().Be("Mã giảm giá không áp dụng cho sản phẩm trong giỏ");
+    }
+
+    [Fact]
+    public async Task QuoteAsync_Should_DiscountOnlyMatchingCategoryLine_When_ScopeIsCategories()
+    {
+        var dbName = Guid.NewGuid().ToString("N");
+        var now = DateTimeOffset.UtcNow;
+        var targetCategoryId = Guid.NewGuid();
+        var matchingProductId = Guid.NewGuid();
+        var otherProductId = Guid.NewGuid();
+        using var db = CreateDb(dbName);
+        await SeedActivePromotionWithCouponAsync(db, now.UtcDateTime, value: 20m, scope: PromotionScope.Categories, targetCategoryIds: new[] { targetCategoryId });
+
+        var catalog = new FakeProductCatalogReader()
+            .WithProduct(matchingProductId, targetCategoryId)
+            .WithProduct(otherProductId, Guid.NewGuid());
+        var lines = new[]
+        {
+            new CouponLine(matchingProductId, 1, 100000m),
+            new CouponLine(otherProductId, 1, 100000m)
+        };
+        var evaluator = CreateEvaluator(db, now, catalog);
+        var (quote, error) = await evaluator.QuoteAsync(Req("SALE10", Guid.NewGuid(), 200000m, lines));
+
+        error.Should().BeNull();
+        quote!.DiscountAmount.Should().Be(20000m);
+    }
+
+    [Fact]
+    public async Task QuoteAsync_Should_ReturnNotApplicable_When_ScopeIsCategoriesAndNoLineMatches()
+    {
+        var dbName = Guid.NewGuid().ToString("N");
+        var now = DateTimeOffset.UtcNow;
+        var productId = Guid.NewGuid();
+        using var db = CreateDb(dbName);
+        await SeedActivePromotionWithCouponAsync(db, now.UtcDateTime, value: 20m, scope: PromotionScope.Categories, targetCategoryIds: new[] { Guid.NewGuid() });
+
+        var catalog = new FakeProductCatalogReader().WithProduct(productId, Guid.NewGuid());
+        var lines = new[] { new CouponLine(productId, 1, 100000m) };
+        var evaluator = CreateEvaluator(db, now, catalog);
+        var (quote, error) = await evaluator.QuoteAsync(Req("SALE10", Guid.NewGuid(), 100000m, lines));
+
+        quote.Should().BeNull();
+        error!.Message.Should().Be("Mã giảm giá không áp dụng cho sản phẩm trong giỏ");
+    }
+
+    [Fact]
+    public async Task QuoteAsync_Should_ReturnShippingFeeAsDiscount_When_TypeIsFreeShipping()
+    {
+        var dbName = Guid.NewGuid().ToString("N");
+        var now = DateTimeOffset.UtcNow;
+        using var db = CreateDb(dbName);
+        await SeedActivePromotionWithCouponAsync(db, now.UtcDateTime, value: 0m, type: PromotionType.FreeShipping);
+
+        var evaluator = CreateEvaluator(db, now);
+        var (quote, error) = await evaluator.QuoteAsync(Req("SALE10", Guid.NewGuid(), 199000m, shippingFee: 30000m));
+
+        error.Should().BeNull();
+        quote!.DiscountAmount.Should().Be(30000m);
+        quote.DiscountTarget.Should().Be("Shipping");
+    }
+
+    [Fact]
+    public async Task QuoteAsync_Should_ReturnError_When_TypeIsFreeShippingAndOrderAlreadyShipsFree()
+    {
+        var dbName = Guid.NewGuid().ToString("N");
+        var now = DateTimeOffset.UtcNow;
+        using var db = CreateDb(dbName);
+        await SeedActivePromotionWithCouponAsync(db, now.UtcDateTime, value: 0m, type: PromotionType.FreeShipping);
+
+        var evaluator = CreateEvaluator(db, now);
+        var (quote, error) = await evaluator.QuoteAsync(Req("SALE10", Guid.NewGuid(), 700000m, shippingFee: 0m));
+
+        quote.Should().BeNull();
+        error!.Message.Should().Be("Đơn hàng đã được miễn phí vận chuyển");
     }
 }
