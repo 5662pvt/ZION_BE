@@ -45,7 +45,7 @@ public class AdjustStockCommandHandlerTests
         using var db = CreateDb(dbName);
         var catalog = new Mock<IProductCatalogReader>();
         catalog.Setup(c => c.GetAsync(productId, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new ProductCatalogItem(productId, "SKU-NEW", "New Product", "Published"));
+            .ReturnsAsync(new ProductCatalogItem(productId, "SKU-NEW", "New Product", "Published", null));
         var handler = new AdjustStockCommandHandler(new InventoryItemRepository(db), new StockMovementRepository(db), db, catalog.Object, new FakeTimeProvider(DateTimeOffset.UtcNow));
 
         var result = await handler.Handle(new AdjustStockCommand(productId, 15, "Initial stock", null), CancellationToken.None);

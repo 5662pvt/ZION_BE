@@ -13,6 +13,8 @@ public static class PromotionsErrors
     public static readonly Error CouponCodeTaken = Error.Conflict("Promotions.CouponCodeTaken", "Mã coupon đã được sử dụng");
     public static readonly Error UsageLimitBelowUsedCount = Error.Validation("Promotions.UsageLimitBelowUsedCount", "Giới hạn sử dụng không được nhỏ hơn số lượt đã dùng");
 
+    public static readonly Error CartEmpty = Error.Validation("Promotions.CartEmpty", "Giỏ hàng trống");
+
     public static readonly Error CouponNotExists = Error.Validation("Promotions.CouponNotExists", "Mã giảm giá không tồn tại");
     public static readonly Error CouponInactive = Error.Validation("Promotions.CouponInactive", "Mã giảm giá không còn hiệu lực");
     public static readonly Error CouponNotStarted = Error.Validation("Promotions.CouponNotStarted", "Mã giảm giá chưa có hiệu lực");

@@ -3,6 +3,7 @@ using Microsoft.Extensions.Options;
 using ZIONShop.Contracts.Cart;
 using ZIONShop.Orders.Application.Features.PlaceOrder;
 using ZIONShop.Orders.Application.Options;
+using ZIONShop.Orders.Application.Services;
 using ZIONShop.Orders.Infrastructure.Persistence;
 using ZIONShop.Orders.Infrastructure.Repositories;
 using ZIONShop.Orders.Tests.Fakes;
@@ -23,6 +24,8 @@ public class PlaceOrderCommandHandlerTests
     private static IOptions<CheckoutOptions> DefaultCheckout() =>
         Options.Create(new CheckoutOptions { ShippingFee = 30000, FreeShippingThreshold = 500000, Currency = "VND" });
 
+    private static ShippingFeeCalculator DefaultShippingFeeCalculator() => new(DefaultCheckout());
+
     [Fact]
     public async Task Handle_Should_PlaceOrder_When_CartAndAddressValid()
     {
@@ -35,7 +38,7 @@ public class PlaceOrderCommandHandlerTests
         var addresses = new FakeUserAddressReader().WithAddress(userId, addressId);
         var prices = new FakeProductPriceLookup().Add(productId, "Widget", 100000m);
 
-        var handler = new PlaceOrderCommandHandler(orders, db, cart, addresses, prices, new FakePromotionEvaluator(), DefaultCheckout());
+        var handler = new PlaceOrderCommandHandler(orders, db, cart, addresses, prices, new FakePromotionEvaluator(), DefaultShippingFeeCalculator(), DefaultCheckout());
         var result = await handler.Handle(new PlaceOrderCommand(userId, addressId, "COD", "Giao giờ hành chính"), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
@@ -53,7 +56,7 @@ public class PlaceOrderCommandHandlerTests
         var (db, orders) = BuildScope();
         var userId = Guid.NewGuid();
         var handler = new PlaceOrderCommandHandler(
-            orders, db, new FakeCartReader(), new FakeUserAddressReader(), new FakeProductPriceLookup(), new FakePromotionEvaluator(), DefaultCheckout());
+            orders, db, new FakeCartReader(), new FakeUserAddressReader(), new FakeProductPriceLookup(), new FakePromotionEvaluator(), DefaultShippingFeeCalculator(), DefaultCheckout());
 
         var result = await handler.Handle(new PlaceOrderCommand(userId, Guid.NewGuid(), "COD", null), CancellationToken.None);
 
@@ -70,7 +73,7 @@ public class PlaceOrderCommandHandlerTests
         var cart = new FakeCartReader().WithCart(userId, "VND", new CartSnapshotLine(productId, "Widget", 1, 100000m));
         var prices = new FakeProductPriceLookup().Add(productId, "Widget", 100000m);
 
-        var handler = new PlaceOrderCommandHandler(orders, db, cart, new FakeUserAddressReader(), prices, new FakePromotionEvaluator(), DefaultCheckout());
+        var handler = new PlaceOrderCommandHandler(orders, db, cart, new FakeUserAddressReader(), prices, new FakePromotionEvaluator(), DefaultShippingFeeCalculator(), DefaultCheckout());
         var result = await handler.Handle(new PlaceOrderCommand(userId, Guid.NewGuid(), "COD", null), CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
@@ -89,7 +92,7 @@ public class PlaceOrderCommandHandlerTests
         var addresses = new FakeUserAddressReader().WithAddress(userId, addressId);
         var prices = new FakeProductPriceLookup().Add(productId, "Widget", 100000m, isAvailable: false);
 
-        var handler = new PlaceOrderCommandHandler(orders, db, cart, addresses, prices, new FakePromotionEvaluator(), DefaultCheckout());
+        var handler = new PlaceOrderCommandHandler(orders, db, cart, addresses, prices, new FakePromotionEvaluator(), DefaultShippingFeeCalculator(), DefaultCheckout());
         var result = await handler.Handle(new PlaceOrderCommand(userId, addressId, "COD", null), CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
@@ -108,7 +111,7 @@ public class PlaceOrderCommandHandlerTests
         var addresses = new FakeUserAddressReader().WithAddress(userId, addressId);
         var prices = new FakeProductPriceLookup().Add(productId, "Widget", 100000m);
 
-        var handler = new PlaceOrderCommandHandler(orders, db, cart, addresses, prices, new FakePromotionEvaluator(), DefaultCheckout());
+        var handler = new PlaceOrderCommandHandler(orders, db, cart, addresses, prices, new FakePromotionEvaluator(), DefaultShippingFeeCalculator(), DefaultCheckout());
         var result = await handler.Handle(new PlaceOrderCommand(userId, addressId, "COD", null), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
@@ -130,7 +133,7 @@ public class PlaceOrderCommandHandlerTests
         var addresses = new FakeUserAddressReader().WithAddress(userId, addressId);
         var prices = new FakeProductPriceLookup().Add(productId, "Widget", 150000m);
 
-        var handler = new PlaceOrderCommandHandler(orders, db, cart, addresses, prices, new FakePromotionEvaluator(), DefaultCheckout());
+        var handler = new PlaceOrderCommandHandler(orders, db, cart, addresses, prices, new FakePromotionEvaluator(), DefaultShippingFeeCalculator(), DefaultCheckout());
         var result = await handler.Handle(new PlaceOrderCommand(userId, addressId, "Online", null), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
@@ -151,7 +154,7 @@ public class PlaceOrderCommandHandlerTests
         var prices = new FakeProductPriceLookup().Add(productId, "Widget", 100000m);
         var promotions = new FakePromotionEvaluator().WithQuote("SALE10", 20000m, "Giảm 10%");
 
-        var handler = new PlaceOrderCommandHandler(orders, db, cart, addresses, prices, promotions, DefaultCheckout());
+        var handler = new PlaceOrderCommandHandler(orders, db, cart, addresses, prices, promotions, DefaultShippingFeeCalculator(), DefaultCheckout());
         var result = await handler.Handle(new PlaceOrderCommand(userId, addressId, "COD", null, "SALE10"), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
@@ -177,7 +180,7 @@ public class PlaceOrderCommandHandlerTests
         var prices = new FakeProductPriceLookup().Add(productId, "Widget", 100000m);
         var promotions = new FakePromotionEvaluator().WithQuote("BIG", 50000m);
 
-        var handler = new PlaceOrderCommandHandler(orders, db, cart, addresses, prices, promotions, DefaultCheckout());
+        var handler = new PlaceOrderCommandHandler(orders, db, cart, addresses, prices, promotions, DefaultShippingFeeCalculator(), DefaultCheckout());
         var result = await handler.Handle(new PlaceOrderCommand(userId, addressId, "COD", null, "BIG"), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
@@ -198,7 +201,7 @@ public class PlaceOrderCommandHandlerTests
         var prices = new FakeProductPriceLookup().Add(productId, "Widget", 100000m);
         var promotions = new FakePromotionEvaluator().WithError("EXPIRED", "Mã giảm giá đã hết hạn");
 
-        var handler = new PlaceOrderCommandHandler(orders, db, cart, addresses, prices, promotions, DefaultCheckout());
+        var handler = new PlaceOrderCommandHandler(orders, db, cart, addresses, prices, promotions, DefaultShippingFeeCalculator(), DefaultCheckout());
         var result = await handler.Handle(new PlaceOrderCommand(userId, addressId, "COD", null, "EXPIRED"), CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
@@ -220,7 +223,7 @@ public class PlaceOrderCommandHandlerTests
         var prices = new FakeProductPriceLookup().Add(productId, "Widget", 100000m);
         var promotions = new FakePromotionEvaluator().WithQuote("SALE10", 10000m);
 
-        var handler = new PlaceOrderCommandHandler(orders, new FakeFailingUnitOfWork(), cart, addresses, prices, promotions, DefaultCheckout());
+        var handler = new PlaceOrderCommandHandler(orders, new FakeFailingUnitOfWork(), cart, addresses, prices, promotions, DefaultShippingFeeCalculator(), DefaultCheckout());
 
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
             handler.Handle(new PlaceOrderCommand(userId, addressId, "COD", null, "SALE10"), CancellationToken.None));
@@ -242,7 +245,7 @@ public class PlaceOrderCommandHandlerTests
         var prices = new FakeProductPriceLookup().Add(productId, "Widget", 100000m);
         var promotions = new FakePromotionEvaluator();
 
-        var handler = new PlaceOrderCommandHandler(orders, db, cart, addresses, prices, promotions, DefaultCheckout());
+        var handler = new PlaceOrderCommandHandler(orders, db, cart, addresses, prices, promotions, DefaultShippingFeeCalculator(), DefaultCheckout());
         var result = await handler.Handle(new PlaceOrderCommand(userId, addressId, "COD", null), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();

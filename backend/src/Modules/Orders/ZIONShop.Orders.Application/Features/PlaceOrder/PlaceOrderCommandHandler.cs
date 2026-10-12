@@ -26,6 +26,7 @@ public class PlaceOrderCommandHandler : IRequestHandler<PlaceOrderCommand, Resul
     private readonly IUserAddressReader _addresses;
     private readonly IProductPriceLookup _prices;
     private readonly IPromotionEvaluator _promotions;
+    private readonly IShippingFeeCalculator _shippingFeeCalculator;
     private readonly CheckoutOptions _checkout;
 
     public PlaceOrderCommandHandler(
@@ -35,6 +36,7 @@ public class PlaceOrderCommandHandler : IRequestHandler<PlaceOrderCommand, Resul
         IUserAddressReader addresses,
         IProductPriceLookup prices,
         IPromotionEvaluator promotions,
+        IShippingFeeCalculator shippingFeeCalculator,
         IOptions<CheckoutOptions> checkout)
     {
         _orders = orders;
@@ -43,6 +45,7 @@ public class PlaceOrderCommandHandler : IRequestHandler<PlaceOrderCommand, Resul
         _addresses = addresses;
         _prices = prices;
         _promotions = promotions;
+        _shippingFeeCalculator = shippingFeeCalculator;
         _checkout = checkout.Value;
     }
 
@@ -80,7 +83,7 @@ public class PlaceOrderCommandHandler : IRequestHandler<PlaceOrderCommand, Resul
             return Result.Failure<OrderDto>(OrdersErrors.ProductUnavailable(string.Join(", ", unavailable)));
 
         var subtotal = lines.Sum(l => l.UnitPrice * l.Quantity);
-        var shippingFee = subtotal >= _checkout.FreeShippingThreshold ? 0m : _checkout.ShippingFee;
+        var shippingFee = _shippingFeeCalculator.Calculate(subtotal);
 
         var shippingAddress = new ShippingAddress(
             address.AddressId, address.RecipientName, address.PhoneNumber, address.Province, address.Ward, address.StreetAddress);
@@ -91,7 +94,9 @@ public class PlaceOrderCommandHandler : IRequestHandler<PlaceOrderCommand, Resul
         var hasCoupon = !string.IsNullOrWhiteSpace(request.CouponCode);
         if (hasCoupon)
         {
-            var (quote, error) = await _promotions.ReserveAsync(request.CouponCode!, request.UserId, order.Id, subtotal, cancellationToken);
+            var couponLines = lines.Select(l => new CouponLine(l.ProductId, l.Quantity, l.UnitPrice * l.Quantity)).ToList();
+            var couponRequest = new CouponRequest(request.CouponCode!, request.UserId, couponLines, subtotal, shippingFee);
+            var (quote, error) = await _promotions.ReserveAsync(couponRequest, order.Id, cancellationToken);
             if (error is not null)
                 return Result.Failure<OrderDto>(OrdersErrors.InvalidCoupon(error.Message));
 

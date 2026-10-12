@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using ZIONShop.Contracts.Promotions;
 using ZIONShop.Promotions.Domain.Entities;
 using ZIONShop.Promotions.Domain.Enums;
 using ZIONShop.Promotions.Infrastructure.Persistence;
@@ -15,6 +16,9 @@ public class PromotionEvaluatorTests
 
     private static PromotionEvaluator CreateEvaluator(PromotionsDbContext db, DateTimeOffset now) =>
         new(new PromotionRepository(db), new CouponCodeRepository(db), new CouponRedemptionRepository(db), db, new FakeTimeProvider(now));
+
+    private static CouponRequest Req(string code, Guid userId, decimal subtotal) =>
+        new(code, userId, Array.Empty<CouponLine>(), subtotal, ShippingFee: 0m);
 
     private static async Task<(Promotion Promotion, CouponCode Coupon)> SeedActivePromotionWithCouponAsync(
         PromotionsDbContext db, DateTime now, decimal value = 10m, decimal? maxDiscount = null,
@@ -40,7 +44,7 @@ public class PromotionEvaluatorTests
         using var db = CreateDb(dbName);
         var evaluator = CreateEvaluator(db, now);
 
-        var (quote, error) = await evaluator.QuoteAsync("NOPE", Guid.NewGuid(), 100000m);
+        var (quote, error) = await evaluator.QuoteAsync(Req("NOPE", Guid.NewGuid(), 100000m));
 
         quote.Should().BeNull();
         error!.Message.Should().Be("Mã giảm giá không tồn tại");
@@ -60,7 +64,7 @@ public class PromotionEvaluatorTests
         await db.SaveChangesAsync();
 
         var evaluator = CreateEvaluator(db, now);
-        var (quote, error) = await evaluator.QuoteAsync("SALE10", Guid.NewGuid(), 100000m);
+        var (quote, error) = await evaluator.QuoteAsync(Req("SALE10", Guid.NewGuid(), 100000m));
 
         quote.Should().BeNull();
         error!.Message.Should().Be("Mã giảm giá không còn hiệu lực");
@@ -77,7 +81,7 @@ public class PromotionEvaluatorTests
         await db.SaveChangesAsync();
 
         var evaluator = CreateEvaluator(db, now);
-        var (quote, error) = await evaluator.QuoteAsync("SALE10", Guid.NewGuid(), 100000m);
+        var (quote, error) = await evaluator.QuoteAsync(Req("SALE10", Guid.NewGuid(), 100000m));
 
         quote.Should().BeNull();
         error!.Message.Should().Be("Mã giảm giá không còn hiệu lực");
@@ -98,7 +102,7 @@ public class PromotionEvaluatorTests
         await db.SaveChangesAsync();
 
         var evaluator = CreateEvaluator(db, now);
-        var (quote, error) = await evaluator.QuoteAsync("SALE10", Guid.NewGuid(), 100000m);
+        var (quote, error) = await evaluator.QuoteAsync(Req("SALE10", Guid.NewGuid(), 100000m));
 
         quote.Should().BeNull();
         error!.Message.Should().Be("Mã giảm giá chưa có hiệu lực");
@@ -119,7 +123,7 @@ public class PromotionEvaluatorTests
         await db.SaveChangesAsync();
 
         var evaluator = CreateEvaluator(db, now);
-        var (quote, error) = await evaluator.QuoteAsync("SALE10", Guid.NewGuid(), 100000m);
+        var (quote, error) = await evaluator.QuoteAsync(Req("SALE10", Guid.NewGuid(), 100000m));
 
         quote.Should().BeNull();
         error!.Message.Should().Be("Mã giảm giá đã hết hạn");
@@ -134,7 +138,7 @@ public class PromotionEvaluatorTests
         await SeedActivePromotionWithCouponAsync(db, now.UtcDateTime, minOrderSubtotal: 200000m);
 
         var evaluator = CreateEvaluator(db, now);
-        var (quote, error) = await evaluator.QuoteAsync("SALE10", Guid.NewGuid(), 100000m);
+        var (quote, error) = await evaluator.QuoteAsync(Req("SALE10", Guid.NewGuid(), 100000m));
 
         quote.Should().BeNull();
         error!.Message.Should().Be("Đơn hàng chưa đạt giá trị tối thiểu 200,000");
@@ -149,7 +153,7 @@ public class PromotionEvaluatorTests
         await SeedActivePromotionWithCouponAsync(db, now.UtcDateTime, value: 10m);
 
         var evaluator = CreateEvaluator(db, now);
-        var (quote, error) = await evaluator.QuoteAsync("sale10", Guid.NewGuid(), 200000m);
+        var (quote, error) = await evaluator.QuoteAsync(Req("sale10", Guid.NewGuid(), 200000m));
 
         error.Should().BeNull();
         quote!.Code.Should().Be("SALE10");
@@ -167,7 +171,7 @@ public class PromotionEvaluatorTests
         var (promotion, coupon) = await SeedActivePromotionWithCouponAsync(db, now.UtcDateTime, value: 10m);
 
         var evaluator = CreateEvaluator(db, now);
-        var (quote, error) = await evaluator.ReserveAsync("SALE10", userId, orderId, 200000m);
+        var (quote, error) = await evaluator.ReserveAsync(Req("SALE10", userId, 200000m), orderId);
 
         error.Should().BeNull();
         quote!.DiscountAmount.Should().Be(20000m);
@@ -192,8 +196,8 @@ public class PromotionEvaluatorTests
         var (promotion, _) = await SeedActivePromotionWithCouponAsync(db, now.UtcDateTime, value: 10m);
 
         var evaluator = CreateEvaluator(db, now);
-        var first = await evaluator.ReserveAsync("SALE10", userId, orderId, 200000m);
-        var second = await evaluator.ReserveAsync("SALE10", userId, orderId, 200000m);
+        var first = await evaluator.ReserveAsync(Req("SALE10", userId, 200000m), orderId);
+        var second = await evaluator.ReserveAsync(Req("SALE10", userId, 200000m), orderId);
 
         second.Error.Should().BeNull();
         second.Quote!.DiscountAmount.Should().Be(first.Quote!.DiscountAmount);
@@ -212,10 +216,10 @@ public class PromotionEvaluatorTests
         await SeedActivePromotionWithCouponAsync(db, now.UtcDateTime, value: 10m, usageLimit: 1);
 
         var evaluator = CreateEvaluator(db, now);
-        var firstResult = await evaluator.ReserveAsync("SALE10", Guid.NewGuid(), Guid.NewGuid(), 100000m);
+        var firstResult = await evaluator.ReserveAsync(Req("SALE10", Guid.NewGuid(), 100000m), Guid.NewGuid());
         firstResult.Error.Should().BeNull();
 
-        var (quote, error) = await evaluator.ReserveAsync("SALE10", Guid.NewGuid(), Guid.NewGuid(), 100000m);
+        var (quote, error) = await evaluator.ReserveAsync(Req("SALE10", Guid.NewGuid(), 100000m), Guid.NewGuid());
 
         quote.Should().BeNull();
         error!.Message.Should().Be("Mã giảm giá đã hết lượt sử dụng");
@@ -231,10 +235,10 @@ public class PromotionEvaluatorTests
         await SeedActivePromotionWithCouponAsync(db, now.UtcDateTime, value: 10m, perUserLimit: 1);
 
         var evaluator = CreateEvaluator(db, now);
-        var firstResult = await evaluator.ReserveAsync("SALE10", userId, Guid.NewGuid(), 100000m);
+        var firstResult = await evaluator.ReserveAsync(Req("SALE10", userId, 100000m), Guid.NewGuid());
         firstResult.Error.Should().BeNull();
 
-        var (quote, error) = await evaluator.ReserveAsync("SALE10", userId, Guid.NewGuid(), 100000m);
+        var (quote, error) = await evaluator.ReserveAsync(Req("SALE10", userId, 100000m), Guid.NewGuid());
 
         quote.Should().BeNull();
         error!.Message.Should().Be("Bạn đã sử dụng hết lượt cho mã này");
@@ -249,10 +253,10 @@ public class PromotionEvaluatorTests
         await SeedActivePromotionWithCouponAsync(db, now.UtcDateTime, value: 10m, perUserLimit: 1);
 
         var evaluator = CreateEvaluator(db, now);
-        var firstResult = await evaluator.ReserveAsync("SALE10", Guid.NewGuid(), Guid.NewGuid(), 100000m);
+        var firstResult = await evaluator.ReserveAsync(Req("SALE10", Guid.NewGuid(), 100000m), Guid.NewGuid());
         firstResult.Error.Should().BeNull();
 
-        var secondResult = await evaluator.ReserveAsync("SALE10", Guid.NewGuid(), Guid.NewGuid(), 100000m);
+        var secondResult = await evaluator.ReserveAsync(Req("SALE10", Guid.NewGuid(), 100000m), Guid.NewGuid());
         secondResult.Error.Should().BeNull();
     }
 
@@ -266,7 +270,7 @@ public class PromotionEvaluatorTests
         var (promotion, coupon) = await SeedActivePromotionWithCouponAsync(db, now.UtcDateTime, value: 10m);
 
         var evaluator = CreateEvaluator(db, now);
-        await evaluator.ReserveAsync("SALE10", Guid.NewGuid(), orderId, 100000m);
+        await evaluator.ReserveAsync(Req("SALE10", Guid.NewGuid(), 100000m), orderId);
 
         await evaluator.ReleaseAsync(orderId);
 
@@ -286,7 +290,7 @@ public class PromotionEvaluatorTests
         var (promotion, _) = await SeedActivePromotionWithCouponAsync(db, now.UtcDateTime, value: 10m);
 
         var evaluator = CreateEvaluator(db, now);
-        await evaluator.ReserveAsync("SALE10", Guid.NewGuid(), orderId, 100000m);
+        await evaluator.ReserveAsync(Req("SALE10", Guid.NewGuid(), 100000m), orderId);
 
         await evaluator.ReleaseAsync(orderId);
         await evaluator.ReleaseAsync(orderId);

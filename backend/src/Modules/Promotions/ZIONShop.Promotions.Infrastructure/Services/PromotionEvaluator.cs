@@ -39,9 +39,9 @@ public class PromotionEvaluator : IPromotionEvaluator
         _timeProvider = timeProvider;
     }
 
-    public async Task<(CouponQuote? Quote, CouponError? Error)> QuoteAsync(string code, Guid userId, decimal subtotal, CancellationToken ct = default)
+    public async Task<(CouponQuote? Quote, CouponError? Error)> QuoteAsync(CouponRequest request, CancellationToken ct = default)
     {
-        var normalizedCode = Normalize(code);
+        var normalizedCode = Normalize(request.Code);
         var coupon = await _coupons.GetByCodeAsync(normalizedCode, ct);
         if (coupon is null) return (null, NotExistsError());
 
@@ -49,24 +49,24 @@ public class PromotionEvaluator : IPromotionEvaluator
         if (promotion is null) return (null, NotExistsError());
 
         var now = _timeProvider.GetUtcNow().UtcDateTime;
-        var error = await ValidateAsync(coupon, promotion, userId, subtotal, now, ct);
+        var error = await ValidateAsync(coupon, promotion, request.UserId, request.Subtotal, now, ct);
         if (error is not null) return (null, error);
 
-        var discount = promotion.CalculateDiscount(subtotal);
-        return (new CouponQuote(coupon.Code, promotion.Id, promotion.Name, discount), null);
+        var discount = promotion.CalculateDiscount(request.Subtotal);
+        return (new CouponQuote(coupon.Code, promotion.Id, promotion.Name, discount, "Items"), null);
     }
 
-    public async Task<(CouponQuote? Quote, CouponError? Error)> ReserveAsync(string code, Guid userId, Guid orderId, decimal subtotal, CancellationToken ct = default)
+    public async Task<(CouponQuote? Quote, CouponError? Error)> ReserveAsync(CouponRequest request, Guid orderId, CancellationToken ct = default)
     {
         var existing = await _redemptions.GetByOrderIdAsync(orderId, ct);
         if (existing is not null && existing.Status != RedemptionStatus.Released)
         {
             var existingPromotion = await _promotions.GetByIdAsync(existing.PromotionId, ct);
             var existingCoupon = await _coupons.GetByIdAsync(existing.CouponCodeId, ct);
-            return (new CouponQuote(existingCoupon?.Code ?? code, existing.PromotionId, existingPromotion?.Name ?? string.Empty, existing.DiscountAmount), null);
+            return (new CouponQuote(existingCoupon?.Code ?? request.Code, existing.PromotionId, existingPromotion?.Name ?? string.Empty, existing.DiscountAmount, "Items"), null);
         }
 
-        var normalizedCode = Normalize(code);
+        var normalizedCode = Normalize(request.Code);
         var coupon = await _coupons.GetByCodeAsync(normalizedCode, ct);
         if (coupon is null) return (null, NotExistsError());
 
@@ -76,16 +76,16 @@ public class PromotionEvaluator : IPromotionEvaluator
         for (var attempt = 1; attempt <= MaxAttempts; attempt++)
         {
             var now = _timeProvider.GetUtcNow().UtcDateTime;
-            var error = await ValidateAsync(coupon, promotion, userId, subtotal, now, ct);
+            var error = await ValidateAsync(coupon, promotion, request.UserId, request.Subtotal, now, ct);
             if (error is not null) return (null, error);
 
-            var discount = promotion.CalculateDiscount(subtotal);
+            var discount = promotion.CalculateDiscount(request.Subtotal);
             promotion.IncrementUsage();
             coupon.IncrementUsage();
 
             if (attempt == 1)
             {
-                var redemption = CouponRedemption.Create(promotion.Id, coupon.Id, orderId, userId, discount, now);
+                var redemption = CouponRedemption.Create(promotion.Id, coupon.Id, orderId, request.UserId, discount, now);
                 await _redemptions.AddAsync(redemption, ct);
             }
 
@@ -95,7 +95,7 @@ public class PromotionEvaluator : IPromotionEvaluator
             try
             {
                 await _uow.SaveChangesAsync(ct);
-                return (new CouponQuote(coupon.Code, promotion.Id, promotion.Name, discount), null);
+                return (new CouponQuote(coupon.Code, promotion.Id, promotion.Name, discount, "Items"), null);
             }
             catch (DbUpdateConcurrencyException ex)
             {

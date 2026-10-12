@@ -26,12 +26,14 @@ public class PromotionsAdminTests
     {
         var admin = await AdminClientAsync();
         var (customer, _, _) = await CreateCustomerWithAddressAsync(_factory);
+        var (productId, _) = await CreatePublishedProductAsync(admin, price: 200000m);
+        await AddToCartAsync(customer, productId, 1);
 
         var promotion = await CreatePromotionAsync(admin, type: "PercentageOff", value: 10m, minOrderSubtotal: 50000m);
         await CreateCouponAsync(admin, promotion.Id, "WELCOME10");
         await ActivatePromotionAsync(admin, promotion.Id);
 
-        var result = await ValidateCouponAsync(customer, "welcome10", 200000m);
+        var result = await ValidateCouponAsync(customer, "welcome10");
 
         result.Code.Should().Be("WELCOME10");
         result.DiscountAmount.Should().Be(20000m);
@@ -42,12 +44,14 @@ public class PromotionsAdminTests
     {
         var admin = await AdminClientAsync();
         var (customer, _, _) = await CreateCustomerWithAddressAsync(_factory);
+        var (productId, _) = await CreatePublishedProductAsync(admin, price: 100000m);
+        await AddToCartAsync(customer, productId, 1);
 
         var promotion = await CreatePromotionAsync(admin, type: "PercentageOff", value: 5m, minOrderSubtotal: 10000m);
         await CreateCouponAsync(admin, promotion.Id, "NONADMIN5");
         await ActivatePromotionAsync(admin, promotion.Id);
 
-        var response = await ValidateCouponRawAsync(customer, "NONADMIN5", 100000m);
+        var response = await ValidateCouponRawAsync(customer, "NONADMIN5");
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
     }
@@ -57,11 +61,13 @@ public class PromotionsAdminTests
     {
         var admin = await AdminClientAsync();
         var (customer, _, _) = await CreateCustomerWithAddressAsync(_factory);
+        var (productId, _) = await CreatePublishedProductAsync(admin, price: 100000m);
+        await AddToCartAsync(customer, productId, 1);
 
         var promotion = await CreatePromotionAsync(admin);
         await CreateCouponAsync(admin, promotion.Id, "INACTIVE1");
 
-        var response = await ValidateCouponRawAsync(customer, "INACTIVE1", 100000m);
+        var response = await ValidateCouponRawAsync(customer, "INACTIVE1");
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
         var envelope = await response.Content.ReadFromJsonAsync<ApiEnvelope<object>>(ApiEnvelopeJson.Options);
@@ -73,12 +79,14 @@ public class PromotionsAdminTests
     {
         var admin = await AdminClientAsync();
         var (customer, _, _) = await CreateCustomerWithAddressAsync(_factory);
+        var (productId, _) = await CreatePublishedProductAsync(admin, price: 100000m);
+        await AddToCartAsync(customer, productId, 1);
 
         var promotion = await CreatePromotionAsync(admin, startsAt: DateTime.UtcNow.AddDays(-10), endsAt: DateTime.UtcNow.AddDays(-1));
         await CreateCouponAsync(admin, promotion.Id, "EXPIRED1");
         await ActivatePromotionAsync(admin, promotion.Id);
 
-        var response = await ValidateCouponRawAsync(customer, "EXPIRED1", 100000m);
+        var response = await ValidateCouponRawAsync(customer, "EXPIRED1");
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
         var envelope = await response.Content.ReadFromJsonAsync<ApiEnvelope<object>>(ApiEnvelopeJson.Options);
@@ -90,12 +98,14 @@ public class PromotionsAdminTests
     {
         var admin = await AdminClientAsync();
         var (customer, _, _) = await CreateCustomerWithAddressAsync(_factory);
+        var (productId, _) = await CreatePublishedProductAsync(admin, price: 100000m);
+        await AddToCartAsync(customer, productId, 1);
 
         var promotion = await CreatePromotionAsync(admin, minOrderSubtotal: 500000m);
         await CreateCouponAsync(admin, promotion.Id, "MINSUB1");
         await ActivatePromotionAsync(admin, promotion.Id);
 
-        var response = await ValidateCouponRawAsync(customer, "MINSUB1", 100000m);
+        var response = await ValidateCouponRawAsync(customer, "MINSUB1");
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
         var envelope = await response.Content.ReadFromJsonAsync<ApiEnvelope<object>>(ApiEnvelopeJson.Options);

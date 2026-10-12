@@ -12,7 +12,7 @@ public class FakePromotionEvaluator : IPromotionEvaluator
 
     public FakePromotionEvaluator WithQuote(string code, decimal discountAmount, string promotionName = "Promo", Guid? promotionId = null)
     {
-        _quotes[code] = new CouponQuote(code, promotionId ?? Guid.NewGuid(), promotionName, discountAmount);
+        _quotes[code] = new CouponQuote(code, promotionId ?? Guid.NewGuid(), promotionName, discountAmount, "Items");
         return this;
     }
 
@@ -22,13 +22,13 @@ public class FakePromotionEvaluator : IPromotionEvaluator
         return this;
     }
 
-    public Task<(CouponQuote? Quote, CouponError? Error)> QuoteAsync(string code, Guid userId, decimal subtotal, CancellationToken ct = default)
-        => Task.FromResult(Resolve(code));
+    public Task<(CouponQuote? Quote, CouponError? Error)> QuoteAsync(CouponRequest request, CancellationToken ct = default)
+        => Task.FromResult(Resolve(request.Code));
 
-    public Task<(CouponQuote? Quote, CouponError? Error)> ReserveAsync(string code, Guid userId, Guid orderId, decimal subtotal, CancellationToken ct = default)
+    public Task<(CouponQuote? Quote, CouponError? Error)> ReserveAsync(CouponRequest request, Guid orderId, CancellationToken ct = default)
     {
-        ReserveCalls.Add((code, userId, orderId, subtotal));
-        return Task.FromResult(Resolve(code));
+        ReserveCalls.Add((request.Code, request.UserId, orderId, request.Subtotal));
+        return Task.FromResult(Resolve(request.Code));
     }
 
     public Task ReleaseAsync(Guid orderId, CancellationToken ct = default)

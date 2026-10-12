@@ -10,7 +10,7 @@ public record PromotionData(
 
 public record CouponData(Guid Id, string Code, bool IsActive, int UsedCount, DateTime CreatedAt);
 
-public record CouponValidationData(string Code, string PromotionName, decimal DiscountAmount);
+public record CouponValidationData(string Code, string PromotionName, decimal DiscountAmount, string DiscountTarget);
 
 public static class PromotionsTestHelpers
 {
@@ -71,12 +71,12 @@ public static class PromotionsTestHelpers
         return envelope!.Data!;
     }
 
-    public static async Task<HttpResponseMessage> ValidateCouponRawAsync(HttpClient customer, string code, decimal subtotal)
-        => await customer.PostAsJsonAsync("/api/v1/promotions/coupons/validate", new { code, subtotal });
+    public static async Task<HttpResponseMessage> ValidateCouponRawAsync(HttpClient customer, string code)
+        => await customer.PostAsJsonAsync("/api/v1/promotions/coupons/validate", new { code });
 
-    public static async Task<CouponValidationData> ValidateCouponAsync(HttpClient customer, string code, decimal subtotal)
+    public static async Task<CouponValidationData> ValidateCouponAsync(HttpClient customer, string code)
     {
-        var response = await ValidateCouponRawAsync(customer, code, subtotal);
+        var response = await ValidateCouponRawAsync(customer, code);
         response.EnsureSuccessStatusCode();
         var envelope = await response.Content.ReadFromJsonAsync<ApiEnvelope<CouponValidationData>>(ApiEnvelopeJson.Options);
         return envelope!.Data!;

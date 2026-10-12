@@ -23,7 +23,8 @@ public class CouponsController : ControllerBase
 
     [HttpPost("validate")]
     public async Task<IActionResult> ValidateCoupon([FromBody] ValidateCouponBody body, CancellationToken ct)
-        => (await _mediator.Send(new ValidateCouponCommand(_currentUser.UserId!.Value, body.Code, body.Subtotal), ct)).ToActionResult();
+        => (await _mediator.Send(new ValidateCouponCommand(_currentUser.UserId!.Value, body.Code), ct)).ToActionResult();
 }
 
-public record ValidateCouponBody(string Code, decimal Subtotal);
+/// <summary>Subtotal is accepted for backward compatibility but ignored; BE computes it from the caller's cart.</summary>
+public record ValidateCouponBody(string Code, decimal? Subtotal = null);

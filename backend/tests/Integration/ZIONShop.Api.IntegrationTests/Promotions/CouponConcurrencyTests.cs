@@ -39,8 +39,8 @@ public class CouponConcurrencyTests
         var orderB = Guid.NewGuid();
 
         var results = await Task.WhenAll(
-            evaluatorA.ReserveAsync(coupon.Code, Guid.NewGuid(), orderA, 100000m),
-            evaluatorB.ReserveAsync(coupon.Code, Guid.NewGuid(), orderB, 100000m));
+            evaluatorA.ReserveAsync(new CouponRequest(coupon.Code, Guid.NewGuid(), Array.Empty<CouponLine>(), 100000m, 0m), orderA),
+            evaluatorB.ReserveAsync(new CouponRequest(coupon.Code, Guid.NewGuid(), Array.Empty<CouponLine>(), 100000m, 0m), orderB));
 
         results.Count(r => r.Error is null).Should().Be(1);
         results.Count(r => r.Error is not null).Should().Be(1);

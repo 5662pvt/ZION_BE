@@ -13,6 +13,7 @@ using ZIONShop.Orders.Domain.Repositories;
 using ZIONShop.Orders.Infrastructure.Persistence;
 using ZIONShop.Orders.Infrastructure.Readers;
 using ZIONShop.Orders.Infrastructure.Repositories;
+using ZIONShop.Orders.Infrastructure.Services;
 
 namespace ZIONShop.Orders.Infrastructure.DependencyInjection;
 
@@ -29,6 +30,7 @@ public static class OrdersInfrastructureExtensions
         services.AddScoped<IOrderRepository, OrderRepository>();
         services.AddScoped<IOrdersUnitOfWork>(sp => sp.GetRequiredService<OrdersDbContext>());
         services.AddScoped<IOrderDetailsReader, OrderDetailsReader>();
+        services.AddScoped<IPurchaseVerifier, PurchaseVerifier>();
 
         services.AddOutbox<OrdersDbContext>();
 

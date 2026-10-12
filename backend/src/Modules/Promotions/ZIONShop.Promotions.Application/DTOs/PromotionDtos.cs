@@ -36,4 +36,4 @@ public record PromotionDto(
 
 public record CouponDto(Guid Id, string Code, bool IsActive, int UsedCount, DateTime CreatedAt);
 
-public record CouponValidationResultDto(string Code, string PromotionName, decimal DiscountAmount);
+public record CouponValidationResultDto(string Code, string PromotionName, decimal DiscountAmount, string DiscountTarget);

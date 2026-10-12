@@ -7,6 +7,5 @@ public class ValidateCouponCommandValidator : AbstractValidator<ValidateCouponCo
     public ValidateCouponCommandValidator()
     {
         RuleFor(x => x.Code).NotEmpty();
-        RuleFor(x => x.Subtotal).GreaterThanOrEqualTo(0m);
     }
 }

@@ -1,6 +1,6 @@
 namespace ZIONShop.Contracts.Products;
 
-public record ProductCatalogItem(Guid ProductId, string Sku, string Name, string Status);
+public record ProductCatalogItem(Guid ProductId, string Sku, string Name, string Status, Guid? CategoryId);
 
 public interface IProductCatalogReader
 {

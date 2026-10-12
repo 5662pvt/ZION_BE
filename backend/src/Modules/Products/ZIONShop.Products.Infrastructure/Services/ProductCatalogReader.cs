@@ -12,12 +12,12 @@ public class ProductCatalogReader : IProductCatalogReader
 
     public async Task<IReadOnlyList<ProductCatalogItem>> ListAsync(CancellationToken ct = default)
         => await _db.Products.AsNoTracking()
-            .Select(p => new ProductCatalogItem(p.Id, p.Sku.Value, p.Name, p.Status.ToString()))
+            .Select(p => new ProductCatalogItem(p.Id, p.Sku.Value, p.Name, p.Status.ToString(), p.CategoryId))
             .ToListAsync(ct);
 
     public async Task<ProductCatalogItem?> GetAsync(Guid productId, CancellationToken ct = default)
         => await _db.Products.AsNoTracking()
             .Where(p => p.Id == productId)
-            .Select(p => new ProductCatalogItem(p.Id, p.Sku.Value, p.Name, p.Status.ToString()))
+            .Select(p => new ProductCatalogItem(p.Id, p.Sku.Value, p.Name, p.Status.ToString(), p.CategoryId))
             .FirstOrDefaultAsync(ct);
 }
