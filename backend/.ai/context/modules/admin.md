@@ -15,13 +15,26 @@
 
 ```
 Modules/Admin/
-├── ZIONShop.Admin.Domain/          # Report read models, optional AuditEntry
-├── ZIONShop.Admin.Application/     # Queries only (MVP)
-├── ZIONShop.Admin.Infrastructure/  # Dapper or EF read DbContext / views
-└── ZIONShop.Admin.Tests/
+├── ZIONShop.Admin.Domain/          # AdminErrors (Exceptions/) — no entities, no DbContext
+├── ZIONShop.Admin.Application/     # Queries only — consumes ZIONShop.Contracts readers
+│   ├── Common/                     # ReportRange (VN-day/month bucketing), KpiMath, CsvWriter/CsvFile
+│   ├── DTOs/                       # ReportDtos.cs — exact shape of the JSON contract
+│   └── Features/
+│       ├── GetDashboard/
+│       ├── GetTopProducts/
+│       ├── GetTopCategories/
+│       ├── GetPromotionPerformance/
+│       ├── ExportRevenueCsv/
+│       ├── ExportTopProductsCsv/
+│       └── ExportPromotionsCsv/
+└── ZIONShop.Admin.Infrastructure/  # still a no-op DI extension — Admin owns no persistence
 ```
 
-**Host API:** `Controllers/AdminController.cs` — prefix `api/v1/admin`
+**Host API:** `Controllers/AdminReportsController.cs` — class-level `[Route("api/v1/admin/reports")]` + `[Authorize(Policy = Policies.AdminOnly)]` (every action is admin-only).
+
+**Data access:** Admin never queries another module's `DbContext`. All aggregation reads come from `ZIONShop.Contracts` reader interfaces (`IOrderReportReader`, `IUserStatsReader`, `IInventoryStatsReader`, `IPromotionLookup`, `ICategoryLookup`, `IProductCatalogReader`), each implemented by its owning module's Infrastructure and resolved via DI. Aggregation itself happens in memory inside the Admin query handlers (pure, deterministic, unit-testable with Moq fakes of the readers).
+
+**Date ranges:** `from`/`to` are Vietnam-local calendar dates (`yyyy-MM-dd`, inclusive); `ReportRange.Create` converts them to a UTC `[fromUtc, toUtc)` window, computes the matching "previous period" (same length immediately before `from`), and picks day vs. month bucket granularity (day when the range is ≤92 days). Default range when both are omitted: last 30 days including today, in VN-local time (`Asia/Ho_Chi_Minh`, falling back to `SE Asia Standard Time` or a fixed +07:00 offset).
 
 ## Authorization (MUST)
 
@@ -32,16 +45,15 @@ Modules/Admin/
 
 Catalog write hiện dùng `AdminOnly` trên Products/Categories — có thể mở `Staff` sau.
 
-## Features (theo phase — xem `16-admin-portal-phases.md`)
+## Features (Phase A7 — reports, implemented)
 
-### Phase A7 (MVP reports)
+- `GetDashboardQuery` → `GET /dashboard` — KPIs (revenue, completedOrders, averageOrderValue, newCustomers, placedOrders, cancelledOrders, discountTotal, awaitingShipment, lowStockProducts incl. `changePercent` vs. previous period), `revenueSeries` (zero-filled buckets), `statusBreakdown`, `paymentMethods`.
+- `GetTopProductsQuery` → `GET /top-products?limit=&sortBy=revenue|quantity` — non-gift lines only; `limit` 1..50 (default 10) validated by FluentValidation, not clamped.
+- `GetTopCategoriesQuery` → `GET /top-categories?sortBy=` — maps product → category via `IProductCatalogReader` + `ICategoryLookup`; uncategorized → "Chưa phân loại".
+- `GetPromotionPerformanceQuery` → `GET /promotions` — coupons via `IPromotionLookup.ResolveCouponCodesAsync` (unresolved code → name=code, type="Unknown"); gifts via `GetByIdsAsync`.
+- `ExportRevenueCsv/ExportTopProductsCsv/ExportPromotionsCsv` queries → `GET /export/*.csv` — `Result<CsvFile>`; UTF-8 BOM + CRLF + RFC4180 escaping via `CsvWriter`, money as plain integers via `CsvWriter.FormatMoney`.
 
-- `GetDashboardSummary` — cards: revenue today, orders pending, low stock count
-- `GetRevenueReport` — `from`, `to`, `groupBy` (day|week|month)
-- `GetOrdersReport` — counts by status
-- `GetTopProductsReport` — top N by quantity/revenue
-
-**Implementation note:** Có thể query cross-schema bằng **read-only SQL views** trong Admin.Infrastructure — **không** inject Orders DbContext vào Products.
+Revenue = Subtotal − DiscountAmount + ShippingFee, attributed to the order's `Completed` status-history timestamp (not `CreatedDate`).
 
 ## Frontend paths (ZION_FE)
 
@@ -72,8 +84,13 @@ Routes: `/admin/*` — guarded by role check against `constants/roles.ts`.
 | Reports | `16-admin-portal-phases.md` A7, `07-database.md`, this file |
 | Catalog admin UI | `modules/products.md`, `16-admin-portal-phases.md` A1–A2 |
 
+## Tests
+
+- Unit: `tests/Unit/ZIONShop.Admin.Tests/` — `Common/ReportRangeTests.cs` (default range, VN-day bucketing across UTC midnight, month granularity + zero-fill, invalid format/order/range-too-large), `Common/CsvWriterTests.cs` (BOM, escaping, CRLF), `Features/*HandlerTests.cs` (Moq fakes of the Contracts readers — no DbContext/EF InMemory needed since Admin has no persistence), `Features/ReportQueryValidatorTests.cs`.
+- Integration: `tests/Integration/ZIONShop.Api.IntegrationTests/Reports/AdminReportsTests.cs` (HTTP-level: admin 200, customer 403, anonymous 401, invalid range 400, top-products contains the seeded product, CSV export starts with BOM) alongside the pre-existing `ReportReadersTests.cs` (exercises the raw `Contracts` readers via DI).
+
 ## Anti-patterns (MUST NOT)
 
-- `AdminDbContext` chứa bảng `products` duplicate
-- Gọi `ProductsDbContext` từ Admin.Application
-- Business rules (giá, tồn, coupon) trong Admin handlers
+- `AdminDbContext` chứa bảng `products` duplicate — Admin has no DbContext at all for reports; it only consumes `ZIONShop.Contracts` reader interfaces.
+- Gọi `ProductsDbContext`/`OrdersDbContext`/... từ Admin.Application
+- Business rules (giá, tồn, coupon) trong Admin handlers — Admin only aggregates data already computed by the owning module

@@ -70,6 +70,7 @@
   </Folder>
   <Folder Name="/tests/" />
   <Folder Name="/tests/Unit/">
+    <Project Path="tests/Unit/ZIONShop.Admin.Tests/ZIONShop.Admin.Tests.csproj" />
     <Project Path="tests/Unit/ZIONShop.Auth.Tests/ZIONShop.Auth.Tests.csproj" />
     <Project Path="tests/Unit/ZIONShop.Cart.Tests/ZIONShop.Cart.Tests.csproj" />
     <Project Path="tests/Unit/ZIONShop.EventBus.Tests/ZIONShop.EventBus.Tests.csproj" />

@@ -1,4 +1,7 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+﻿using System.Reflection;
+using FluentValidation;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace ZIONShop.Admin.Application.DependencyInjection;
 
@@ -6,7 +9,10 @@ public static class AdminApplicationExtensions
 {
     public static IServiceCollection AddAdminApplication(this IServiceCollection services)
     {
-        // TODO: register MediatR/Validators/AutoMapper when this module is implemented.
+        var assembly = Assembly.GetExecutingAssembly();
+        services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(assembly));
+        services.AddValidatorsFromAssembly(assembly, includeInternalTypes: true);
+        services.TryAddSingleton(TimeProvider.System);
         return services;
     }
 }
