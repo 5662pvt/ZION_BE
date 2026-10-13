@@ -7,6 +7,7 @@ using ZIONShop.Products.Application.Interfaces;
 using ZIONShop.Products.Application.Options;
 using ZIONShop.Products.Domain.Repositories;
 using ZIONShop.Products.Infrastructure.Persistence;
+using ZIONShop.Products.Infrastructure.Readers;
 using ZIONShop.Products.Infrastructure.Repositories;
 using ZIONShop.Products.Infrastructure.Services;
 using ZIONShop.Products.Infrastructure.Storage;
@@ -26,6 +27,7 @@ public static class ProductsInfrastructureExtensions
         services.AddScoped<IProductsUnitOfWork>(sp => sp.GetRequiredService<ProductsDbContext>());
         services.AddScoped<IProductPriceLookup, ProductPriceLookup>();
         services.AddScoped<IProductCatalogReader, ProductCatalogReader>();
+        services.AddScoped<ICategoryLookup, CategoryLookup>();
 
         var cloudinarySection = configuration.GetSection(CloudinaryOptions.SectionName);
         services.Configure<CloudinaryOptions>(cloudinarySection);

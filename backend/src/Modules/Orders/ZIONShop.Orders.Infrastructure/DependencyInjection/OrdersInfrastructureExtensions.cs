@@ -30,6 +30,7 @@ public static class OrdersInfrastructureExtensions
         services.AddScoped<IOrderRepository, OrderRepository>();
         services.AddScoped<IOrdersUnitOfWork>(sp => sp.GetRequiredService<OrdersDbContext>());
         services.AddScoped<IOrderDetailsReader, OrderDetailsReader>();
+        services.AddScoped<IOrderReportReader, OrderReportReader>();
         services.AddScoped<IPurchaseVerifier, PurchaseVerifier>();
 
         services.AddOutbox<OrdersDbContext>();

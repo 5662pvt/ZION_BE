@@ -13,6 +13,7 @@ using ZIONShop.Promotions.Application.Services;
 using ZIONShop.Promotions.Domain.Repositories;
 using ZIONShop.Promotions.Infrastructure.BackgroundServices;
 using ZIONShop.Promotions.Infrastructure.Persistence;
+using ZIONShop.Promotions.Infrastructure.Readers;
 using ZIONShop.Promotions.Infrastructure.Repositories;
 using ZIONShop.Promotions.Infrastructure.Services;
 
@@ -35,6 +36,7 @@ public static class PromotionsInfrastructureExtensions
         services.AddScoped<IPromotionsUnitOfWork>(sp => sp.GetRequiredService<PromotionsDbContext>());
         services.AddScoped<IPromotionEvaluator, PromotionEvaluator>();
         services.AddScoped<IGiftPromotionEvaluator, GiftPromotionEvaluator>();
+        services.AddScoped<IPromotionLookup, PromotionLookup>();
 
         services.AddScoped<StaleReservationReleaseProcessor>();
         services.AddHostedService<StaleReservationReleaseBackgroundService>();

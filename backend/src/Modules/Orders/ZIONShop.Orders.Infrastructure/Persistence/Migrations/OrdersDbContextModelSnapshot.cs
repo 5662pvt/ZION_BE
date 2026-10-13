@@ -145,6 +145,10 @@ namespace ZIONShop.Orders.Infrastructure.Persistence.Migrations
                     b.HasIndex("Code")
                         .IsUnique();
 
+                    b.HasIndex("CreatedDate");
+
+                    b.HasIndex("Status");
+
                     b.HasIndex("UserId");
 
                     b.ToTable("Orders", "orders");
@@ -163,8 +167,8 @@ namespace ZIONShop.Orders.Infrastructure.Persistence.Migrations
                     b.Property<bool>("IsGift")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
-                        .HasColumnName("is_gift")
-                        .HasDefaultValue(false);
+                        .HasDefaultValue(false)
+                        .HasColumnName("is_gift");
 
                     b.Property<Guid>("OrderId")
                         .HasColumnType("uuid");
@@ -214,6 +218,8 @@ namespace ZIONShop.Orders.Infrastructure.Persistence.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("OrderId");
+
+                    b.HasIndex("Status", "At");
 
                     b.ToTable("OrderStatusHistories", "orders");
                 });

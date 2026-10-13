@@ -16,6 +16,8 @@ public class OrderConfiguration : IEntityTypeConfiguration<Order>
 
         builder.Property(o => o.UserId).IsRequired();
         builder.HasIndex(o => o.UserId);
+        builder.HasIndex(o => o.CreatedDate);
+        builder.HasIndex(o => o.Status);
 
         builder.Property(o => o.Status).HasConversion<string>().HasMaxLength(32).IsRequired();
         builder.Property(o => o.PaymentMethod).HasConversion<string>().HasMaxLength(16).IsRequired();

@@ -22,6 +22,7 @@ public static class AuthInfrastructureExtensions
         services.AddScoped<IAuthOtpRepository, AuthOtpRepository>();
         services.AddScoped<IAuthUnitOfWork>(sp => sp.GetRequiredService<AuthDbContext>());
         services.AddScoped<IUserContactReader, UserContactReader>();
+        services.AddScoped<IUserStatsReader, UserStatsReader>();
         return services;
     }
 }

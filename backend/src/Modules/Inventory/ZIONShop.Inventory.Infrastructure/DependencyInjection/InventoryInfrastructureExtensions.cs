@@ -27,6 +27,7 @@ public static class InventoryInfrastructureExtensions
         services.AddScoped<IInventoryUnitOfWork>(sp => sp.GetRequiredService<InventoryDbContext>());
         services.AddScoped<IInventoryOutbox, InventoryOutbox>();
         services.AddScoped<IStockAvailabilityReader, StockAvailabilityReader>();
+        services.AddScoped<IInventoryStatsReader, InventoryStatsReader>();
 
         services.AddOutbox<InventoryDbContext>();
         services.AddHostedService<ReservationExpiryBackgroundService>();
