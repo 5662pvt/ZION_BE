@@ -29,7 +29,7 @@ public record ShippingAddressDto(
     string Ward,
     string StreetAddress);
 
-public record OrderLineDto(Guid ProductId, string ProductName, decimal UnitPrice, int Quantity, decimal LineTotal);
+public record OrderLineDto(Guid ProductId, string ProductName, decimal UnitPrice, int Quantity, decimal LineTotal, bool IsGift);
 
 public record OrderSummaryDto(Guid Id, string Code, string Status, decimal Total, string Currency, DateTime CreatedAt, int ItemCount);
 

@@ -78,6 +78,27 @@ public class Order : AggregateRoot
         DiscountTarget = discountTarget is "Items" or "Shipping" ? discountTarget : "Items";
     }
 
+    /// <summary>Adds a free gift line granted by a Gift promotion. Does not affect Subtotal/discount (purchased-line only).</summary>
+    public Result AddGiftLine(Guid productId, string productName, int quantity, Guid promotionId)
+    {
+        if (Status != OrderStatus.PendingStock) return Result.Failure(OrdersErrors.InvalidTransition);
+        _lines.Add(OrderLine.CreateGift(Id, productId, productName, quantity, promotionId));
+        return Result.Success();
+    }
+
+    private const string GiftDroppedNote = "Quà tặng hết hàng – đã bỏ quà";
+
+    /// <summary>Removes gift lines for the given products (inventory could not cover them). Returns the removed lines.</summary>
+    public IReadOnlyList<OrderLine> DropGiftLines(IReadOnlyCollection<Guid> productIds)
+    {
+        var toRemove = _lines.Where(l => l.IsGift && productIds.Contains(l.ProductId)).ToList();
+        if (toRemove.Count == 0) return Array.Empty<OrderLine>();
+
+        foreach (var line in toRemove) _lines.Remove(line);
+        _statusHistory.Add(OrderStatusHistory.Create(Id, Status, GiftDroppedNote));
+        return toRemove;
+    }
+
     public Result ConfirmReservation()
     {
         if (Status != OrderStatus.PendingStock) return Result.Failure(OrdersErrors.InvalidTransition);

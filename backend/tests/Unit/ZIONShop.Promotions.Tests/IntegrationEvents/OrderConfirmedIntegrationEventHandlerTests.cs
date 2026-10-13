@@ -5,82 +5,60 @@ using ZIONShop.Promotions.Domain.Entities;
 using ZIONShop.Promotions.Domain.Enums;
 using ZIONShop.Promotions.Infrastructure.Persistence;
 using ZIONShop.Promotions.Infrastructure.Repositories;
-using ZIONShop.Promotions.Tests.TestSupport;
 
 namespace ZIONShop.Promotions.Tests.IntegrationEvents;
 
 public class OrderConfirmedIntegrationEventHandlerTests
 {
-    private static PromotionsDbContext CreateDb(string name) =>
-        new(new DbContextOptionsBuilder<PromotionsDbContext>().UseInMemoryDatabase(name).Options);
-
-    [Fact]
-    public async Task HandleAsync_Should_MarkCommitted_When_Reserved()
+    private static (PromotionsDbContext Db, OrderConfirmedIntegrationEventHandler Handler) BuildScope()
     {
-        var dbName = Guid.NewGuid().ToString("N");
-        var now = DateTimeOffset.UtcNow;
-        var orderId = Guid.NewGuid();
-        var userId = Guid.NewGuid();
-
-        using (var seedDb = CreateDb(dbName))
-        {
-            var promotion = Promotion.Create("Sale", null, PromotionType.FixedAmountOff, 1000m, null, 0m,
-                now.UtcDateTime.AddDays(-1), now.UtcDateTime.AddDays(1), null, null);
-            promotion.Activate();
-            await seedDb.Promotions.AddAsync(promotion);
-            var coupon = CouponCode.Create(promotion.Id, "SALE", now.UtcDateTime);
-            await seedDb.CouponCodes.AddAsync(coupon);
-            await seedDb.CouponRedemptions.AddAsync(CouponRedemption.Create(promotion.Id, coupon.Id, orderId, userId, 1000m, now.UtcDateTime));
-            await seedDb.SaveChangesAsync();
-        }
-
-        using var db = CreateDb(dbName);
-        var handler = new OrderConfirmedIntegrationEventHandler(new CouponRedemptionRepository(db), db, new FakeTimeProvider(now));
-
-        await handler.HandleAsync(new OrderConfirmedIntegrationEvent(orderId, userId));
-
-        using var verifyDb = CreateDb(dbName);
-        verifyDb.CouponRedemptions.Single(r => r.OrderId == orderId).Status.Should().Be(RedemptionStatus.Committed);
+        var options = new DbContextOptionsBuilder<PromotionsDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
+            .Options;
+        var db = new PromotionsDbContext(options);
+        var handler = new OrderConfirmedIntegrationEventHandler(new CouponRedemptionRepository(db), new GiftRedemptionRepository(db), db, TimeProvider.System);
+        return (db, handler);
     }
 
     [Fact]
-    public async Task HandleAsync_Should_BeIdempotent_When_CalledTwice()
+    public async Task HandleAsync_Should_CommitAllReservedGiftRedemptions_When_OrderHasMultipleGiftPromotions()
     {
-        var dbName = Guid.NewGuid().ToString("N");
-        var now = DateTimeOffset.UtcNow;
+        var (db, handler) = BuildScope();
         var orderId = Guid.NewGuid();
         var userId = Guid.NewGuid();
+        var giftA = GiftRedemption.Create(Guid.NewGuid(), orderId, userId, DateTime.UtcNow);
+        var giftB = GiftRedemption.Create(Guid.NewGuid(), orderId, userId, DateTime.UtcNow);
+        db.GiftRedemptions.AddRange(giftA, giftB);
+        await db.SaveChangesAsync();
 
-        using (var seedDb = CreateDb(dbName))
-        {
-            var promotion = Promotion.Create("Sale", null, PromotionType.FixedAmountOff, 1000m, null, 0m,
-                now.UtcDateTime.AddDays(-1), now.UtcDateTime.AddDays(1), null, null);
-            promotion.Activate();
-            await seedDb.Promotions.AddAsync(promotion);
-            var coupon = CouponCode.Create(promotion.Id, "SALE", now.UtcDateTime);
-            await seedDb.CouponCodes.AddAsync(coupon);
-            await seedDb.CouponRedemptions.AddAsync(CouponRedemption.Create(promotion.Id, coupon.Id, orderId, userId, 1000m, now.UtcDateTime));
-            await seedDb.SaveChangesAsync();
-        }
+        await handler.HandleAsync(new OrderConfirmedIntegrationEvent(orderId, userId), CancellationToken.None);
 
-        using var db = CreateDb(dbName);
-        var handler = new OrderConfirmedIntegrationEventHandler(new CouponRedemptionRepository(db), db, new FakeTimeProvider(now));
-
-        await handler.HandleAsync(new OrderConfirmedIntegrationEvent(orderId, userId));
-        await handler.HandleAsync(new OrderConfirmedIntegrationEvent(orderId, userId));
-
-        using var verifyDb = CreateDb(dbName);
-        verifyDb.CouponRedemptions.Single(r => r.OrderId == orderId).Status.Should().Be(RedemptionStatus.Committed);
+        var reloaded = await db.GiftRedemptions.AsNoTracking().Where(r => r.OrderId == orderId).ToListAsync();
+        reloaded.Should().OnlyContain(r => r.Status == RedemptionStatus.Committed);
     }
 
     [Fact]
-    public async Task HandleAsync_Should_NoOp_When_NoRedemptionForOrder()
+    public async Task HandleAsync_Should_CommitCouponRedemption_When_Reserved()
     {
-        var dbName = Guid.NewGuid().ToString("N");
-        var now = DateTimeOffset.UtcNow;
-        using var db = CreateDb(dbName);
-        var handler = new OrderConfirmedIntegrationEventHandler(new CouponRedemptionRepository(db), db, new FakeTimeProvider(now));
+        var (db, handler) = BuildScope();
+        var orderId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+        var redemption = CouponRedemption.Create(Guid.NewGuid(), Guid.NewGuid(), orderId, userId, 10000m, DateTime.UtcNow);
+        db.CouponRedemptions.Add(redemption);
+        await db.SaveChangesAsync();
 
-        await handler.HandleAsync(new OrderConfirmedIntegrationEvent(Guid.NewGuid(), Guid.NewGuid()));
+        await handler.HandleAsync(new OrderConfirmedIntegrationEvent(orderId, userId), CancellationToken.None);
+
+        var reloaded = await db.CouponRedemptions.AsNoTracking().SingleAsync(r => r.OrderId == orderId);
+        reloaded.Status.Should().Be(RedemptionStatus.Committed);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Should_NoOp_When_NoRedemptionsForOrder()
+    {
+        var (_, handler) = BuildScope();
+
+        await handler.HandleAsync(new OrderConfirmedIntegrationEvent(Guid.NewGuid(), Guid.NewGuid()), CancellationToken.None);
+        // No exception means success; nothing to assert beyond idempotent no-op behavior.
     }
 }

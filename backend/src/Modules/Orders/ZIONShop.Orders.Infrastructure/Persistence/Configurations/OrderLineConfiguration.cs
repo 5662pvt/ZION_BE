@@ -15,6 +15,8 @@ public class OrderLineConfiguration : IEntityTypeConfiguration<OrderLine>
         builder.Property(l => l.ProductName).IsRequired().HasMaxLength(256);
         builder.Property(l => l.UnitPrice).HasColumnType("decimal(18,2)").IsRequired();
         builder.Property(l => l.Quantity).IsRequired();
+        builder.Property(l => l.IsGift).HasColumnName("is_gift").IsRequired().HasDefaultValue(false);
+        builder.Property(l => l.GiftPromotionId).HasColumnName("gift_promotion_id");
         builder.Ignore(l => l.LineTotal);
         builder.HasIndex(l => new { l.OrderId, l.ProductId });
     }

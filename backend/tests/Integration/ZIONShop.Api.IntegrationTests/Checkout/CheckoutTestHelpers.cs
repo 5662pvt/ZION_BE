@@ -8,7 +8,7 @@ public record AddressData(Guid Id, string RecipientName, string PhoneNumber, str
 public record AvailabilityData(Guid ProductId, int Available, bool InStock);
 public record InventoryItemData(Guid ProductId, string Sku, string ProductName, int OnHand, int Reserved, int Available, int LowStockThreshold, bool IsLowStock);
 public record ShippingAddressData(Guid AddressId, string RecipientName, string PhoneNumber, string Province, string Ward, string StreetAddress);
-public record OrderLineData(Guid ProductId, string ProductName, decimal UnitPrice, int Quantity, decimal LineTotal);
+public record OrderLineData(Guid ProductId, string ProductName, decimal UnitPrice, int Quantity, decimal LineTotal, bool IsGift);
 public record OrderStatusHistoryData(string Status, DateTime At, string? Note);
 public record OrderData(Guid Id, string Code, string Status, string PaymentMethod, decimal Subtotal, decimal ShippingFee, string? CouponCode, decimal DiscountAmount, string? DiscountTarget, decimal Total, string Currency, DateTime CreatedAt, string? Note, string? CancelReason, ShippingAddressData ShippingAddress, List<OrderLineData> Lines, List<OrderStatusHistoryData> History);
 public record AdminOrderSummaryData(Guid Id, string Code, string Status, string PaymentMethod, decimal Total, string Currency, DateTime CreatedAt, int ItemCount, string RecipientName, string PhoneNumber);
@@ -203,5 +203,28 @@ public static class CheckoutTestHelpers
         } while (DateTime.UtcNow < deadline);
 
         throw new TimeoutException($"Inventory for SKU '{sku}' did not reach the expected state within {timeout}. Last observed: OnHand={last.OnHand}, Reserved={last.Reserved}.");
+    }
+
+    /// <summary>
+    /// Same rationale as <see cref="WaitForInventoryAsync"/>, but keyed by productId against the public
+    /// availability endpoint -- convenient for gift-line assertions where only the productId (not the
+    /// SKU) is at hand.
+    /// </summary>
+    public static async Task<AvailabilityData> WaitForAvailabilityAsync(
+        HttpClient client,
+        Guid productId,
+        Func<AvailabilityData, bool> predicate,
+        TimeSpan? timeout = null)
+    {
+        var deadline = DateTime.UtcNow + (timeout ?? TimeSpan.FromSeconds(20));
+        AvailabilityData last;
+        do
+        {
+            last = await GetAvailabilityAsync(client, productId);
+            if (predicate(last)) return last;
+            await Task.Delay(250);
+        } while (DateTime.UtcNow < deadline);
+
+        throw new TimeoutException($"Availability for product '{productId}' did not reach the expected state within {timeout}. Last observed: Available={last.Available}.");
     }
 }

@@ -1,72 +1,69 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
-using Moq;
-using ZIONShop.Contracts.Promotions;
 using ZIONShop.Promotions.Application.Services;
 using ZIONShop.Promotions.Domain.Entities;
 using ZIONShop.Promotions.Infrastructure.Persistence;
 using ZIONShop.Promotions.Infrastructure.Repositories;
-using ZIONShop.Promotions.Tests.TestSupport;
+using ZIONShop.Promotions.Tests.Fakes;
 
 namespace ZIONShop.Promotions.Tests.Services;
 
 public class StaleReservationReleaseProcessorTests
 {
-    private static PromotionsDbContext CreateDb(string name) =>
-        new(new DbContextOptionsBuilder<PromotionsDbContext>().UseInMemoryDatabase(name).Options);
-
-    [Fact]
-    public async Task ReleaseStaleReservationsAsync_Should_ReleaseOnlyReservationsOlderThan30Minutes()
+    private static (PromotionsDbContext Db, StaleReservationReleaseProcessor Processor, FakePromotionEvaluator Coupons, FakeGiftPromotionEvaluator Gifts) BuildScope()
     {
-        var dbName = Guid.NewGuid().ToString("N");
-        var now = DateTimeOffset.UtcNow;
-        var staleOrderId = Guid.NewGuid();
-        var freshOrderId = Guid.NewGuid();
-
-        using (var seedDb = CreateDb(dbName))
-        {
-            var promotion = Promotion.Create("Sale", null, ZIONShop.Promotions.Domain.Enums.PromotionType.FixedAmountOff, 1000m, null, 0m,
-                now.UtcDateTime.AddDays(-1), now.UtcDateTime.AddDays(1), null, null);
-            promotion.Activate();
-            await seedDb.Promotions.AddAsync(promotion);
-            var coupon = CouponCode.Create(promotion.Id, "SALE", now.UtcDateTime);
-            await seedDb.CouponCodes.AddAsync(coupon);
-
-            var staleRedemption = CouponRedemption.Create(promotion.Id, coupon.Id, staleOrderId, Guid.NewGuid(), 1000m, now.UtcDateTime.AddMinutes(-31));
-            var freshRedemption = CouponRedemption.Create(promotion.Id, coupon.Id, freshOrderId, Guid.NewGuid(), 1000m, now.UtcDateTime.AddMinutes(-5));
-            await seedDb.CouponRedemptions.AddAsync(staleRedemption);
-            await seedDb.CouponRedemptions.AddAsync(freshRedemption);
-            await seedDb.SaveChangesAsync();
-        }
-
-        using var db = CreateDb(dbName);
-        var evaluator = new Mock<IPromotionEvaluator>();
-        evaluator.Setup(e => e.ReleaseAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
-
+        var options = new DbContextOptionsBuilder<PromotionsDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
+            .Options;
+        var db = new PromotionsDbContext(options);
+        var coupons = new FakePromotionEvaluator();
+        var gifts = new FakeGiftPromotionEvaluator();
         var processor = new StaleReservationReleaseProcessor(
-            new CouponRedemptionRepository(db), evaluator.Object, new FakeTimeProvider(now), NullLogger<StaleReservationReleaseProcessor>.Instance);
-
-        var count = await processor.ReleaseStaleReservationsAsync();
-
-        count.Should().Be(1);
-        evaluator.Verify(e => e.ReleaseAsync(staleOrderId, It.IsAny<CancellationToken>()), Times.Once);
-        evaluator.Verify(e => e.ReleaseAsync(freshOrderId, It.IsAny<CancellationToken>()), Times.Never);
+            new CouponRedemptionRepository(db), new GiftRedemptionRepository(db), coupons, gifts, TimeProvider.System, NullLogger<StaleReservationReleaseProcessor>.Instance);
+        return (db, processor, coupons, gifts);
     }
 
     [Fact]
-    public async Task ReleaseStaleReservationsAsync_Should_ReturnZero_When_NothingStale()
+    public async Task ReleaseStaleReservationsAsync_Should_ReleaseStaleGiftRedemption_When_OlderThanThirtyMinutes()
     {
-        var dbName = Guid.NewGuid().ToString("N");
-        var now = DateTimeOffset.UtcNow;
-        using var db = CreateDb(dbName);
-        var evaluator = new Mock<IPromotionEvaluator>();
+        var (db, processor, _, gifts) = BuildScope();
+        var orderId = Guid.NewGuid();
+        var stale = GiftRedemption.Create(Guid.NewGuid(), orderId, Guid.NewGuid(), DateTime.UtcNow.AddMinutes(-40));
+        db.GiftRedemptions.Add(stale);
+        await db.SaveChangesAsync();
 
-        var processor = new StaleReservationReleaseProcessor(
-            new CouponRedemptionRepository(db), evaluator.Object, new FakeTimeProvider(now), NullLogger<StaleReservationReleaseProcessor>.Instance);
+        var released = await processor.ReleaseStaleReservationsAsync();
 
-        var count = await processor.ReleaseStaleReservationsAsync();
+        released.Should().Be(1);
+        gifts.ReleasedGiftsOrderIds.Should().ContainSingle(id => id == orderId);
+    }
 
-        count.Should().Be(0);
-        evaluator.Verify(e => e.ReleaseAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Never);
+    [Fact]
+    public async Task ReleaseStaleReservationsAsync_Should_NotReleaseGiftRedemption_When_WithinThirtyMinutes()
+    {
+        var (db, processor, _, gifts) = BuildScope();
+        var fresh = GiftRedemption.Create(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), DateTime.UtcNow.AddMinutes(-5));
+        db.GiftRedemptions.Add(fresh);
+        await db.SaveChangesAsync();
+
+        var released = await processor.ReleaseStaleReservationsAsync();
+
+        released.Should().Be(0);
+        gifts.ReleasedGiftsOrderIds.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task ReleaseStaleReservationsAsync_Should_ReleaseStaleCouponRedemption_When_OlderThanThirtyMinutes()
+    {
+        var (db, processor, coupons, _) = BuildScope();
+        var orderId = Guid.NewGuid();
+        var stale = CouponRedemption.Create(Guid.NewGuid(), Guid.NewGuid(), orderId, Guid.NewGuid(), 10000m, DateTime.UtcNow.AddMinutes(-45));
+        db.CouponRedemptions.Add(stale);
+        await db.SaveChangesAsync();
+
+        var released = await processor.ReleaseStaleReservationsAsync();
+
+        released.Should().Be(1);
+        coupons.ReleasedOrderIds.Should().ContainSingle(id => id == orderId);
     }
 }

@@ -4,5 +4,6 @@ public enum PromotionType
 {
     PercentageOff,
     FixedAmountOff,
-    FreeShipping
+    FreeShipping,
+    Gift
 }

@@ -1,4 +1,5 @@
 using MediatR;
+using ZIONShop.Contracts.Products;
 using ZIONShop.Promotions.Application.DTOs;
 using ZIONShop.Promotions.Application.Interfaces;
 using ZIONShop.Promotions.Application.Mappings;
@@ -15,12 +16,14 @@ public class CreatePromotionCommandHandler : IRequestHandler<CreatePromotionComm
     private readonly IPromotionRepository _promotions;
     private readonly IPromotionsUnitOfWork _uow;
     private readonly TimeProvider _timeProvider;
+    private readonly IProductCatalogReader _catalogReader;
 
-    public CreatePromotionCommandHandler(IPromotionRepository promotions, IPromotionsUnitOfWork uow, TimeProvider timeProvider)
+    public CreatePromotionCommandHandler(IPromotionRepository promotions, IPromotionsUnitOfWork uow, TimeProvider timeProvider, IProductCatalogReader catalogReader)
     {
         _promotions = promotions;
         _uow = uow;
         _timeProvider = timeProvider;
+        _catalogReader = catalogReader;
     }
 
     public async Task<Result<PromotionDto>> Handle(CreatePromotionCommand request, CancellationToken cancellationToken)
@@ -31,14 +34,29 @@ public class CreatePromotionCommandHandler : IRequestHandler<CreatePromotionComm
         if (!Enum.TryParse<PromotionScope>(request.Scope, ignoreCase: true, out var scope))
             return Result.Failure<PromotionDto>(PromotionsErrors.InvalidPromotionScope);
 
-        var value = type == PromotionType.FreeShipping ? 0m : request.Value;
-        var maxDiscountAmount = type == PromotionType.FreeShipping ? null : request.MaxDiscountAmount;
+        var value = type is PromotionType.FreeShipping or PromotionType.Gift ? 0m : request.Value;
+        var maxDiscountAmount = type is PromotionType.FreeShipping or PromotionType.Gift ? null : request.MaxDiscountAmount;
+        var minQuantity = type == PromotionType.Gift ? request.MinQuantity : null;
+        var giftItems = type == PromotionType.Gift
+            ? request.GiftItems?.Select(g => new GiftItemInput(g.ProductId, g.Quantity)).ToList()
+            : null;
 
-        var promotion = Promotion.Create(
+        if (type == PromotionType.Gift && giftItems is { Count: > 0 })
+        {
+            foreach (var item in giftItems)
+            {
+                var product = await _catalogReader.GetAsync(item.ProductId, cancellationToken);
+                if (product is null) return Result.Failure<PromotionDto>(PromotionsErrors.GiftProductNotFound);
+            }
+        }
+
+        var createResult = Promotion.Create(
             request.Name, request.Description, type, value, maxDiscountAmount,
             request.MinOrderSubtotal, request.StartsAt, request.EndsAt, request.UsageLimit, request.PerUserLimit,
-            scope, request.TargetProductIds, request.TargetCategoryIds);
+            scope, request.TargetProductIds, request.TargetCategoryIds, minQuantity, giftItems);
+        if (createResult.IsFailure) return Result.Failure<PromotionDto>(createResult.Error);
 
+        var promotion = createResult.Value;
         await _promotions.AddAsync(promotion, cancellationToken);
         await _uow.SaveChangesAsync(cancellationToken);
 

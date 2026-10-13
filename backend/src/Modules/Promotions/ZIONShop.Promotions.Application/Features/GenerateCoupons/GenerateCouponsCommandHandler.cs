@@ -3,6 +3,7 @@ using ZIONShop.Promotions.Application.DTOs;
 using ZIONShop.Promotions.Application.Interfaces;
 using ZIONShop.Promotions.Application.Mappings;
 using ZIONShop.Promotions.Domain.Entities;
+using ZIONShop.Promotions.Domain.Enums;
 using ZIONShop.Promotions.Domain.Exceptions;
 using ZIONShop.Promotions.Domain.Repositories;
 using ZIONShop.SharedKernel.Results;
@@ -32,6 +33,9 @@ public class GenerateCouponsCommandHandler : IRequestHandler<GenerateCouponsComm
     {
         var promotion = await _promotions.GetByIdAsync(request.PromotionId, cancellationToken);
         if (promotion is null) return Result.Failure<IReadOnlyList<CouponDto>>(PromotionsErrors.PromotionNotFound);
+
+        if (promotion.Type == PromotionType.Gift)
+            return Result.Failure<IReadOnlyList<CouponDto>>(PromotionsErrors.CouponNotAllowedForGift);
 
         var prefix = request.Prefix.Trim().ToUpperInvariant();
         var codes = new HashSet<string>(StringComparer.Ordinal);

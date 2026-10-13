@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using ZIONShop.Contracts.Inventory;
 using ZIONShop.Contracts.Orders;
 using ZIONShop.Contracts.Promotions;
 using ZIONShop.EventBus.DependencyInjection;
@@ -30,8 +31,10 @@ public static class PromotionsInfrastructureExtensions
         services.AddScoped<IPromotionRepository, PromotionRepository>();
         services.AddScoped<ICouponCodeRepository, CouponCodeRepository>();
         services.AddScoped<ICouponRedemptionRepository, CouponRedemptionRepository>();
+        services.AddScoped<IGiftRedemptionRepository, GiftRedemptionRepository>();
         services.AddScoped<IPromotionsUnitOfWork>(sp => sp.GetRequiredService<PromotionsDbContext>());
         services.AddScoped<IPromotionEvaluator, PromotionEvaluator>();
+        services.AddScoped<IGiftPromotionEvaluator, GiftPromotionEvaluator>();
 
         services.AddScoped<StaleReservationReleaseProcessor>();
         services.AddHostedService<StaleReservationReleaseBackgroundService>();
@@ -40,6 +43,7 @@ public static class PromotionsInfrastructureExtensions
 
         services.AddIntegrationEventHandler<OrderConfirmedIntegrationEvent, OrderConfirmedIntegrationEventHandler>();
         services.AddIntegrationEventHandler<OrderCancelledIntegrationEvent, OrderCancelledIntegrationEventHandler>();
+        services.AddIntegrationEventHandler<InventoryReservationFailedIntegrationEvent, InventoryReservationFailedIntegrationEventHandler>();
 
         return services;
     }

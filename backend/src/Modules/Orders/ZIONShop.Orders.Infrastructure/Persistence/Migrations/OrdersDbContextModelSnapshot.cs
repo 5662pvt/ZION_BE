@@ -156,6 +156,16 @@ namespace ZIONShop.Orders.Infrastructure.Persistence.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<Guid?>("GiftPromotionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("gift_promotion_id");
+
+                    b.Property<bool>("IsGift")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_gift")
+                        .HasDefaultValue(false);
+
                     b.Property<Guid>("OrderId")
                         .HasColumnType("uuid");
 

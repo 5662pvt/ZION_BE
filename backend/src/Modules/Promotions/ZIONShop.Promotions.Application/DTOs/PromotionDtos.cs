@@ -1,5 +1,7 @@
 namespace ZIONShop.Promotions.Application.DTOs;
 
+public record GiftItemDto(Guid ProductId, int Quantity);
+
 public record PromotionSummaryDto(
     Guid Id,
     string Name,
@@ -17,7 +19,9 @@ public record PromotionSummaryDto(
     int CouponCount,
     string Scope,
     IReadOnlyList<Guid> TargetProductIds,
-    IReadOnlyList<Guid> TargetCategoryIds);
+    IReadOnlyList<Guid> TargetCategoryIds,
+    int? MinQuantity,
+    IReadOnlyList<GiftItemDto> GiftItems);
 
 public record PromotionDto(
     Guid Id,
@@ -38,8 +42,12 @@ public record PromotionDto(
     string Scope,
     IReadOnlyList<Guid> TargetProductIds,
     IReadOnlyList<Guid> TargetCategoryIds,
-    IReadOnlyList<CouponDto> Coupons);
+    IReadOnlyList<CouponDto> Coupons,
+    int? MinQuantity,
+    IReadOnlyList<GiftItemDto> GiftItems);
 
 public record CouponDto(Guid Id, string Code, bool IsActive, int UsedCount, DateTime CreatedAt);
 
 public record CouponValidationResultDto(string Code, string PromotionName, decimal DiscountAmount, string DiscountTarget);
+
+public record GiftPreviewDto(Guid PromotionId, string PromotionName, Guid ProductId, string ProductName, string? ImageUrl, int Quantity, bool Available);

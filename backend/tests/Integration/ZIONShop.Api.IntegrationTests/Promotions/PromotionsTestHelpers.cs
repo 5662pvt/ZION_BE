@@ -6,11 +6,16 @@ namespace ZIONShop.Api.IntegrationTests.Promotions;
 public record PromotionData(
     Guid Id, string Name, string? Description, string Type, decimal Value, decimal? MaxDiscountAmount, decimal MinOrderSubtotal,
     DateTime StartsAt, DateTime EndsAt, bool IsActive, string Status, int? UsageLimit, int? PerUserLimit,
-    int UsedCount, int CouponCount, string Scope, List<Guid> TargetProductIds, List<Guid> TargetCategoryIds, List<CouponData> Coupons);
+    int UsedCount, int CouponCount, string Scope, List<Guid> TargetProductIds, List<Guid> TargetCategoryIds, List<CouponData> Coupons,
+    int? MinQuantity, List<GiftItemData> GiftItems);
 
 public record CouponData(Guid Id, string Code, bool IsActive, int UsedCount, DateTime CreatedAt);
 
 public record CouponValidationData(string Code, string PromotionName, decimal DiscountAmount, string DiscountTarget);
+
+public record GiftItemData(Guid ProductId, int Quantity);
+
+public record GiftPreviewData(Guid PromotionId, string PromotionName, Guid ProductId, string ProductName, string? ImageUrl, int Quantity, bool Available);
 
 public record CategoryData(Guid Id, string Name, string Slug, string? Description, Guid? ParentId, int DisplayOrder);
 
@@ -30,7 +35,9 @@ public static class PromotionsTestHelpers
         DateTime? endsAt = null,
         string scope = "Order",
         IReadOnlyList<Guid>? targetProductIds = null,
-        IReadOnlyList<Guid>? targetCategoryIds = null)
+        IReadOnlyList<Guid>? targetCategoryIds = null,
+        int? minQuantity = null,
+        IReadOnlyList<GiftItemData>? giftItems = null)
     {
         var token = Guid.NewGuid().ToString("N")[..8];
         return await admin.PostAsJsonAsync("/api/v1/promotions", new
@@ -47,7 +54,9 @@ public static class PromotionsTestHelpers
             perUserLimit,
             scope,
             targetProductIds,
-            targetCategoryIds
+            targetCategoryIds,
+            minQuantity,
+            giftItems
         });
     }
 
@@ -63,11 +72,13 @@ public static class PromotionsTestHelpers
         DateTime? endsAt = null,
         string scope = "Order",
         IReadOnlyList<Guid>? targetProductIds = null,
-        IReadOnlyList<Guid>? targetCategoryIds = null)
+        IReadOnlyList<Guid>? targetCategoryIds = null,
+        int? minQuantity = null,
+        IReadOnlyList<GiftItemData>? giftItems = null)
     {
         var response = await CreatePromotionRawAsync(
             admin, type, value, maxDiscountAmount, minOrderSubtotal, usageLimit, perUserLimit, startsAt, endsAt,
-            scope, targetProductIds, targetCategoryIds);
+            scope, targetProductIds, targetCategoryIds, minQuantity, giftItems);
         response.EnsureSuccessStatusCode();
         var envelope = await response.Content.ReadFromJsonAsync<ApiEnvelope<PromotionData>>(ApiEnvelopeJson.Options);
         return envelope!.Data!;
@@ -177,6 +188,17 @@ public static class PromotionsTestHelpers
         publishResponse.EnsureSuccessStatusCode();
 
         return productId;
+    }
+
+    public static async Task<HttpResponseMessage> GetGiftPreviewRawAsync(HttpClient customer)
+        => await customer.GetAsync("/api/v1/promotions/gifts/preview");
+
+    public static async Task<List<GiftPreviewData>> GetGiftPreviewAsync(HttpClient customer)
+    {
+        var response = await GetGiftPreviewRawAsync(customer);
+        response.EnsureSuccessStatusCode();
+        var envelope = await response.Content.ReadFromJsonAsync<ApiEnvelope<List<GiftPreviewData>>>(ApiEnvelopeJson.Options);
+        return envelope!.Data!;
     }
 
     public static async Task<(Guid PromotionId, string Code)> SeedScopedPromotionAsync(

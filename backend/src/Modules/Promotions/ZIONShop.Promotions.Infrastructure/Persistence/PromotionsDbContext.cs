@@ -20,6 +20,7 @@ public class PromotionsDbContext : DbContext, IPromotionsUnitOfWork
     public DbSet<Promotion> Promotions => Set<Promotion>();
     public DbSet<CouponCode> CouponCodes => Set<CouponCode>();
     public DbSet<CouponRedemption> CouponRedemptions => Set<CouponRedemption>();
+    public DbSet<GiftRedemption> GiftRedemptions => Set<GiftRedemption>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

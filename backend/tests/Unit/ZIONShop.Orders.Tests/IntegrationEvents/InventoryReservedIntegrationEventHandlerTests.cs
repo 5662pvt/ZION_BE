@@ -6,6 +6,7 @@ using ZIONShop.Orders.Domain.Enums;
 using ZIONShop.Orders.Domain.ValueObjects;
 using ZIONShop.Orders.Infrastructure.Persistence;
 using ZIONShop.Orders.Infrastructure.Repositories;
+using ZIONShop.Orders.Tests.Fakes;
 
 namespace ZIONShop.Orders.Tests.IntegrationEvents;
 
@@ -38,7 +39,7 @@ public class InventoryReservedIntegrationEventHandlerTests
         var (db, orders) = BuildScope();
         var order = await SeedOrderAsync(db, orders, PaymentMethod.COD);
 
-        var handler = new InventoryReservedIntegrationEventHandler(orders, db);
+        var handler = new InventoryReservedIntegrationEventHandler(orders, db, new FakeGiftPromotionEvaluator());
         await handler.HandleAsync(new InventoryReservedIntegrationEvent(order.Id, Array.Empty<ReservedItem>(), DateTime.UtcNow.AddMinutes(15)));
 
         var reloaded = await orders.GetByIdAsync(order.Id);
@@ -51,7 +52,7 @@ public class InventoryReservedIntegrationEventHandlerTests
         var (db, orders) = BuildScope();
         var order = await SeedOrderAsync(db, orders, PaymentMethod.Online);
 
-        var handler = new InventoryReservedIntegrationEventHandler(orders, db);
+        var handler = new InventoryReservedIntegrationEventHandler(orders, db, new FakeGiftPromotionEvaluator());
         await handler.HandleAsync(new InventoryReservedIntegrationEvent(order.Id, Array.Empty<ReservedItem>(), DateTime.UtcNow.AddMinutes(15)));
 
         var reloaded = await orders.GetByIdAsync(order.Id);
@@ -64,7 +65,7 @@ public class InventoryReservedIntegrationEventHandlerTests
         var (db, orders) = BuildScope();
         var order = await SeedOrderAsync(db, orders, PaymentMethod.COD);
 
-        var handler = new InventoryReservedIntegrationEventHandler(orders, db);
+        var handler = new InventoryReservedIntegrationEventHandler(orders, db, new FakeGiftPromotionEvaluator());
         var @event = new InventoryReservedIntegrationEvent(order.Id, Array.Empty<ReservedItem>(), DateTime.UtcNow.AddMinutes(15));
 
         await handler.HandleAsync(@event);
@@ -78,9 +79,72 @@ public class InventoryReservedIntegrationEventHandlerTests
     public async Task HandleAsync_Should_NoOp_When_OrderUnknown()
     {
         var (db, orders) = BuildScope();
-        var handler = new InventoryReservedIntegrationEventHandler(orders, db);
+        var handler = new InventoryReservedIntegrationEventHandler(orders, db, new FakeGiftPromotionEvaluator());
 
         await handler.HandleAsync(new InventoryReservedIntegrationEvent(Guid.NewGuid(), Array.Empty<ReservedItem>(), DateTime.UtcNow));
         // no exception thrown is the assertion
+    }
+
+    [Fact]
+    public async Task HandleAsync_Should_DropShortGiftLine_But_NotReleasePromotion_When_AnotherGiftLineOfItStillReserved()
+    {
+        var (db, orders) = BuildScope();
+        var productId = Guid.NewGuid();
+        var promotionId = Guid.NewGuid();
+        var giftProduct1 = Guid.NewGuid();
+        var giftProduct2 = Guid.NewGuid();
+
+        var order = Order.Place(
+            Guid.NewGuid(), PaymentMethod.COD, "VND", 30000,
+            new ShippingAddress(Guid.NewGuid(), "Nguyen Van A", "0900000000", "Hà Nội", "Cầu Giấy", "123 Đường ABC"),
+            new[] { (productId, "Widget", 100000m, 1) },
+            null);
+        order.AddGiftLine(giftProduct1, "Gift 1", 1, promotionId);
+        order.AddGiftLine(giftProduct2, "Gift 2", 1, promotionId);
+        await orders.AddAsync(order, CancellationToken.None);
+        await db.SaveChangesAsync(CancellationToken.None);
+
+        var giftEvaluator = new FakeGiftPromotionEvaluator();
+        var handler = new InventoryReservedIntegrationEventHandler(orders, db, giftEvaluator);
+        // giftProduct1 missing from the reserved items -> short -> dropped; giftProduct2 kept.
+        var @event = new InventoryReservedIntegrationEvent(
+            order.Id, new[] { new ReservedItem(productId, 1), new ReservedItem(giftProduct2, 1) }, DateTime.UtcNow.AddMinutes(15));
+
+        await handler.HandleAsync(@event);
+
+        var reloaded = await orders.GetByIdAsync(order.Id);
+        reloaded!.Lines.Should().NotContain(l => l.ProductId == giftProduct1);
+        reloaded.Lines.Should().Contain(l => l.ProductId == giftProduct2);
+        reloaded.StatusHistory.Should().Contain(h => h.Note == "Quà tặng hết hàng – đã bỏ quà");
+        giftEvaluator.ReleasedGiftCalls.Should().BeEmpty(); // promotion still has a kept gift line
+    }
+
+    [Fact]
+    public async Task HandleAsync_Should_ReleaseGiftPromotion_When_AllOfItsGiftLinesAreDropped()
+    {
+        var (db, orders) = BuildScope();
+        var productId = Guid.NewGuid();
+        var promotionId = Guid.NewGuid();
+        var giftProductId = Guid.NewGuid();
+
+        var order = Order.Place(
+            Guid.NewGuid(), PaymentMethod.COD, "VND", 30000,
+            new ShippingAddress(Guid.NewGuid(), "Nguyen Van A", "0900000000", "Hà Nội", "Cầu Giấy", "123 Đường ABC"),
+            new[] { (productId, "Widget", 100000m, 1) },
+            null);
+        order.AddGiftLine(giftProductId, "Gift", 1, promotionId);
+        await orders.AddAsync(order, CancellationToken.None);
+        await db.SaveChangesAsync(CancellationToken.None);
+
+        var giftEvaluator = new FakeGiftPromotionEvaluator();
+        var handler = new InventoryReservedIntegrationEventHandler(orders, db, giftEvaluator);
+        // giftProductId missing entirely from the reserved items -> dropped, and it was the promotion's only line.
+        var @event = new InventoryReservedIntegrationEvent(order.Id, new[] { new ReservedItem(productId, 1) }, DateTime.UtcNow.AddMinutes(15));
+
+        await handler.HandleAsync(@event);
+
+        var reloaded = await orders.GetByIdAsync(order.Id);
+        reloaded!.Lines.Should().NotContain(l => l.IsGift);
+        giftEvaluator.ReleasedGiftCalls.Should().ContainSingle(c => c.OrderId == order.Id && c.PromotionId == promotionId);
     }
 }

@@ -19,7 +19,7 @@ public class OrderDetailsReader : IOrderDetailsReader
         if (order is null) return null;
 
         var lines = order.Lines
-            .Select(l => new OrderDetailsLine(l.ProductName, l.Quantity, l.UnitPrice, l.LineTotal))
+            .Select(l => new OrderDetailsLine(l.ProductName, l.Quantity, l.UnitPrice, l.LineTotal, l.IsGift))
             .ToList();
 
         return new OrderDetails(

@@ -145,6 +145,42 @@ namespace ZIONShop.Promotions.Infrastructure.Persistence.Migrations
                     b.ToTable("CouponRedemptions", "promotions");
                 });
 
+            modelBuilder.Entity("ZIONShop.Promotions.Domain.Entities.GiftRedemption", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("OrderId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("PromotionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PromotionId", "OrderId")
+                        .IsUnique();
+
+                    b.HasIndex("PromotionId", "UserId", "Status");
+
+                    b.ToTable("GiftRedemptions", "promotions");
+                });
+
             modelBuilder.Entity("ZIONShop.Promotions.Domain.Entities.Promotion", b =>
                 {
                     b.Property<Guid>("Id")
@@ -184,6 +220,9 @@ namespace ZIONShop.Promotions.Infrastructure.Persistence.Migrations
 
                     b.Property<decimal?>("MaxDiscountAmount")
                         .HasColumnType("decimal(18,2)");
+
+                    b.Property<int?>("MinQuantity")
+                        .HasColumnType("integer");
 
                     b.Property<decimal>("MinOrderSubtotal")
                         .HasColumnType("decimal(18,2)");
@@ -245,6 +284,30 @@ namespace ZIONShop.Promotions.Infrastructure.Persistence.Migrations
                     b.HasIndex("IsActive");
 
                     b.ToTable("Promotions", "promotions");
+                });
+
+            modelBuilder.Entity("ZIONShop.Promotions.Domain.Entities.Promotion", b =>
+                {
+                    b.OwnsMany("ZIONShop.Promotions.Domain.Entities.PromotionGiftItem", "GiftItems", b1 =>
+                        {
+                            b1.Property<Guid>("PromotionId")
+                                .HasColumnType("uuid");
+
+                            b1.Property<Guid>("ProductId")
+                                .HasColumnType("uuid");
+
+                            b1.Property<int>("Quantity")
+                                .HasColumnType("integer");
+
+                            b1.HasKey("PromotionId", "ProductId");
+
+                            b1.ToTable("promotion_gift_items", "promotions");
+
+                            b1.WithOwner()
+                                .HasForeignKey("PromotionId");
+                        });
+
+                    b.Navigation("GiftItems");
                 });
 #pragma warning restore 612, 618
         }

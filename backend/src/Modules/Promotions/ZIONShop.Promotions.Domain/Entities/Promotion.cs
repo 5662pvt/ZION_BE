@@ -5,8 +5,13 @@ using ZIONShop.SharedKernel.Results;
 
 namespace ZIONShop.Promotions.Domain.Entities;
 
+/// <summary>Input for a gift reward line; validated against <see cref="Promotion.Create"/>/<see cref="Promotion.Update"/>'s gift rules, not persisted itself (see <see cref="PromotionGiftItem"/>).</summary>
+public sealed record GiftItemInput(Guid ProductId, int Quantity);
+
 public class Promotion : AggregateRoot
 {
+    private readonly List<PromotionGiftItem> _giftItems = new();
+
     private Promotion() { }
 
     public string Name { get; private set; } = string.Empty;
@@ -24,8 +29,10 @@ public class Promotion : AggregateRoot
     public PromotionScope Scope { get; private set; } = PromotionScope.Order;
     public Guid[] TargetProductIds { get; private set; } = Array.Empty<Guid>();
     public Guid[] TargetCategoryIds { get; private set; } = Array.Empty<Guid>();
+    public int? MinQuantity { get; private set; }
+    public IReadOnlyList<PromotionGiftItem> GiftItems => _giftItems.AsReadOnly();
 
-    public static Promotion Create(
+    public static Result<Promotion> Create(
         string name,
         string? description,
         PromotionType type,
@@ -38,9 +45,14 @@ public class Promotion : AggregateRoot
         int? perUserLimit,
         PromotionScope scope = PromotionScope.Order,
         IReadOnlyList<Guid>? targetProductIds = null,
-        IReadOnlyList<Guid>? targetCategoryIds = null)
+        IReadOnlyList<Guid>? targetCategoryIds = null,
+        int? minQuantity = null,
+        IReadOnlyList<GiftItemInput>? giftItems = null)
     {
-        return new Promotion
+        var giftError = ValidateGiftRules(type, scope, minQuantity, minOrderSubtotal, giftItems);
+        if (giftError is not null) return Result.Failure<Promotion>(giftError);
+
+        var promotion = new Promotion
         {
             Id = Guid.NewGuid(),
             Name = name,
@@ -57,8 +69,17 @@ public class Promotion : AggregateRoot
             UsedCount = 0,
             Scope = scope,
             TargetProductIds = targetProductIds?.ToArray() ?? Array.Empty<Guid>(),
-            TargetCategoryIds = targetCategoryIds?.ToArray() ?? Array.Empty<Guid>()
+            TargetCategoryIds = targetCategoryIds?.ToArray() ?? Array.Empty<Guid>(),
+            MinQuantity = type == PromotionType.Gift ? minQuantity : null
         };
+
+        if (type == PromotionType.Gift && giftItems is not null)
+        {
+            foreach (var item in giftItems)
+                promotion._giftItems.Add(PromotionGiftItem.Create(promotion.Id, item.ProductId, item.Quantity));
+        }
+
+        return Result.Success(promotion);
     }
 
     public Result Update(
@@ -74,10 +95,15 @@ public class Promotion : AggregateRoot
         int? perUserLimit,
         PromotionScope scope = PromotionScope.Order,
         IReadOnlyList<Guid>? targetProductIds = null,
-        IReadOnlyList<Guid>? targetCategoryIds = null)
+        IReadOnlyList<Guid>? targetCategoryIds = null,
+        int? minQuantity = null,
+        IReadOnlyList<GiftItemInput>? giftItems = null)
     {
         if (usageLimit.HasValue && usageLimit.Value < UsedCount)
             return Result.Failure(PromotionsErrors.UsageLimitBelowUsedCount);
+
+        var giftError = ValidateGiftRules(type, scope, minQuantity, minOrderSubtotal, giftItems);
+        if (giftError is not null) return Result.Failure(giftError);
 
         Name = name;
         Description = description;
@@ -92,6 +118,15 @@ public class Promotion : AggregateRoot
         Scope = scope;
         TargetProductIds = targetProductIds?.ToArray() ?? Array.Empty<Guid>();
         TargetCategoryIds = targetCategoryIds?.ToArray() ?? Array.Empty<Guid>();
+        MinQuantity = type == PromotionType.Gift ? minQuantity : null;
+
+        _giftItems.Clear();
+        if (type == PromotionType.Gift && giftItems is not null)
+        {
+            foreach (var item in giftItems)
+                _giftItems.Add(PromotionGiftItem.Create(Id, item.ProductId, item.Quantity));
+        }
+
         return Result.Success();
     }
 
@@ -145,4 +180,34 @@ public class Promotion : AggregateRoot
     public void IncrementUsage() => UsedCount++;
 
     public void DecrementUsage() => UsedCount = Math.Max(0, UsedCount - 1);
+
+    /// <summary>Structural rules from the Gift contract: non-Gift promotions must not carry gift fields; Gift
+    /// promotions must have 1-5 distinct gift items with quantity 1-10, and minQuantity consistent with Scope
+    /// (required and ≥1 for Products/Categories, forbidden for Order where MinOrderSubtotal must be &gt; 0 instead).</summary>
+    private static Error? ValidateGiftRules(PromotionType type, PromotionScope scope, int? minQuantity, decimal minOrderSubtotal, IReadOnlyList<GiftItemInput>? giftItems)
+    {
+        if (type != PromotionType.Gift)
+        {
+            if (giftItems is { Count: > 0 }) return PromotionsErrors.GiftItemsNotAllowed;
+            if (minQuantity.HasValue) return PromotionsErrors.MinQuantityNotAllowed;
+            return null;
+        }
+
+        if (giftItems is null || giftItems.Count == 0) return PromotionsErrors.GiftItemsRequired;
+        if (giftItems.Count > 5) return PromotionsErrors.GiftItemsTooMany;
+        if (giftItems.Select(g => g.ProductId).Distinct().Count() != giftItems.Count) return PromotionsErrors.GiftItemsDuplicateProduct;
+        if (giftItems.Any(g => g.Quantity is < 1 or > 10)) return PromotionsErrors.GiftQuantityInvalid;
+
+        if (scope == PromotionScope.Order)
+        {
+            if (minQuantity.HasValue) return PromotionsErrors.MinQuantityNotAllowedForOrderScope;
+            if (minOrderSubtotal <= 0m) return PromotionsErrors.OrderScopeRequiresPositiveSubtotal;
+        }
+        else if (!minQuantity.HasValue || minQuantity.Value < 1)
+        {
+            return PromotionsErrors.MinQuantityRequired;
+        }
+
+        return null;
+    }
 }

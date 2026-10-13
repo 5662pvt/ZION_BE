@@ -27,7 +27,18 @@ public class PromotionConfiguration : IEntityTypeConfiguration<Promotion>
         builder.Property(p => p.Scope).HasConversion<string>().HasMaxLength(16).IsRequired().HasDefaultValue(PromotionScope.Order);
         builder.Property(p => p.TargetProductIds).HasColumnType("uuid[]").IsRequired().HasDefaultValueSql("'{}'");
         builder.Property(p => p.TargetCategoryIds).HasColumnType("uuid[]").IsRequired().HasDefaultValueSql("'{}'");
+        builder.Property(p => p.MinQuantity);
         builder.HasIndex(p => p.IsActive);
+
+        builder.OwnsMany(p => p.GiftItems, gi =>
+        {
+            gi.ToTable("promotion_gift_items");
+            gi.WithOwner().HasForeignKey(x => x.PromotionId);
+            gi.HasKey(x => new { x.PromotionId, x.ProductId });
+            gi.Property(x => x.ProductId).IsRequired();
+            gi.Property(x => x.Quantity).IsRequired();
+        });
+        builder.Navigation(p => p.GiftItems).UsePropertyAccessMode(PropertyAccessMode.Field);
 
         builder.Property(p => p.CreatedDate).IsRequired();
         builder.Property(p => p.CreatedBy).HasMaxLength(128);

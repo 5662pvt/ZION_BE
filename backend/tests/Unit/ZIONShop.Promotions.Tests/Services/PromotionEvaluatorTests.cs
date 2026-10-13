@@ -27,7 +27,7 @@ public class PromotionEvaluatorTests
         IReadOnlyList<Guid>? targetProductIds = null, IReadOnlyList<Guid>? targetCategoryIds = null)
     {
         var promotion = Promotion.Create("Sale", null, type, value, maxDiscount, minOrderSubtotal,
-            now.AddDays(-1), now.AddDays(1), usageLimit, perUserLimit, scope, targetProductIds, targetCategoryIds);
+            now.AddDays(-1), now.AddDays(1), usageLimit, perUserLimit, scope, targetProductIds, targetCategoryIds).Value;
         promotion.Activate();
         await db.Promotions.AddAsync(promotion);
 
@@ -59,7 +59,7 @@ public class PromotionEvaluatorTests
         var now = DateTimeOffset.UtcNow;
         using var db = CreateDb(dbName);
         var promotion = Promotion.Create("Sale", null, PromotionType.PercentageOff, 10m, null, 0m,
-            now.UtcDateTime.AddDays(-1), now.UtcDateTime.AddDays(1), null, null);
+            now.UtcDateTime.AddDays(-1), now.UtcDateTime.AddDays(1), null, null).Value;
         await db.Promotions.AddAsync(promotion);
         var coupon = CouponCode.Create(promotion.Id, "SALE10", now.UtcDateTime);
         await db.CouponCodes.AddAsync(coupon);
@@ -96,7 +96,7 @@ public class PromotionEvaluatorTests
         var now = DateTimeOffset.UtcNow;
         using var db = CreateDb(dbName);
         var promotion = Promotion.Create("Sale", null, PromotionType.PercentageOff, 10m, null, 0m,
-            now.UtcDateTime.AddDays(1), now.UtcDateTime.AddDays(5), null, null);
+            now.UtcDateTime.AddDays(1), now.UtcDateTime.AddDays(5), null, null).Value;
         promotion.Activate();
         await db.Promotions.AddAsync(promotion);
         var coupon = CouponCode.Create(promotion.Id, "SALE10", now.UtcDateTime);
@@ -117,7 +117,7 @@ public class PromotionEvaluatorTests
         var now = DateTimeOffset.UtcNow;
         using var db = CreateDb(dbName);
         var promotion = Promotion.Create("Sale", null, PromotionType.PercentageOff, 10m, null, 0m,
-            now.UtcDateTime.AddDays(-5), now.UtcDateTime.AddDays(-1), null, null);
+            now.UtcDateTime.AddDays(-5), now.UtcDateTime.AddDays(-1), null, null).Value;
         promotion.Activate();
         await db.Promotions.AddAsync(promotion);
         var coupon = CouponCode.Create(promotion.Id, "SALE10", now.UtcDateTime);

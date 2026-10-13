@@ -149,6 +149,11 @@ public class PromotionEvaluator : IPromotionEvaluator
 
     private async Task<CouponError?> ValidateAsync(CouponCode coupon, Promotion promotion, Guid userId, decimal subtotal, DateTime now, CancellationToken ct)
     {
+        // Defensive: CreateCoupon/GenerateCoupons already refuse to mint a coupon for a Gift promotion,
+        // so this should be unreachable in practice.
+        if (promotion.Type == PromotionType.Gift)
+            return ToCouponError(PromotionsErrors.CouponNotAllowedForGift);
+
         if (!coupon.IsActive || !promotion.IsActive)
             return ToCouponError(PromotionsErrors.CouponInactive);
 

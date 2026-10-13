@@ -6,10 +6,10 @@ namespace ZIONShop.Promotions.Tests.Domain;
 public class PromotionTests
 {
     private static Promotion CreatePercentage(decimal value, decimal? cap, DateTime startsAt, DateTime endsAt) =>
-        Promotion.Create("Sale", null, PromotionType.PercentageOff, value, cap, 0m, startsAt, endsAt, null, null);
+        Promotion.Create("Sale", null, PromotionType.PercentageOff, value, cap, 0m, startsAt, endsAt, null, null).Value;
 
     private static Promotion CreateFixed(decimal value, DateTime startsAt, DateTime endsAt) =>
-        Promotion.Create("Sale", null, PromotionType.FixedAmountOff, value, null, 0m, startsAt, endsAt, null, null);
+        Promotion.Create("Sale", null, PromotionType.FixedAmountOff, value, null, 0m, startsAt, endsAt, null, null).Value;
 
     [Fact]
     public void CalculateDiscount_Should_RoundAndCap_When_PercentageOffExceedsMaxDiscount()
@@ -159,7 +159,7 @@ public class PromotionTests
         var productId = Guid.NewGuid();
         var promotion = Promotion.Create("Sale", null, PromotionType.FixedAmountOff, 1000m, null, 0m,
             DateTime.UtcNow.AddDays(-1), DateTime.UtcNow.AddDays(1), null, null,
-            PromotionScope.Products, new[] { productId });
+            PromotionScope.Products, new[] { productId }).Value;
 
         promotion.IsLineEligible(productId, null).Should().BeTrue();
         promotion.IsLineEligible(Guid.NewGuid(), null).Should().BeFalse();
@@ -171,7 +171,7 @@ public class PromotionTests
         var categoryId = Guid.NewGuid();
         var promotion = Promotion.Create("Sale", null, PromotionType.FixedAmountOff, 1000m, null, 0m,
             DateTime.UtcNow.AddDays(-1), DateTime.UtcNow.AddDays(1), null, null,
-            PromotionScope.Categories, targetCategoryIds: new[] { categoryId });
+            PromotionScope.Categories, targetCategoryIds: new[] { categoryId }).Value;
 
         promotion.IsLineEligible(Guid.NewGuid(), categoryId).Should().BeTrue();
         promotion.IsLineEligible(Guid.NewGuid(), Guid.NewGuid()).Should().BeFalse();

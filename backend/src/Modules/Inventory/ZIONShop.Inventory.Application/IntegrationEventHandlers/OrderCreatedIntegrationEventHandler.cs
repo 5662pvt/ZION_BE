@@ -54,16 +54,31 @@ public class OrderCreatedIntegrationEventHandler : IIntegrationEventHandler<Orde
             var unavailable = new List<Guid>();
             var toReserve = new List<(InventoryItem Item, int Quantity)>();
 
-            foreach (var line in @event.Lines)
-            {
-                var item = await items.GetByProductIdAsync(line.ProductId, cancellationToken);
-                if (item is null || item.Available < line.Quantity)
+            var groups = @event.Lines
+                .GroupBy(l => l.ProductId)
+                .Select(g => new
                 {
-                    unavailable.Add(line.ProductId);
+                    ProductId = g.Key,
+                    Paid = g.Where(l => !l.IsGift).Sum(l => l.Quantity),
+                    Gift = g.Where(l => l.IsGift).Sum(l => l.Quantity)
+                });
+
+            foreach (var group in groups)
+            {
+                var item = await items.GetByProductIdAsync(group.ProductId, cancellationToken);
+                var available = item?.Available ?? 0;
+
+                if (group.Paid > 0 && available < group.Paid)
+                {
+                    unavailable.Add(group.ProductId);
                     continue;
                 }
 
-                toReserve.Add((item, line.Quantity));
+                if (item is null) continue; // gift-only product with no inventory record -> nothing to reserve, gift dropped
+
+                var quantity = group.Paid + (available >= group.Paid + group.Gift ? group.Gift : 0);
+                if (quantity > 0)
+                    toReserve.Add((item, quantity));
             }
 
             if (unavailable.Count > 0)

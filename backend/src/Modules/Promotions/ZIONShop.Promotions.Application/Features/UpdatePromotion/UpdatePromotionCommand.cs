@@ -18,4 +18,6 @@ public record UpdatePromotionCommand(
     int? PerUserLimit,
     string Scope = "Order",
     IReadOnlyList<Guid>? TargetProductIds = null,
-    IReadOnlyList<Guid>? TargetCategoryIds = null) : IRequest<Result<PromotionDto>>;
+    IReadOnlyList<Guid>? TargetCategoryIds = null,
+    int? MinQuantity = null,
+    IReadOnlyList<GiftItemDto>? GiftItems = null) : IRequest<Result<PromotionDto>>;

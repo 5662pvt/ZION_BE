@@ -75,6 +75,25 @@ public class OrderEmailTemplatesTests
     }
 
     [Fact]
+    public void BuildConfirmedBody_Should_RenderGiftLine_With_FreeLabelAndSuffix()
+    {
+        var order = new OrderDetails(
+            Guid.NewGuid(), Guid.NewGuid(), "ZS0001", "Confirmed", "COD",
+            200000m, 0, null, null, 30000m, 230000m, "VND",
+            "Nguyen Van A", "0900000000", "123 ABC", null, DateTime.UtcNow,
+            new[]
+            {
+                new OrderDetailsLine("Widget", 2, 100000m, 200000m),
+                new OrderDetailsLine("Nón lưỡi trai", 1, 0m, 0m, IsGift: true)
+            });
+
+        var body = OrderEmailTemplates.BuildConfirmedBody(null, order, "http://localhost:3000");
+
+        body.Should().Contain("Nón lưỡi trai (Quà tặng)");
+        body.Should().Contain("Miễn phí");
+    }
+
+    [Fact]
     public void BuildCancelledBody_Should_ContainReason_When_Provided()
     {
         var order = BuildOrder(cancelReason: "Khách hàng đổi ý <script>");

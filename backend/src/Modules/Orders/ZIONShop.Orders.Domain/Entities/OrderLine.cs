@@ -11,6 +11,8 @@ public class OrderLine : BaseEntity
     public string ProductName { get; private set; } = string.Empty;
     public decimal UnitPrice { get; private set; }
     public int Quantity { get; private set; }
+    public bool IsGift { get; private set; }
+    public Guid? GiftPromotionId { get; private set; }
 
     public decimal LineTotal => UnitPrice * Quantity;
 
@@ -27,6 +29,23 @@ public class OrderLine : BaseEntity
             ProductName = productName,
             UnitPrice = unitPrice,
             Quantity = quantity
+        };
+    }
+
+    public static OrderLine CreateGift(Guid orderId, Guid productId, string productName, int quantity, Guid promotionId)
+    {
+        if (quantity <= 0) throw new ArgumentException("Quantity must be positive", nameof(quantity));
+
+        return new OrderLine
+        {
+            Id = Guid.NewGuid(),
+            OrderId = orderId,
+            ProductId = productId,
+            ProductName = productName,
+            UnitPrice = 0m,
+            Quantity = quantity,
+            IsGift = true,
+            GiftPromotionId = promotionId
         };
     }
 }

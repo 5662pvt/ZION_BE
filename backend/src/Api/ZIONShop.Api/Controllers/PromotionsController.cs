@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using ZIONShop.Auth.Authorization;
 using ZIONShop.Common.Api;
+using ZIONShop.Promotions.Application.DTOs;
 using ZIONShop.Promotions.Application.Features.ActivatePromotion;
 using ZIONShop.Promotions.Application.Features.CreateCoupon;
 using ZIONShop.Promotions.Application.Features.CreatePromotion;
@@ -43,7 +44,8 @@ public class PromotionsController : ControllerBase
     {
         var cmd = new CreatePromotionCommand(
             body.Name, body.Description, body.Type, body.Value, body.MaxDiscountAmount, body.MinOrderSubtotal,
-            body.StartsAt, body.EndsAt, body.UsageLimit, body.PerUserLimit, body.Scope, body.TargetProductIds, body.TargetCategoryIds);
+            body.StartsAt, body.EndsAt, body.UsageLimit, body.PerUserLimit, body.Scope, body.TargetProductIds, body.TargetCategoryIds,
+            body.MinQuantity, body.GiftItems?.Select(g => new GiftItemDto(g.ProductId, g.Quantity)).ToList());
         return (await _mediator.Send(cmd, ct)).ToActionResult("Promotion created");
     }
 
@@ -52,7 +54,8 @@ public class PromotionsController : ControllerBase
     {
         var cmd = new UpdatePromotionCommand(
             id, body.Name, body.Description, body.Type, body.Value, body.MaxDiscountAmount, body.MinOrderSubtotal,
-            body.StartsAt, body.EndsAt, body.UsageLimit, body.PerUserLimit, body.Scope, body.TargetProductIds, body.TargetCategoryIds);
+            body.StartsAt, body.EndsAt, body.UsageLimit, body.PerUserLimit, body.Scope, body.TargetProductIds, body.TargetCategoryIds,
+            body.MinQuantity, body.GiftItems?.Select(g => new GiftItemDto(g.ProductId, g.Quantity)).ToList());
         return (await _mediator.Send(cmd, ct)).ToActionResult("Promotion updated");
     }
 
@@ -92,7 +95,10 @@ public record PromotionUpsertRequest(
     int? PerUserLimit,
     string Scope = "Order",
     Guid[]? TargetProductIds = null,
-    Guid[]? TargetCategoryIds = null);
+    Guid[]? TargetCategoryIds = null,
+    int? MinQuantity = null,
+    GiftItemBody[]? GiftItems = null);
 
 public record CreateCouponBody(string Code);
 public record GenerateCouponsBody(string Prefix, int Count);
+public record GiftItemBody(Guid ProductId, int Quantity);

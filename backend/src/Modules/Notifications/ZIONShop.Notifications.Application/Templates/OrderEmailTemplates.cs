@@ -77,11 +77,14 @@ public static class OrderEmailTemplates
           .Append("</tr>");
         foreach (var line in lines)
         {
+            var name = line.IsGift ? $"{line.ProductName} (Quà tặng)" : line.ProductName;
+            var unitPriceCell = line.IsGift ? "Miễn phí" : FormatMoney(line.UnitPrice);
+            var lineTotalCell = line.IsGift ? "Miễn phí" : FormatMoney(line.LineTotal);
             sb.Append("<tr>")
-              .Append($"<td style=\"padding:6px;\">{Encode(line.ProductName)}</td>")
+              .Append($"<td style=\"padding:6px;\">{Encode(name)}</td>")
               .Append($"<td style=\"padding:6px;text-align:right;\">{line.Quantity}</td>")
-              .Append($"<td style=\"padding:6px;text-align:right;\">{FormatMoney(line.UnitPrice)}</td>")
-              .Append($"<td style=\"padding:6px;text-align:right;\">{FormatMoney(line.LineTotal)}</td>")
+              .Append($"<td style=\"padding:6px;text-align:right;\">{unitPriceCell}</td>")
+              .Append($"<td style=\"padding:6px;text-align:right;\">{lineTotalCell}</td>")
               .Append("</tr>");
         }
         sb.Append("</table>");

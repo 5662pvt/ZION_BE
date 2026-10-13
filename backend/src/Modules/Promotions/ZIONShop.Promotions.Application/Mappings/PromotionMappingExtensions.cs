@@ -22,7 +22,9 @@ public static class PromotionMappingExtensions
         couponCount,
         promotion.Scope.ToString(),
         promotion.TargetProductIds,
-        promotion.TargetCategoryIds);
+        promotion.TargetCategoryIds,
+        promotion.MinQuantity,
+        promotion.GiftItems.Select(g => g.ToDto()).ToList());
 
     public static PromotionDto ToDto(this Promotion promotion, IReadOnlyList<CouponCode> coupons, DateTime utcNow) => new(
         promotion.Id,
@@ -43,7 +45,11 @@ public static class PromotionMappingExtensions
         promotion.Scope.ToString(),
         promotion.TargetProductIds,
         promotion.TargetCategoryIds,
-        coupons.Select(c => c.ToDto()).ToList());
+        coupons.Select(c => c.ToDto()).ToList(),
+        promotion.MinQuantity,
+        promotion.GiftItems.Select(g => g.ToDto()).ToList());
 
     public static CouponDto ToDto(this CouponCode coupon) => new(coupon.Id, coupon.Code, coupon.IsActive, coupon.UsedCount, coupon.CreatedAt);
+
+    public static GiftItemDto ToDto(this PromotionGiftItem item) => new(item.ProductId, item.Quantity);
 }

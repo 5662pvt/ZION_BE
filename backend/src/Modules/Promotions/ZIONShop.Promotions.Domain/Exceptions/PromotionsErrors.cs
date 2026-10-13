@@ -27,4 +27,16 @@ public static class PromotionsErrors
 
     public static Error CouponMinSubtotalNotMet(decimal minOrderSubtotal) =>
         Error.Validation("Promotions.CouponMinSubtotalNotMet", $"Đơn hàng chưa đạt giá trị tối thiểu {minOrderSubtotal.ToString("N0", System.Globalization.CultureInfo.InvariantCulture)}");
+
+    public static readonly Error GiftItemsRequired = Error.Validation("Promotions.GiftItemsRequired", "Khuyến mãi quà tặng phải có 1-5 sản phẩm quà tặng");
+    public static readonly Error GiftItemsTooMany = Error.Validation("Promotions.GiftItemsTooMany", "Khuyến mãi quà tặng chỉ được tối đa 5 sản phẩm quà tặng");
+    public static readonly Error GiftItemsDuplicateProduct = Error.Validation("Promotions.GiftItemsDuplicateProduct", "Sản phẩm quà tặng không được trùng lặp");
+    public static readonly Error GiftQuantityInvalid = Error.Validation("Promotions.GiftQuantityInvalid", "Số lượng quà tặng phải trong khoảng 1-10");
+    public static readonly Error GiftItemsNotAllowed = Error.Validation("Promotions.GiftItemsNotAllowed", "Chỉ khuyến mãi loại 'Gift' mới có sản phẩm quà tặng");
+    public static readonly Error MinQuantityRequired = Error.Validation("Promotions.MinQuantityRequired", "'minQuantity' là bắt buộc khi scope khác 'Order'");
+    public static readonly Error MinQuantityNotAllowedForOrderScope = Error.Validation("Promotions.MinQuantityNotAllowedForOrderScope", "'minQuantity' phải để trống khi scope là 'Order'");
+    public static readonly Error OrderScopeRequiresPositiveSubtotal = Error.Validation("Promotions.OrderScopeRequiresPositiveSubtotal", "'minOrderSubtotal' phải lớn hơn 0 khi scope là 'Order' với khuyến mãi quà tặng");
+    public static readonly Error MinQuantityNotAllowed = Error.Validation("Promotions.MinQuantityNotAllowed", "'minQuantity' chỉ áp dụng cho khuyến mãi loại 'Gift'");
+    public static readonly Error GiftProductNotFound = Error.Validation("Promotions.GiftProductNotFound", "Sản phẩm quà tặng không tồn tại");
+    public static readonly Error CouponNotAllowedForGift = Error.Validation("Promotions.CouponNotAllowedForGift", "Khuyến mãi quà tặng không dùng mã giảm giá");
 }

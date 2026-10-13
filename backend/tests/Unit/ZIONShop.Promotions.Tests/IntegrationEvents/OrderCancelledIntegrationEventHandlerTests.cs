@@ -1,22 +1,22 @@
-using Moq;
 using ZIONShop.Contracts.Orders;
-using ZIONShop.Contracts.Promotions;
 using ZIONShop.Promotions.Application.IntegrationEvents;
+using ZIONShop.Promotions.Tests.Fakes;
 
 namespace ZIONShop.Promotions.Tests.IntegrationEvents;
 
 public class OrderCancelledIntegrationEventHandlerTests
 {
     [Fact]
-    public async Task HandleAsync_Should_DelegateToEvaluatorRelease_When_Called()
+    public async Task HandleAsync_Should_ReleaseCouponAndGifts_When_OrderCancelled()
     {
         var orderId = Guid.NewGuid();
-        var evaluator = new Mock<IPromotionEvaluator>();
-        evaluator.Setup(e => e.ReleaseAsync(orderId, It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
-        var handler = new OrderCancelledIntegrationEventHandler(evaluator.Object);
+        var coupons = new FakePromotionEvaluator();
+        var gifts = new FakeGiftPromotionEvaluator();
+        var handler = new OrderCancelledIntegrationEventHandler(coupons, gifts);
 
-        await handler.HandleAsync(new OrderCancelledIntegrationEvent(orderId, Guid.NewGuid(), "Khách hủy đơn"));
+        await handler.HandleAsync(new OrderCancelledIntegrationEvent(orderId, Guid.NewGuid(), "Customer request"), CancellationToken.None);
 
-        evaluator.Verify(e => e.ReleaseAsync(orderId, It.IsAny<CancellationToken>()), Times.Once);
+        coupons.ReleasedOrderIds.Should().ContainSingle(id => id == orderId);
+        gifts.ReleasedGiftsOrderIds.Should().ContainSingle(id => id == orderId);
     }
 }
