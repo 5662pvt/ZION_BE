@@ -3,33 +3,33 @@
 ## Solution tree
 
 ```
-backend/
-├── ZIONShop.sln
-├── src/
-│   ├── BuildingBlocks/
-│   │   ├── SharedKernel/
-│   │   ├── Contracts/
-│   │   ├── EventBus/
-│   │   ├── Caching/
-│   │   ├── Logging/
-│   │   ├── Auth/
-│   │   └── Common/
-│   ├── Modules/
-│   │   ├── Auth/
-│   │   ├── Users/
-│   │   ├── Products/       # includes Categories
-│   │   ├── Inventory/
-│   │   ├── Cart/
-│   │   ├── Orders/
-│   │   ├── Payments/
-│   │   ├── Promotions/
-│   │   ├── Notifications/
-│   │   ├── Reviews/
-│   │   └── Admin/
-│   └── Api/
-└── tests/
-    ├── Unit/
-    └── Integration/
+ZIONShop.slnx
+src/
+├── BuildingBlocks/
+│   ├── SharedKernel/
+│   ├── Contracts/
+│   ├── EventBus/
+│   ├── Caching/
+│   ├── Logging/
+│   ├── Auth/
+│   └── Common/
+├── Modules/
+│   ├── Auth/
+│   ├── Users/
+│   ├── Products/       # includes Categories
+│   ├── Inventory/
+│   ├── Cart/
+│   ├── Orders/
+│   ├── Payments/
+│   ├── Promotions/
+│   ├── Notifications/
+│   ├── Reviews/
+│   └── Admin/
+└── Api/
+tests/
+├── Unit/
+├── Integration/
+└── Architecture/
 ```
 
 ## Module list

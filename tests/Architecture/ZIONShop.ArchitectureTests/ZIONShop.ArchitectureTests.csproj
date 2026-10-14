@@ -1,0 +1,66 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+  <ItemGroup>
+    <Using Include="Xunit" />
+    <Using Include="FluentAssertions" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+    <PackageReference Include="FluentAssertions" />
+    <PackageReference Include="NetArchTest.Rules" />
+    <PackageReference Include="coverlet.collector" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Admin -->
+    <ProjectReference Include="..\..\..\src\Modules\Admin\ZIONShop.Admin.Domain\ZIONShop.Admin.Domain.csproj" />
+    <ProjectReference Include="..\..\..\src\Modules\Admin\ZIONShop.Admin.Application\ZIONShop.Admin.Application.csproj" />
+    <ProjectReference Include="..\..\..\src\Modules\Admin\ZIONShop.Admin.Infrastructure\ZIONShop.Admin.Infrastructure.csproj" />
+    <!-- Auth -->
+    <ProjectReference Include="..\..\..\src\Modules\Auth\ZIONShop.Auth.Domain\ZIONShop.Auth.Domain.csproj" />
+    <ProjectReference Include="..\..\..\src\Modules\Auth\ZIONShop.Auth.Application\ZIONShop.Auth.Application.csproj" />
+    <ProjectReference Include="..\..\..\src\Modules\Auth\ZIONShop.Auth.Infrastructure\ZIONShop.Auth.Infrastructure.csproj" />
+    <!-- Cart -->
+    <ProjectReference Include="..\..\..\src\Modules\Cart\ZIONShop.Cart.Domain\ZIONShop.Cart.Domain.csproj" />
+    <ProjectReference Include="..\..\..\src\Modules\Cart\ZIONShop.Cart.Application\ZIONShop.Cart.Application.csproj" />
+    <ProjectReference Include="..\..\..\src\Modules\Cart\ZIONShop.Cart.Infrastructure\ZIONShop.Cart.Infrastructure.csproj" />
+    <!-- Inventory -->
+    <ProjectReference Include="..\..\..\src\Modules\Inventory\ZIONShop.Inventory.Domain\ZIONShop.Inventory.Domain.csproj" />
+    <ProjectReference Include="..\..\..\src\Modules\Inventory\ZIONShop.Inventory.Application\ZIONShop.Inventory.Application.csproj" />
+    <ProjectReference Include="..\..\..\src\Modules\Inventory\ZIONShop.Inventory.Infrastructure\ZIONShop.Inventory.Infrastructure.csproj" />
+    <!-- Notifications -->
+    <ProjectReference Include="..\..\..\src\Modules\Notifications\ZIONShop.Notifications.Domain\ZIONShop.Notifications.Domain.csproj" />
+    <ProjectReference Include="..\..\..\src\Modules\Notifications\ZIONShop.Notifications.Application\ZIONShop.Notifications.Application.csproj" />
+    <ProjectReference Include="..\..\..\src\Modules\Notifications\ZIONShop.Notifications.Infrastructure\ZIONShop.Notifications.Infrastructure.csproj" />
+    <!-- Orders -->
+    <ProjectReference Include="..\..\..\src\Modules\Orders\ZIONShop.Orders.Domain\ZIONShop.Orders.Domain.csproj" />
+    <ProjectReference Include="..\..\..\src\Modules\Orders\ZIONShop.Orders.Application\ZIONShop.Orders.Application.csproj" />
+    <ProjectReference Include="..\..\..\src\Modules\Orders\ZIONShop.Orders.Infrastructure\ZIONShop.Orders.Infrastructure.csproj" />
+    <!-- Payments -->
+    <ProjectReference Include="..\..\..\src\Modules\Payments\ZIONShop.Payments.Domain\ZIONShop.Payments.Domain.csproj" />
+    <ProjectReference Include="..\..\..\src\Modules\Payments\ZIONShop.Payments.Application\ZIONShop.Payments.Application.csproj" />
+    <ProjectReference Include="..\..\..\src\Modules\Payments\ZIONShop.Payments.Infrastructure\ZIONShop.Payments.Infrastructure.csproj" />
+    <!-- Products -->
+    <ProjectReference Include="..\..\..\src\Modules\Products\ZIONShop.Products.Domain\ZIONShop.Products.Domain.csproj" />
+    <ProjectReference Include="..\..\..\src\Modules\Products\ZIONShop.Products.Application\ZIONShop.Products.Application.csproj" />
+    <ProjectReference Include="..\..\..\src\Modules\Products\ZIONShop.Products.Infrastructure\ZIONShop.Products.Infrastructure.csproj" />
+    <!-- Promotions -->
+    <ProjectReference Include="..\..\..\src\Modules\Promotions\ZIONShop.Promotions.Domain\ZIONShop.Promotions.Domain.csproj" />
+    <ProjectReference Include="..\..\..\src\Modules\Promotions\ZIONShop.Promotions.Application\ZIONShop.Promotions.Application.csproj" />
+    <ProjectReference Include="..\..\..\src\Modules\Promotions\ZIONShop.Promotions.Infrastructure\ZIONShop.Promotions.Infrastructure.csproj" />
+    <!-- Reviews -->
+    <ProjectReference Include="..\..\..\src\Modules\Reviews\ZIONShop.Reviews.Domain\ZIONShop.Reviews.Domain.csproj" />
+    <ProjectReference Include="..\..\..\src\Modules\Reviews\ZIONShop.Reviews.Application\ZIONShop.Reviews.Application.csproj" />
+    <ProjectReference Include="..\..\..\src\Modules\Reviews\ZIONShop.Reviews.Infrastructure\ZIONShop.Reviews.Infrastructure.csproj" />
+    <!-- Users -->
+    <ProjectReference Include="..\..\..\src\Modules\Users\ZIONShop.Users.Domain\ZIONShop.Users.Domain.csproj" />
+    <ProjectReference Include="..\..\..\src\Modules\Users\ZIONShop.Users.Application\ZIONShop.Users.Application.csproj" />
+    <ProjectReference Include="..\..\..\src\Modules\Users\ZIONShop.Users.Infrastructure\ZIONShop.Users.Infrastructure.csproj" />
+    <!-- Api -->
+    <ProjectReference Include="..\..\..\src\Api\ZIONShop.Api\ZIONShop.Api.csproj" />
+  </ItemGroup>
+</Project>

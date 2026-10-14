@@ -5,15 +5,16 @@ ENV ASPNETCORE_URLS=http://+:8080
 
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
-COPY backend/Directory.Build.props backend/
-COPY backend/Directory.Packages.props backend/
-COPY backend/.editorconfig backend/
-COPY backend/ZIONShop.slnx backend/
-COPY backend/src backend/src
-COPY backend/tests backend/tests
+COPY Directory.Build.props .
+COPY Directory.Packages.props .
+COPY .editorconfig .
+COPY global.json .
+COPY ZIONShop.slnx .
+COPY src src
+COPY tests tests
 
-RUN dotnet restore backend/src/Api/ZIONShop.Api/ZIONShop.Api.csproj
-RUN dotnet publish backend/src/Api/ZIONShop.Api/ZIONShop.Api.csproj -c Release -o /app/publish --no-restore
+RUN dotnet restore src/Api/ZIONShop.Api/ZIONShop.Api.csproj
+RUN dotnet publish src/Api/ZIONShop.Api/ZIONShop.Api.csproj -c Release -o /app/publish --no-restore
 
 FROM base AS final
 WORKDIR /app

@@ -2,27 +2,31 @@
 
 Ecommerce enterprise platform: modular monolith backend (.NET 8, PostgreSQL) in this repo (`ZION_BE`), and a Next.js 16 frontend in the **separate sibling repo `ZION_FE`** (own `.git`).
 
-This scaffold follows [CLAUDE.md](../CLAUDE.md) for architecture rules and conventions.
+This scaffold follows [CLAUDE.md](CLAUDE.md) for architecture rules and conventions.
 
 ## Layout
 
 ```text
 ZION_BE/ (this repo)
-|-- backend/
-|   |-- ZIONShop.slnx
-|   |-- Directory.Build.props
-|   |-- Directory.Packages.props
+|-- ZIONShop.slnx
+|-- Directory.Build.props
+|-- Directory.Packages.props
+|-- global.json
+|-- .ai/                 # agent context
+|-- deploy/
 |   |-- docker-compose.yml
 |   |-- .env.example
-|   |-- infra/
-|   |   `-- nginx/nginx.conf
-|   |-- src/
-|   |   |-- Api/ZIONShop.Api/
-|   |   |-- BuildingBlocks/
-|   |   `-- Modules/
-|   `-- tests/Unit/
-|-- frontend/            # empty placeholder — NOT used
-`-- CLAUDE.md
+|   `-- nginx/nginx.conf
+|-- docs/
+|   `-- DEPLOYMENT_GUIDE.md
+|-- src/
+|   |-- Api/ZIONShop.Api/
+|   |-- BuildingBlocks/
+|   `-- Modules/
+`-- tests/
+    |-- Unit/
+    |-- Integration/
+    `-- Architecture/
 
 ../ZION_FE/               # actual frontend — separate repo, Next.js 16 + antd 5
 ```
@@ -36,10 +40,9 @@ ZION_BE/ (this repo)
 ## Run With Docker
 
 ```powershell
-cd backend
-cp .env.example .env
-docker compose up -d postgres redis rabbitmq seq
-docker compose up -d --build api
+cp deploy/.env.example deploy/.env
+docker compose -f deploy/docker-compose.yml up -d postgres redis rabbitmq seq
+docker compose -f deploy/docker-compose.yml up -d --build api
 ```
 
 - API: <http://localhost:8080/swagger>
@@ -52,8 +55,7 @@ Seed account: `admin@zionshop.local` / `Admin@123`.
 ## Run Backend Locally
 
 ```powershell
-cd backend
-dotnet build
+dotnet build ZIONShop.slnx
 dotnet run --project src\Api\ZIONShop.Api\ZIONShop.Api.csproj
 ```
 
@@ -70,7 +72,7 @@ Frontend is the separate repo `ZION_FE` (Next.js 16). See `ZION_FE/README.md` fo
 User secrets (local dev):
 
 ```powershell
-cd backend\src\Api\ZIONShop.Api
+cd src\Api\ZIONShop.Api
 dotnet user-secrets set "Email:Host" "smtp.gmail.com"
 dotnet user-secrets set "Email:UserName" "you@example.com"
 dotnet user-secrets set "Email:Password" "<app-password>"
@@ -87,6 +89,5 @@ Email__Password=<app-password>
 ## Testing
 
 ```powershell
-cd backend
-dotnet test
+dotnet test ZIONShop.slnx
 ```

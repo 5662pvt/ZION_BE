@@ -1,21 +1,25 @@
 # ZIONShop Agent Entry Point
 
-Read this file first. Detailed agent context now lives in `backend/.ai/context/`.
+Read this file first. Detailed agent context now lives in `.ai/context/`.
 
 ## Project
 
 ZIONShop is an ecommerce platform with:
 
 - Backend: .NET 8 modular monolith, Clean Architecture, CQRS, MediatR, EF Core, PostgreSQL (Npgsql; Neon for cloud). Build with .NET SDK 10.x (`global.json`, `rollForward: latestFeature`); runtime/target remains .NET 8.
-- Frontend: Next.js 16 App Router + TypeScript + antd 5 + TanStack Query — separate sibling repo `../ZION_FE` (this repo's own `frontend/` folder is an empty, unused placeholder).
-- Infrastructure: Docker Compose and nginx under `backend/`.
+- Frontend: Next.js 16 App Router + TypeScript + antd 5 + TanStack Query — separate sibling repo `../ZION_FE`.
+- Infrastructure: Docker Compose and nginx under `deploy/`.
 
 ## Root Layout
 
 ```text
-ZIONShop/ (this repo = ZION_BE)
-|-- backend/        # real code: ZIONShop.slnx, src/, tests/
-|-- frontend/        # empty placeholder — NOT used
+ZION_BE/ (this repo)
+|-- .ai/            # agent context
+|-- deploy/         # docker-compose.yml, .env.example, nginx/
+|-- docs/           # DEPLOYMENT_GUIDE.md
+|-- src/            # Api/, BuildingBlocks/, Modules/
+|-- tests/          # Unit/, Integration/, Architecture/
+|-- ZIONShop.slnx, global.json, Directory.Build.props, Directory.Packages.props
 |-- .gitignore
 `-- CLAUDE.md
 
@@ -34,27 +38,26 @@ ZIONShop/ (this repo = ZION_BE)
 
 ## Context Routing
 
-- Overview: `backend/.ai/context/01-overview.md`
-- Architecture: `backend/.ai/context/02-architecture.md`
-- Backend structure: `backend/.ai/context/03-backend-structure.md`
-- Frontend structure: `backend/.ai/context/04-frontend-structure.md`
-- Module layout: `backend/.ai/context/05-module-layout.md`
-- Backend rules: `backend/.ai/context/06-backend-rules.md`
-- Database: `backend/.ai/context/07-database.md`
-- API: `backend/.ai/context/08-api.md`
-- Security: `backend/.ai/context/09-security.md`
-- Events: `backend/.ai/context/10-event-driven.md`
-- Roadmap: `backend/.ai/context/12-roadmap.md`
-- Testing and Git: `backend/.ai/context/13-testing-git.md`
-- Task prompts: `backend/.ai/context/17-ai-prompts.md`
+- Overview: `.ai/context/01-overview.md`
+- Architecture: `.ai/context/02-architecture.md`
+- Backend structure: `.ai/context/03-backend-structure.md`
+- Frontend structure: `.ai/context/04-frontend-structure.md`
+- Module layout: `.ai/context/05-module-layout.md`
+- Backend rules: `.ai/context/06-backend-rules.md`
+- Database: `.ai/context/07-database.md`
+- API: `.ai/context/08-api.md`
+- Security: `.ai/context/09-security.md`
+- Events: `.ai/context/10-event-driven.md`
+- Roadmap: `.ai/context/12-roadmap.md`
+- Testing and Git: `.ai/context/13-testing-git.md`
+- Task prompts: `.ai/context/17-ai-prompts.md`
 
 ## Common Commands
 
 ```powershell
-cd backend
-dotnet build
-dotnet test
-docker compose up -d --build api
+dotnet build ZIONShop.slnx
+dotnet test ZIONShop.slnx
+docker compose -f deploy/docker-compose.yml up -d --build api
 ```
 
 ```powershell

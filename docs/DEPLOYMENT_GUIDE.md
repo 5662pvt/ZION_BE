@@ -6,7 +6,7 @@ Guide nay di theo huong hien tai cua du an:
 - Frontend: Next.js 16 (App Router) + antd 5 — repo rieng `ZION_FE` (sibling repo, khong phai `ZION_BE/frontend` — thu muc do rong/khong dung).
 - Database cloud: PostgreSQL managed service, vi du Neon, Supabase, Render PostgreSQL.
 - CI/CD: GitHub Actions.
-- Root repo giu gon: `backend/`, `frontend/` (khong dung), `.gitignore`, `CLAUDE.md`.
+- Root repo giu gon: `src/`, `tests/`, `deploy/`, `docs/`, `.ai/`, `.gitignore`, `CLAUDE.md`.
 
 ## 1. Muc tieu moi truong
 
@@ -25,10 +25,9 @@ Khong cho dev ket noi truc tiep vao production DB.
 Mac dinh moi nguoi nen chay DB local bang Docker. Cach nay an toan nhat cho repo public.
 
 ```powershell
-cd backend
-cp .env.example .env
-docker compose up -d postgres redis rabbitmq seq
-dotnet restore
+cp deploy/.env.example deploy/.env
+docker compose -f deploy/docker-compose.yml up -d postgres redis rabbitmq seq
+dotnet restore ZIONShop.slnx
 dotnet run --project src\Api\ZIONShop.Api\ZIONShop.Api.csproj
 ```
 
@@ -169,7 +168,7 @@ Ly do:
 
 Deploy backend theo huong:
 
-1. Build Docker image tu `backend/src/Api/ZIONShop.Api/Dockerfile`.
+1. Build Docker image tu `src/Api/ZIONShop.Api/Dockerfile` (build context la repo root).
 2. Push image len container registry.
 3. Deploy image vao Azure Container Apps.
 4. Set environment variables cho API.
@@ -199,22 +198,18 @@ production frontend -> production API
 
 ## 10. Docker Compose Usage
 
-File `backend/docker-compose.yml` phu hop cho local/dev stack.
-
-Chay tu thu muc `backend`:
+File `deploy/docker-compose.yml` phu hop cho local/dev stack (postgres, redis, rabbitmq, seq, api, nginx).
 
 ```powershell
-cd backend
-docker compose up -d postgres redis rabbitmq seq
-docker compose up -d --build api
-docker compose --profile dev up -d frontend-dev
+docker compose -f deploy/docker-compose.yml up -d postgres redis rabbitmq seq
+docker compose -f deploy/docker-compose.yml up -d --build api
 ```
 
 Luu y:
 
-- `frontend-dev` mount tu `../frontend`.
+- Nginx trong compose nay chi la reverse proxy cho API (`/api/`, `/swagger/`, `/healthz`); frontend (`ZION_FE`) deploy rieng, khong nam trong compose nay.
 - Neu deploy production bang Azure, khong nhat thiet phai dung Docker Compose tren server.
-- Docker Compose chu yeu de chay local full stack.
+- Docker Compose chu yeu de chay local full stack backend.
 
 ## 11. Database Migration Strategy
 

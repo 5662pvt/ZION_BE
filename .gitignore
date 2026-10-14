@@ -14,6 +14,7 @@ out/
 *.pfx
 *.publishsettings
 .idea/
+TestResults/
 
 # Local secrets
 appsettings.*.local.json
@@ -43,6 +44,9 @@ docker-compose.override.yml
 # EF Core
 *.mdf
 *.ldf
+
+# Local uploaded product images (LocalImageStorage fallback)
+**/App_Data/
 
 # Agent/local tooling
 /.agents/
