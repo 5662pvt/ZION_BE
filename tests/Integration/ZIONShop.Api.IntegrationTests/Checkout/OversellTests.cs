@@ -1,7 +1,14 @@
-using System.Net;
-using System.Net.Http.Json;
+using System.Text.Json;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using ZIONShop.Api.IntegrationTests.Infrastructure;
+using ZIONShop.Contracts.Inventory;
+using ZIONShop.Contracts.Orders;
+using ZIONShop.EventBus.Abstractions;
+using ZIONShop.EventBus.Outbox;
+using ZIONShop.Inventory.Infrastructure.Persistence;
 using static ZIONShop.Api.IntegrationTests.Checkout.CheckoutTestHelpers;
+using InventoryOrderCreatedHandler = ZIONShop.Inventory.Application.IntegrationEventHandlers.OrderCreatedIntegrationEventHandler;
 
 namespace ZIONShop.Api.IntegrationTests.Checkout;
 
@@ -11,6 +18,13 @@ namespace ZIONShop.Api.IntegrationTests.Checkout;
 /// under real contention that approach either oversold or produced false "Hết hàng" cancellations while
 /// stock was still available. These tests assert the new behavior never oversells, never goes negative,
 /// and never deadlocks when two orders touch the same two products in opposite order.
+///
+/// They drive <c>OrderCreatedIntegrationEventHandler</c> (Inventory's reservation handler) directly, each
+/// invocation resolved in its own DI scope (own DbContext/connection) and released from a shared start gate
+/// at the same time, so the reservation layer is actually exercised under concurrency. Going through the
+/// HTTP API + outbox instead would not do this: the InMemory event bus dispatches one handler at a time per
+/// publish, and the outbox publisher drains its table one message at a time, so an HTTP-level test never has
+/// more than one reservation attempt in flight no matter how many requests are fired concurrently.
 /// </summary>
 [Collection(ApiTestCollection.Name)]
 public class OversellTests
@@ -28,59 +42,43 @@ public class OversellTests
     }
 
     [Fact]
-    public async Task FiftyConcurrentSingleUnitOrders_Should_ReserveExactlyTen_When_OnHandIsTen()
+    public async Task FiftyConcurrentReservationHandlers_Should_ReserveExactlyTen_When_OnHandIsTen()
     {
         var admin = await AdminClientAsync();
         var (productId, sku) = await CreatePublishedProductAsync(admin);
         await AdjustStockAsync(admin, productId, 10);
 
-        const int customerCount = 50;
-        var customers = new List<(HttpClient Client, Guid AddressId)>();
-        for (var i = 0; i < customerCount; i++)
-        {
-            var (client, addressId, _) = await CreateCustomerWithAddressAsync(_factory);
-            await AddToCartAsync(client, productId, 1);
-            customers.Add((client, addressId));
-        }
+        var events = Enumerable.Range(0, 50)
+            .Select(_ => new OrderCreatedIntegrationEvent(
+                Guid.NewGuid(), Guid.NewGuid(), 100000m,
+                new[] { new OrderLine(productId, 1, 100000m, false) },
+                "COD", "VND"))
+            .ToList();
 
-        var responses = await Task.WhenAll(customers.Select(c => PlaceOrderRawAsync(c.Client, c.AddressId, "COD")));
+        await RunConcurrentlyAsync(events);
 
-        foreach (var response in responses)
-        {
-            var status = (int)response.StatusCode;
-            (status is >= 200 and < 300 || status == (int)HttpStatusCode.Conflict)
-                .Should().BeTrue($"expected 2xx or 409, got {status}");
-        }
+        var orderIds = events.Select(e => e.OrderId).ToHashSet();
+        using var verifyScope = _factory.Services.CreateScope();
+        var inventoryDb = verifyScope.ServiceProvider.GetRequiredService<InventoryDbContext>();
 
-        var createdOrders = new List<(HttpClient Client, Guid OrderId)>();
-        for (var i = 0; i < responses.Length; i++)
-        {
-            var status = (int)responses[i].StatusCode;
-            if (status is >= 200 and < 300)
-            {
-                var envelope = await responses[i].Content.ReadFromJsonAsync<ApiEnvelope<OrderData>>(ApiEnvelopeJson.Options);
-                createdOrders.Add((customers[i].Client, envelope!.Data!.Id));
-            }
-        }
+        var reservedQuantity = await inventoryDb.StockReservations
+            .Where(r => orderIds.Contains(r.OrderId))
+            .SumAsync(r => r.Quantity);
+        reservedQuantity.Should().Be(10, "10 units of stock can satisfy exactly 10 of the 50 single-unit reservation attempts");
 
-        var finalStates = await WaitUntilNoLongerPendingAsync(createdOrders);
+        var reservationCount = await inventoryDb.StockReservations.CountAsync(r => orderIds.Contains(r.OrderId));
+        reservationCount.Should().Be(10);
 
-        var nonCancelled = finalStates.Count(o => o.Status != "Cancelled");
-        nonCancelled.Should().Be(10, "exactly 10 of the 50 single-unit requests can be satisfied by 10 units of stock");
+        var failedCount = await CountMatchingFailuresAsync(inventoryDb, orderIds);
+        failedCount.Should().Be(40);
 
-        foreach (var cancelled in finalStates.Where(o => o.Status == "Cancelled"))
-            cancelled.CancelReason.Should().Contain("Hết hàng");
-
-        // COD orders commit (OnHand -= reserved, Reserved -> 0) automatically once Confirmed, so once every
-        // order has settled the item should be fully, exactly depleted -- never oversold, never negative.
-        var item = await WaitForInventoryAsync(admin, sku, i => i.Reserved == 0, TimeSpan.FromSeconds(60));
-        item.OnHand.Should().Be(0);
-        item.Reserved.Should().Be(0);
+        var item = await GetInventoryItemBySkuAsync(admin, sku);
+        item.Reserved.Should().Be(10);
         item.Available.Should().Be(0);
     }
 
     [Fact]
-    public async Task TwoCustomers_MultiProductOppositeOrder_Should_NotDeadlock_Across_TenConcurrentRounds()
+    public async Task TwentyConcurrentReservationHandlers_Should_NotDeadlock_When_TwoProductsAlternateOrder()
     {
         var admin = await AdminClientAsync();
         var (productA, skuA) = await CreatePublishedProductAsync(admin);
@@ -89,73 +87,74 @@ public class OversellTests
         await AdjustStockAsync(admin, productA, initialStock);
         await AdjustStockAsync(admin, productB, initialStock);
 
-        const int rounds = 10;
-        var allOrders = new List<(HttpClient Client, Guid OrderId)>();
-
-        for (var round = 0; round < rounds; round++)
+        var events = new List<OrderCreatedIntegrationEvent>();
+        for (var i = 0; i < 10; i++)
         {
-            var (customer1, address1, _) = await CreateCustomerWithAddressAsync(_factory);
-            var (customer2, address2, _) = await CreateCustomerWithAddressAsync(_factory);
-
-            // customer1 touches A then B; customer2 touches B then A -- opposite order, same two rows.
-            await AddToCartAsync(customer1, productA, 1);
-            await AddToCartAsync(customer1, productB, 1);
-            await AddToCartAsync(customer2, productB, 1);
-            await AddToCartAsync(customer2, productA, 1);
-
-            var responses = await Task.WhenAll(
-                PlaceOrderRawAsync(customer1, address1, "COD"),
-                PlaceOrderRawAsync(customer2, address2, "COD"));
-
-            foreach (var response in responses)
-            {
-                var status = (int)response.StatusCode;
-                (status is >= 200 and < 300 || status == (int)HttpStatusCode.Conflict)
-                    .Should().BeTrue($"no deadlock/5xx expected in round {round}, got {status}");
-            }
-
-            var roundClients = new[] { customer1, customer2 };
-            for (var i = 0; i < responses.Length; i++)
-            {
-                var status = (int)responses[i].StatusCode;
-                if (status is >= 200 and < 300)
-                {
-                    var envelope = await responses[i].Content.ReadFromJsonAsync<ApiEnvelope<OrderData>>(ApiEnvelopeJson.Options);
-                    allOrders.Add((roundClients[i], envelope!.Data!.Id));
-                }
-            }
+            // Alternating line order per event -- the handler itself normalizes by ProductId before
+            // reserving, so this exercises that normalization rather than relying on it.
+            events.Add(new OrderCreatedIntegrationEvent(
+                Guid.NewGuid(), Guid.NewGuid(), 200000m,
+                new[] { new OrderLine(productA, 1, 100000m, false), new OrderLine(productB, 1, 100000m, false) },
+                "COD", "VND"));
+            events.Add(new OrderCreatedIntegrationEvent(
+                Guid.NewGuid(), Guid.NewGuid(), 200000m,
+                new[] { new OrderLine(productB, 1, 100000m, false), new OrderLine(productA, 1, 100000m, false) },
+                "COD", "VND"));
         }
 
-        // A deadlock would surface here as a timeout (order stuck in PendingStock) or a thrown exception.
-        var finalStates = await WaitUntilNoLongerPendingAsync(allOrders);
-        var confirmedCount = finalStates.Count(o => o.Status == "Confirmed");
-        confirmedCount.Should().Be(allOrders.Count, "stock is abundant (1000) relative to the 20 orders placed, so none should be cancelled");
+        await RunConcurrentlyAsync(events); // a deadlock would surface here as an exception
 
-        var itemA = await WaitForInventoryAsync(admin, skuA, i => i.Reserved == 0, TimeSpan.FromSeconds(60));
-        var itemB = await WaitForInventoryAsync(admin, skuB, i => i.Reserved == 0, TimeSpan.FromSeconds(60));
+        var orderIds = events.Select(e => e.OrderId).ToHashSet();
+        using var verifyScope = _factory.Services.CreateScope();
+        var inventoryDb = verifyScope.ServiceProvider.GetRequiredService<InventoryDbContext>();
+        var reservedQuantity = await inventoryDb.StockReservations
+            .Where(r => orderIds.Contains(r.OrderId))
+            .SumAsync(r => r.Quantity);
+        reservedQuantity.Should().Be(events.Count * 2, "stock is abundant, so every order reserves both of its lines");
 
-        itemA.OnHand.Should().Be(initialStock - confirmedCount);
-        itemB.OnHand.Should().Be(initialStock - confirmedCount);
+        var itemA = await GetInventoryItemBySkuAsync(admin, skuA);
+        var itemB = await GetInventoryItemBySkuAsync(admin, skuB);
+        itemA.Reserved.Should().Be(events.Count);
+        itemB.Reserved.Should().Be(events.Count);
         itemA.Available.Should().BeGreaterThanOrEqualTo(0);
         itemB.Available.Should().BeGreaterThanOrEqualTo(0);
     }
 
-    private static async Task<List<OrderData>> WaitUntilNoLongerPendingAsync(
-        List<(HttpClient Client, Guid OrderId)> orders, TimeSpan? timeout = null)
+    /// <summary>
+    /// Resolves <c>IIntegrationEventHandler&lt;OrderCreatedIntegrationEvent&gt;</c> for each event in its own
+    /// DI scope (own DbContext/connection), then releases every invocation from a shared start gate at once so
+    /// they really overlap instead of running one after another.
+    /// </summary>
+    private async Task RunConcurrentlyAsync(IReadOnlyList<OrderCreatedIntegrationEvent> events)
     {
-        var deadline = DateTime.UtcNow + (timeout ?? TimeSpan.FromSeconds(60));
-        List<OrderData> last;
-        do
+        var startGate = new SemaphoreSlim(0);
+        var tasks = events.Select(async @event =>
         {
-            last = new List<OrderData>(orders.Count);
-            foreach (var (client, orderId) in orders)
-                last.Add(await GetOrderAsync(client, orderId));
+            using var scope = _factory.Services.CreateScope();
+            var handler = scope.ServiceProvider.GetServices<IIntegrationEventHandler<OrderCreatedIntegrationEvent>>()
+                .Single(h => h.GetType().GetGenericArguments().Contains(typeof(InventoryOrderCreatedHandler)));
 
-            if (last.All(o => o.Status != "PendingStock")) return last;
-            await Task.Delay(500);
-        } while (DateTime.UtcNow < deadline);
+            await startGate.WaitAsync();
+            await handler.HandleAsync(@event, CancellationToken.None);
+        }).ToList();
 
-        var stillPending = last.Count(o => o.Status == "PendingStock");
-        throw new TimeoutException($"{stillPending}/{orders.Count} orders were still PendingStock after {timeout}.");
+        await Task.Delay(50); // give every task a chance to reach the gate before releasing it
+        startGate.Release(events.Count);
+
+        await Task.WhenAll(tasks); // no exception is part of the assertion
+    }
+
+    private static async Task<int> CountMatchingFailuresAsync(InventoryDbContext db, IReadOnlySet<Guid> orderIds)
+    {
+        var failedMessages = await db.Set<OutboxMessage>()
+            .Where(m => m.Type.Contains(nameof(InventoryReservationFailedIntegrationEvent)))
+            .Select(m => m.Content)
+            .ToListAsync();
+
+        var failedOrderIds = failedMessages
+            .Select(c => JsonSerializer.Deserialize<InventoryReservationFailedIntegrationEvent>(c)!.OrderId)
+            .ToHashSet();
+
+        return orderIds.Count(id => failedOrderIds.Contains(id));
     }
 }

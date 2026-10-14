@@ -39,17 +39,7 @@ public class OrderCancelledIntegrationEventHandler : IIntegrationEventHandler<Or
         if (active.Count == 0 && committed.Count == 0) return; // idempotent: nothing left to release or return
 
         var now = _timeProvider.GetUtcNow().UtcDateTime;
-        foreach (var reservation in active)
-        {
-            var item = await _items.GetByProductIdAsync(reservation.ProductId, cancellationToken);
-            if (item is not null)
-            {
-                item.Release(reservation.Quantity);
-                await _movements.AddAsync(StockMovement.Create(reservation.ProductId, StockMovementType.Release, reservation.Quantity, @event.OrderId.ToString(), now), cancellationToken);
-            }
-
-            reservation.MarkReleased();
-        }
+        await ActiveReservationReleaser.ReleaseAsync(active, _items, _movements, @event.OrderId, now, cancellationToken);
 
         foreach (var reservation in committed)
         {

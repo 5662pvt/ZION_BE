@@ -37,13 +37,34 @@ Luồng xử lý:
 
 1. Kiểm tra `(EventId, Consumer)` đã tồn tại trong `TDbContext.Set<InboxMessage>()` chưa. Có rồi → log
    `"duplicate {EventType} {EventId} skipped by {Consumer}"` rồi return, **không** gọi `THandler`.
-2. Chưa có → `Add` một `InboxMessage` mới vào `TDbContext` (chưa `SaveChanges`), rồi gọi `THandler.HandleAsync(...)`.
-3. Handler ném exception → gỡ (`Detach`) entry vừa thêm rồi rethrow — không gì được ghi, không gì được
-   commit, event sẽ được giao lại và thử lại từ đầu.
-4. Handler chạy xong không lỗi: nếu handler đã tự gọi `SaveChangesAsync` trên cùng `TDbContext` (qua uow
-   scoped cùng DI scope) thì dòng inbox đã được commit **atomic** cùng thay đổi nghiệp vụ. Nếu entry vẫn
-   còn ở trạng thái `Added` (handler không đụng tới `TDbContext` này, xem phần "Không atomic" bên dưới) thì
-   decorator tự gọi `SaveChangesAsync` để dòng inbox vẫn được ghi lại cho lần giao sau.
+2. Chưa có → `Add` một `InboxMessage` mới vào `TDbContext` (chưa `SaveChanges`).
+3. Nếu `TDbContext.Database.CurrentTransaction` đang `null`, decorator tự mở MỘT transaction tường minh
+   (`Database.BeginTransactionAsync`) bọc toàn bộ phần còn lại — kể cả mọi lần `SaveChangesAsync` mà
+   `THandler` tự gọi trên cùng `TDbContext` này (một handler có thể gọi nhiều lần, ví dụ release coupon rồi
+   release từng gift redemption trong loop). Nếu đã có transaction mở sẵn (handler tự `BeginTransactionAsync`
+   trên cùng `TDbContext`, decorator phát hiện trước khi gọi `THandler`), decorator **không** mở transaction
+   riêng — nó dựa vào handler join bằng SAVEPOINT, xem phần "Nested transaction" bên dưới.
+4. Gọi `THandler.HandleAsync(...)`.
+5. Handler ném exception (ở bất kỳ bước nào, kể cả sau khi đã tự `SaveChangesAsync` một hoặc nhiều lần) →
+   nếu decorator sở hữu transaction, `RollbackAsync` toàn bộ (undo luôn các save đã "thành công" trước đó
+   trong cùng lần giao này) → gỡ (`Detach`) entry inbox → rethrow. Không gì được ghi, không gì được commit,
+   event sẽ được giao lại và thử lại từ đầu.
+6. Handler chạy xong không lỗi: nếu entry inbox vẫn còn `Added` (handler không đụng tới `TDbContext` này,
+   xem phần "Không atomic" bên dưới), decorator tự `SaveChangesAsync` để ghi dòng inbox. Sau đó, nếu
+   decorator sở hữu transaction, `CommitAsync` — đây là lúc mọi thay đổi (dòng inbox + mọi save của handler)
+   mới thực sự durable.
+
+### Nested transaction (handler tự mở transaction)
+
+Một handler như `Inventory.OrderCreatedIntegrationEventHandler` tự gọi `_uow.BeginTransactionAsync()` để
+bọc logic reserve-stock/rollback-khi-hết-hàng của riêng nó. Vì decorator đã mở transaction trước khi gọi
+handler, `InventoryDbContext.BeginTransactionAsync` phát hiện `Database.CurrentTransaction` khác `null` và
+**join** bằng SAVEPOINT (`CreateSavepointAsync`) thay vì mở transaction thật thứ hai (sẽ throw). Với
+`IInventoryTransaction` trả về từ nhánh này: `CommitAsync` là no-op (transaction ngoài của decorator mới
+thực sự commit), `RollbackAsync` = `RollbackToSavepointAsync` (chỉ undo phần việc từ sau savepoint, không
+ảnh hưởng dòng inbox hay bất kỳ thứ gì decorator đã ghi trước đó). Nhờ vậy, nhánh "hết hàng" của handler này
+(rollback về savepoint rồi `SaveChangesAsync` cho `InventoryReservationFailedIntegrationEvent` + dòng inbox)
+vẫn commit đúng — thông qua commit transaction ngoài của decorator, không phải transaction riêng của nó.
 
 ### Concurrency
 

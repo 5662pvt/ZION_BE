@@ -98,9 +98,14 @@ public sealed class RabbitMqPublisher : IDisposable
         try
         {
             channel.BasicPublish(exchange, routingKey, mandatory, props, body);
+            // WaitForConfirmsOrDie closes the channel itself and throws IOException on a nack, or
+            // TimeoutException if the confirm never arrives -- both are broker/transport stalls, not
+            // this message's fault, so they must map to BrokerUnavailableException the same as a
+            // channel already closed out from under us (AlreadyClosedException) or interrupted mid-call
+            // (OperationInterruptedException), not to a plain publish-rejected failure.
             channel.WaitForConfirmsOrDie(TimeSpan.FromSeconds(Math.Max(1, _options.ConfirmTimeoutSeconds)));
         }
-        catch (AlreadyClosedException ex)
+        catch (Exception ex) when (ex is AlreadyClosedException or IOException or TimeoutException or OperationInterruptedException)
         {
             InvalidateChannel();
             throw new BrokerUnavailableException("RabbitMQ channel closed unexpectedly while publishing.", ex);
@@ -135,8 +140,13 @@ public sealed class RabbitMqPublisher : IDisposable
         {
             throw;
         }
-        catch (Exception ex) when (ex is BrokerUnreachableException or AlreadyClosedException or SocketException)
+        catch (Exception ex) when (ex is BrokerUnreachableException or AlreadyClosedException or SocketException
+            or ObjectDisposedException or OperationInterruptedException or IOException or TimeoutException)
         {
+            // Covers every way acquiring the connection/channel or declaring topology can fail while
+            // the broker is down or recovering -- including ObjectDisposedException, which
+            // RabbitMqConnection's IsConnected/IsRecovering guard against internally but a connection
+            // that *was* legitimately disposed (app shutdown) can still surface here.
             throw new BrokerUnavailableException("RabbitMQ broker is unavailable.", ex);
         }
     }

@@ -33,6 +33,7 @@ public static class OrdersInfrastructureExtensions
         services.AddScoped<IOrderDetailsReader, OrderDetailsReader>();
         services.AddScoped<IOrderReportReader, OrderReportReader>();
         services.AddScoped<IPurchaseVerifier, PurchaseVerifier>();
+        services.AddScoped<IIdempotencyLock, PostgresIdempotencyLock>();
 
         services.AddOutbox<OrdersDbContext>();
 

@@ -38,6 +38,7 @@ public static class InventoryInfrastructureExtensions
         services.AddIntegrationEventHandler<OrderCreatedIntegrationEvent, OrderCreatedIntegrationEventHandler, InventoryDbContext>();
         services.AddIntegrationEventHandler<OrderConfirmedIntegrationEvent, OrderConfirmedIntegrationEventHandler, InventoryDbContext>();
         services.AddIntegrationEventHandler<OrderCancelledIntegrationEvent, OrderCancelledIntegrationEventHandler, InventoryDbContext>();
+        services.AddIntegrationEventHandler<OrderReservationReleaseRequestedIntegrationEvent, OrderReservationReleaseRequestedIntegrationEventHandler, InventoryDbContext>();
 
         return services;
     }

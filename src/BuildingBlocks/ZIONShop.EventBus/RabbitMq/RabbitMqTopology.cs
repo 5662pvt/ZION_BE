@@ -98,6 +98,10 @@ public static class RabbitMqTopology
                 "Queue '{Queue}' already exists without the expected arguments (406 PRECONDITION_FAILED); attempting a one-time migration",
                 queueName);
 
+            // The 406 already closed this channel on the broker side; dispose the now-unusable .NET
+            // object instead of abandoning it.
+            try { channel.Dispose(); } catch { /* already closed by the broker */ }
+
             var freshChannel = connection.CreateModel();
             try
             {

@@ -27,8 +27,21 @@ public class InventoryDbContext : DbContext, IInventoryUnitOfWork
     public new Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
         => base.SaveChangesAsync(cancellationToken);
 
+    /// <summary>
+    /// If a transaction is already open on this DbContext (e.g. the IdempotentIntegrationEventHandler
+    /// decorator wrapping this handler's delivery), a second real BeginTransactionAsync would throw --
+    /// join the existing one via a SAVEPOINT instead. Only starts a real transaction when none is open.
+    /// </summary>
     public async Task<IInventoryTransaction> BeginTransactionAsync(CancellationToken cancellationToken = default)
     {
+        var currentTransaction = Database.CurrentTransaction;
+        if (currentTransaction is not null)
+        {
+            var savepointName = $"sp_{Guid.NewGuid():N}";
+            await currentTransaction.CreateSavepointAsync(savepointName, cancellationToken);
+            return new EfInventoryTransaction(currentTransaction, savepointName);
+        }
+
         var transaction = await Database.BeginTransactionAsync(cancellationToken);
         return new EfInventoryTransaction(transaction);
     }

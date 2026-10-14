@@ -65,8 +65,19 @@ that Postgres can already make atomic.
 
 ## Integration events
 
-- Consumes: `OrderCreatedIntegrationEvent` (reserve)
+- Consumes: `OrderCreatedIntegrationEvent` (reserve), `OrderConfirmedIntegrationEvent` (commit), `OrderCancelledIntegrationEvent` (release active / return committed), `OrderReservationReleaseRequestedIntegrationEvent` (release active — W11 rework, see below)
 - Publishes: `InventoryReservedIntegrationEvent`, `InventoryReservationFailedIntegrationEvent`
+
+### Releasing a reservation that outlived its order (W11 rework)
+
+A reservation can land for an order that is already `Cancelled` (e.g. `OrderCreated` was stuck in a delayed
+retry queue while the customer cancelled the still-`PendingStock` order; `OrderCancelledIntegrationEventHandler`
+found nothing to release at that time because the reservation didn't exist yet). Orders detects this in
+`InventoryReservedIntegrationEventHandler` and publishes `OrderReservationReleaseRequestedIntegrationEvent`
+instead of silently no-op'ing. `OrderReservationReleaseRequestedIntegrationEventHandler` releases that order's
+*active* reservations the same way `OrderCancelledIntegrationEventHandler` does (shared
+`ActiveReservationReleaser.ReleaseAsync` helper) — only the active half, since a reservation released this way
+was never committed (the order never reached `Confirmed`).
 
 ## Related docs
 

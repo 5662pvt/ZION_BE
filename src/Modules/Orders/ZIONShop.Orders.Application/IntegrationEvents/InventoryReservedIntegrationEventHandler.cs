@@ -25,6 +25,17 @@ public class InventoryReservedIntegrationEventHandler : IIntegrationEventHandler
     {
         var order = await _orders.GetByIdAsync(@event.OrderId, cancellationToken);
         if (order is null) return;
+
+        // The order was cancelled before this reservation arrived (e.g. a delayed OrderCreated retry reserved
+        // stock after the customer already cancelled) -- the reservation will never be consumed, so ask
+        // Inventory to release it instead of silently leaking it like the plain not-PendingStock no-op below.
+        if (order.Status == OrderStatus.Cancelled)
+        {
+            _uow.AddOutboxEvent(new OrderReservationReleaseRequestedIntegrationEvent(order.Id, "Order already cancelled"));
+            await _uow.SaveChangesAsync(cancellationToken);
+            return;
+        }
+
         if (order.Status != OrderStatus.PendingStock) return; // already processed, idempotent no-op
 
         var reservedByProduct = @event.Items.ToDictionary(i => i.ProductId, i => i.Quantity);

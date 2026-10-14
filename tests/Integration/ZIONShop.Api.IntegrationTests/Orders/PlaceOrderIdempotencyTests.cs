@@ -1,12 +1,17 @@
 using System.Net;
 using System.Net.Http.Json;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using ZIONShop.Api.IntegrationTests.Checkout;
 using ZIONShop.Api.IntegrationTests.Infrastructure;
 using ZIONShop.Contracts.Inventory;
+using ZIONShop.Contracts.Orders;
 using ZIONShop.EventBus.Abstractions;
+using ZIONShop.EventBus.Outbox;
+using ZIONShop.Orders.Infrastructure.Persistence;
 using static ZIONShop.Api.IntegrationTests.Checkout.CheckoutTestHelpers;
 using static ZIONShop.Api.IntegrationTests.Notifications.NotificationsTestHelpers;
+using static ZIONShop.Api.IntegrationTests.Promotions.PromotionsTestHelpers;
 
 namespace ZIONShop.Api.IntegrationTests.Orders;
 
@@ -102,6 +107,43 @@ public class PlaceOrderIdempotencyTests
     }
 
     [Fact]
+    public async Task SameKeyWithPerUserLimitedCoupon_Should_CreateExactlyOneOrder_When_CalledConcurrently()
+    {
+        var admin = await AdminClientAsync();
+        var (productId, _) = await CreatePublishedProductAsync(admin, price: 700000m);
+        await AdjustStockAsync(admin, productId, 10);
+
+        var promotion = await CreatePromotionAsync(
+            admin, type: "PercentageOff", value: 10m, maxDiscountAmount: 50000m,
+            minOrderSubtotal: 300000m, usageLimit: 10, perUserLimit: 1);
+        var coupon = await CreateCouponAsync(admin, promotion.Id, "LOCK10PCT");
+        await ActivatePromotionAsync(admin, promotion.Id);
+
+        var (customer, addressId, _) = await CreateCustomerWithAddressAsync(_factory);
+        await AddToCartAsync(customer, productId, 1);
+        var key = $"coupon-con-{Guid.NewGuid():N}";
+
+        var responses = await Task.WhenAll(Enumerable.Range(0, 5)
+            .Select(_ => PlaceOrderWithKeyAsync(customer, addressId, "COD", key, couponCode: coupon.Code)));
+
+        foreach (var response in responses)
+            ((int)response.StatusCode).Should().BeInRange(200, 299, $"every concurrent request for the same Idempotency-Key must settle 2xx, got {response.StatusCode}");
+
+        var orderIds = new List<Guid>();
+        foreach (var response in responses)
+        {
+            var envelope = await response.Content.ReadFromJsonAsync<ApiEnvelope<OrderData>>(ApiEnvelopeJson.Options);
+            orderIds.Add(envelope!.Data!.Id);
+        }
+
+        orderIds.Distinct().Should().ContainSingle();
+        (await GetMyOrdersCountAsync(customer)).Should().Be(1);
+
+        var afterAll = await WaitForPromotionUsedCountAsync(admin, promotion.Id, 1);
+        afterAll.UsedCount.Should().Be(1);
+    }
+
+    [Fact]
     public async Task SameKey_Should_ReturnConflict_When_RequestBodyDiffers()
     {
         var admin = await AdminClientAsync();
@@ -191,6 +233,11 @@ public class PlaceOrderIdempotencyTests
         // Simulates the async Inventory reservation failing outright (e.g. a concurrent order depleted stock
         // between the sync pre-check and the real atomic reservation) by publishing the same event Inventory
         // would publish in that case, through the real integration-event pipeline (not by touching Inventory).
+        // The real OrderCreated outbox row for this order is discarded first so the still-available stock can
+        // never legitimately get reserved and confirm the order in the background, racing this synthetic
+        // failure and making the test flaky.
+        await DiscardPendingOutboxMessageAsync<OrderCreatedIntegrationEvent>(placed.Id);
+
         using var scope = _factory.Services.CreateScope();
         var eventBus = scope.ServiceProvider.GetRequiredService<IEventBus>();
         await eventBus.PublishAsync(new InventoryReservationFailedIntegrationEvent(placed.Id, "Hết hàng", new[] { productId }));
@@ -200,5 +247,62 @@ public class PlaceOrderIdempotencyTests
 
         var log = await WaitForNotificationLogAsync(admin, placed.Id, "OrderCancelled");
         log.Status.Should().Be("Sent");
+    }
+
+    [Fact]
+    public async Task LateReservation_Should_BeReleased_When_ItArrivesAfterOrderWasAlreadyCancelled()
+    {
+        var admin = await AdminClientAsync();
+        var (productId, sku) = await CreatePublishedProductAsync(admin);
+        await AdjustStockAsync(admin, productId, 5);
+        var (customer, addressId, userId) = await CreateCustomerWithAddressAsync(_factory);
+        await AddToCartAsync(customer, productId, 1);
+
+        var placed = await PlaceOrderAsync(customer, addressId, "COD");
+
+        // Reproduces the F3 leak directly: discard the real OrderCreated outbox row (standing in for it
+        // being stuck in a delayed retry queue) and cancel the order while Inventory has not reserved
+        // anything for it yet.
+        await DiscardPendingOutboxMessageAsync<OrderCreatedIntegrationEvent>(placed.Id);
+        var cancelResponse = await CancelOrderRawAsync(customer, placed.Id);
+        cancelResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        await WaitForOrderStatusAsync(customer, placed.Id, "Cancelled");
+
+        var beforeLateReservation = await GetInventoryItemBySkuAsync(admin, sku);
+        beforeLateReservation.Reserved.Should().Be(0);
+
+        // The delayed retry finally lands: Inventory has no idea the order was cancelled and reserves stock
+        // for it anyway (COD -> no expiry), publishing the real InventoryReservedIntegrationEvent through its
+        // own outbox exactly as it would in production.
+        using var scope = _factory.Services.CreateScope();
+        var eventBus = scope.ServiceProvider.GetRequiredService<IEventBus>();
+        await eventBus.PublishAsync(new OrderCreatedIntegrationEvent(
+            placed.Id, userId, placed.Total,
+            placed.Lines.Select(l => new OrderLine(l.ProductId, l.Quantity, l.UnitPrice, l.IsGift)).ToList(),
+            placed.PaymentMethod, placed.Currency));
+
+        // Confirms the reservation really happened (i.e. this test exercises the leak, not a trivial no-op).
+        var reservedSnapshot = await WaitForInventoryAsync(admin, sku, i => i.Reserved > 0, TimeSpan.FromSeconds(10));
+        reservedSnapshot.Reserved.Should().Be(1);
+
+        // Without the release-on-cancel fix this would stay reserved forever: InventoryReservedIntegrationEventHandler
+        // would see the order is Cancelled and silently no-op. With the fix it requests a release, which Inventory's
+        // outbox round-trip (InventoryReserved -> Orders -> OrderReservationReleaseRequested -> Inventory) applies
+        // asynchronously, so Reserved must return to its starting value.
+        var released = await WaitForInventoryAsync(admin, sku, i => i.Reserved == 0, TimeSpan.FromSeconds(30));
+        released.OnHand.Should().Be(5);
+        released.Available.Should().Be(5);
+    }
+
+    private async Task DiscardPendingOutboxMessageAsync<TEvent>(Guid orderId) where TEvent : IntegrationEvent
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<OrdersDbContext>();
+        var pending = await db.Set<OutboxMessage>()
+            .Where(m => m.ProcessedOn == null && m.Type.Contains(typeof(TEvent).Name))
+            .ToListAsync();
+        var match = pending.Single(m => m.Content.Contains(orderId.ToString()));
+        db.Set<OutboxMessage>().Remove(match);
+        await db.SaveChangesAsync();
     }
 }

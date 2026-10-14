@@ -14,6 +14,10 @@ public class RabbitMqOptions
 
     /// <summary>Number of delayed retries (via <c>{QueueName}.retry.N</c> queues) before a message is dead-lettered.</summary>
     public int RetryCount { get; set; } = 5;
+
+    /// <summary>Number of exponential-backoff attempts to (re)establish the broker connection -- distinct
+    /// from <see cref="RetryCount"/>, which governs message-level retry/DLQ, not connection backoff.</summary>
+    public int ConnectRetryCount { get; set; } = 5;
     public int OutboxPollSeconds { get; set; } = 2;
 
     /// <summary>Consumer prefetch (QoS) -- caps in-flight unacked deliveries per channel.</summary>

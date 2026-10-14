@@ -36,6 +36,7 @@ public class PlaceOrderCommandHandler : IRequestHandler<PlaceOrderCommand, Resul
     private readonly IStockAvailabilityReader _stockAvailability;
     private readonly IShippingFeeCalculator _shippingFeeCalculator;
     private readonly IOrderIdempotencyKeyRepository _idempotencyKeys;
+    private readonly IIdempotencyLock _idempotencyLock;
     private readonly TimeProvider _timeProvider;
     private readonly CheckoutOptions _checkout;
 
@@ -50,6 +51,7 @@ public class PlaceOrderCommandHandler : IRequestHandler<PlaceOrderCommand, Resul
         IStockAvailabilityReader stockAvailability,
         IShippingFeeCalculator shippingFeeCalculator,
         IOrderIdempotencyKeyRepository idempotencyKeys,
+        IIdempotencyLock idempotencyLock,
         TimeProvider timeProvider,
         IOptions<CheckoutOptions> checkout)
     {
@@ -63,6 +65,7 @@ public class PlaceOrderCommandHandler : IRequestHandler<PlaceOrderCommand, Resul
         _stockAvailability = stockAvailability;
         _shippingFeeCalculator = shippingFeeCalculator;
         _idempotencyKeys = idempotencyKeys;
+        _idempotencyLock = idempotencyLock;
         _timeProvider = timeProvider;
         _checkout = checkout.Value;
     }
@@ -72,10 +75,21 @@ public class PlaceOrderCommandHandler : IRequestHandler<PlaceOrderCommand, Resul
         var hasIdempotencyKey = !string.IsNullOrEmpty(request.IdempotencyKey);
         string? fingerprint = null;
 
+        if (hasIdempotencyKey && !IdempotencyKeyPattern.IsMatch(request.IdempotencyKey!))
+            return Result.Failure<PlaceOrderResult>(OrdersErrors.InvalidIdempotencyKey);
+
+        // Serializes concurrent requests for the same (user, key) BEFORE any side effect (coupon/gift
+        // reservation, order insert) runs, so a losing request's replay lookup below always finds the
+        // winner's already-committed row instead of racing it -- the unique-index catch further down
+        // remains as a fallback.
+        await using var idempotencyLock = hasIdempotencyKey
+            ? await _idempotencyLock.AcquireAsync(request.UserId, request.IdempotencyKey!, cancellationToken)
+            : null;
+
         if (hasIdempotencyKey)
         {
-            if (!IdempotencyKeyPattern.IsMatch(request.IdempotencyKey!))
-                return Result.Failure<PlaceOrderResult>(OrdersErrors.InvalidIdempotencyKey);
+            if (idempotencyLock is null)
+                return Result.Failure<PlaceOrderResult>(OrdersErrors.IdempotencyKeyInProgress);
 
             fingerprint = IdempotencyFingerprint.Compute(request.AddressId, request.PaymentMethod, request.Note, request.CouponCode);
 

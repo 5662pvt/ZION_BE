@@ -79,8 +79,19 @@ Handled by `ZIONShop.Orders.Application.IntegrationEvents.*` (registered in `Ord
 - Scope: `(UserId, Key)`, stored in `orders.idempotency_keys` (`OrderIdempotencyKey` entity/`IOrderIdempotencyKeyRepository`), unique index `IX_idempotency_keys_UserId_Key`.
 - Request fingerprint: SHA-256 of `addressId (lower) | paymentMethod (lower) | note (trim, null→"") | couponCode (trim, upper, null→"")` (`IdempotencyFingerprint.Compute`).
 - First request: order + key row saved in the same `SaveChangesAsync`. Same key + same fingerprint again (sequential or concurrent): no new order, 200 with the existing order + response header `Idempotent-Replayed: true`. Same key + different fingerprint: 409 `Orders.IdempotencyKeyReused`.
-- Concurrency: the loser hits the unique `(UserId, Key)` index on save. `OrdersDbContext.SaveChangesAsync` translates that Postgres `23505` into `DuplicateIdempotencyKeyException` (Application-level — Application never references Npgsql); the handler catches it, releases any coupon/gift reservations it had speculatively taken, then re-reads the key row and replays the winner's order (or returns `Orders.IdempotencyKeyReused` if the fingerprint differs).
+- Concurrency: before any side effect, the handler acquires a PostgreSQL session advisory lock for `(UserId, Key)` via `IIdempotencyLock` (Application interface, `PostgresIdempotencyLock` in Infrastructure — opens `OrdersDbContext`'s own connection explicitly, polls `pg_try_advisory_lock` every ~100ms up to ~10s, releases with `pg_advisory_unlock` + closes the connection when the handler returns). This serializes concurrent requests for the same key so a losing request's replay lookup always finds the winner's already-committed row instead of racing it (e.g. a limited coupon's `PerUserLimit` would otherwise reject the 2nd request instead of replaying). Lock acquisition timing out → 409 `Orders.IdempotencyKeyInProgress`. Requests without a key never acquire the lock. The unique `(UserId, Key)` index + `DuplicateIdempotencyKeyException` handling (Postgres `23505`, translated by `OrdersDbContext.SaveChangesAsync`) remains as a fallback: the handler catches it, releases any coupon/gift reservations it had speculatively taken, then re-reads the key row and replays the winner's order (or returns `Orders.IdempotencyKeyReused` if the fingerprint differs).
 - Controller (`OrdersController.Place`) reads the header via `[FromHeader(Name = "Idempotency-Key")]`, passes it on `PlaceOrderCommand`, and sets the `Idempotent-Replayed` response header when the handler reports a replay — the 200 body (`OrderDto`) is unchanged either way.
+
+## Reservation arriving after cancel (W11 rework)
+
+`InventoryReservedIntegrationEventHandler` used to no-op whenever the order was no longer `PendingStock`,
+treating "already cancelled" the same as "already processed". That silently leaked stock forever when a
+delayed `OrderCreated` retry reserved stock for an order the customer had already cancelled in the
+meantime (`InventoryReservationExpired`/`PaymentFailed`-free leak — nothing else ever asks Inventory to give
+it back). Now, when the order is specifically `Cancelled`, the handler publishes
+`OrderReservationReleaseRequestedIntegrationEvent(OrderId, Reason)` instead — see
+[11-inventory.md](../11-inventory.md) for the Inventory-side release handler. Every other non-`PendingStock`
+status is still treated as a normal already-processed no-op.
 
 ## Stock pre-check on place order (W11)
 

@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -35,7 +36,8 @@ public sealed class EventBusTestHost : IAsyncDisposable
     public static async Task<EventBusTestHost> CreateAsync(
         RabbitMqContainer rabbitMq,
         PostgreSqlContainer postgres,
-        Action<RabbitMqOptions>? configure = null)
+        Action<RabbitMqOptions>? configure = null,
+        Action<IServiceCollection>? configureServices = null)
     {
         var suffix = Guid.NewGuid().ToString("N")[..8];
         var options = new RabbitMqOptions
@@ -76,16 +78,26 @@ public sealed class EventBusTestHost : IAsyncDisposable
         var schema = "t" + suffix;
         var dbOptions = new DbContextOptionsBuilder<EventBusTestDbContext>()
             .UseNpgsql(postgres.GetConnectionString())
+            // Without this, EF Core's default model cache key (DbContext type only) would make every
+            // EventBusTestDbContext instance in this test process reuse whichever schema compiled the
+            // model first, silently collapsing every test's "isolated" schema into one shared schema.
+            .ReplaceService<IModelCacheKeyFactory, SchemaAwareModelCacheKeyFactory>()
             .Options;
         services.AddScoped(_ => new EventBusTestDbContext(dbOptions, schema));
         services.AddScoped<IOutbox<EventBusTestDbContext>, Outbox<EventBusTestDbContext>>();
+
+        configureServices?.Invoke(services);
 
         var provider = services.BuildServiceProvider();
 
         using (var scope = provider.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<EventBusTestDbContext>();
-            await db.Database.EnsureCreatedAsync();
+            // EnsureCreatedAsync's "already created?" check looks for ANY table in the whole database,
+            // not this schema specifically -- with many tests sharing one Postgres container (each its
+            // own schema), only the very first test to run would ever actually get its tables created.
+            // Generate and run this model's own create script instead, scoped to its own schema.
+            await db.Database.ExecuteSqlRawAsync(db.Database.GenerateCreateScript());
         }
 
         return new EventBusTestHost(provider, options, recorder);

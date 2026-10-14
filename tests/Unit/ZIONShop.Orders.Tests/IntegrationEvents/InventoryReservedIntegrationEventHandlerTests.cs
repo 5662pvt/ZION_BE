@@ -1,5 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using ZIONShop.Contracts.Inventory;
+using ZIONShop.Contracts.Orders;
+using ZIONShop.EventBus.Outbox;
 using ZIONShop.Orders.Application.IntegrationEvents;
 using ZIONShop.Orders.Domain.Entities;
 using ZIONShop.Orders.Domain.Enums;
@@ -73,6 +75,26 @@ public class InventoryReservedIntegrationEventHandlerTests
 
         var reloaded = await orders.GetByIdAsync(order.Id);
         reloaded!.Status.Should().Be(OrderStatus.Confirmed);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Should_RequestReservationRelease_When_OrderAlreadyCancelled()
+    {
+        var (db, orders) = BuildScope();
+        var order = await SeedOrderAsync(db, orders, PaymentMethod.COD);
+        order.Cancel("Khách hủy đơn", isStaff: false);
+        orders.Update(order);
+        await db.SaveChangesAsync(CancellationToken.None);
+
+        var handler = new InventoryReservedIntegrationEventHandler(orders, db, new FakeGiftPromotionEvaluator());
+        await handler.HandleAsync(new InventoryReservedIntegrationEvent(order.Id, Array.Empty<ReservedItem>(), DateTime.UtcNow.AddMinutes(15)));
+
+        var reloaded = await orders.GetByIdAsync(order.Id);
+        reloaded!.Status.Should().Be(OrderStatus.Cancelled); // the late reservation never flips an already-cancelled order
+
+        var outboxMessages = await db.Set<OutboxMessage>().ToListAsync();
+        outboxMessages.Should().ContainSingle(m =>
+            m.Type.Contains(nameof(OrderReservationReleaseRequestedIntegrationEvent)) && m.Content.Contains(order.Id.ToString()));
     }
 
     [Fact]

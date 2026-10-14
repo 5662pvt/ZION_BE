@@ -39,7 +39,7 @@ public class PlaceOrderCommandHandlerTests
         var prices = new FakeProductPriceLookup().Add(productId, "Widget", 100000m);
         var stock = new FakeStockAvailabilityReader().WithAvailable(productId, 2);
 
-        var handler = new PlaceOrderCommandHandler(orders, db, cart, addresses, prices, new FakePromotionEvaluator(), new FakeGiftPromotionEvaluator(), stock, DefaultShippingFeeCalculator(), new FakeOrderIdempotencyKeyRepository(), TimeProvider.System, DefaultCheckout());
+        var handler = new PlaceOrderCommandHandler(orders, db, cart, addresses, prices, new FakePromotionEvaluator(), new FakeGiftPromotionEvaluator(), stock, DefaultShippingFeeCalculator(), new FakeOrderIdempotencyKeyRepository(), new FakeIdempotencyLock(), TimeProvider.System, DefaultCheckout());
         var result = await handler.Handle(new PlaceOrderCommand(userId, addressId, "COD", "Giao giờ hành chính"), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
@@ -58,7 +58,7 @@ public class PlaceOrderCommandHandlerTests
         var (db, orders) = BuildScope();
         var userId = Guid.NewGuid();
         var handler = new PlaceOrderCommandHandler(
-            orders, db, new FakeCartReader(), new FakeUserAddressReader(), new FakeProductPriceLookup(), new FakePromotionEvaluator(), new FakeGiftPromotionEvaluator(), new FakeStockAvailabilityReader(), DefaultShippingFeeCalculator(), new FakeOrderIdempotencyKeyRepository(), TimeProvider.System, DefaultCheckout());
+            orders, db, new FakeCartReader(), new FakeUserAddressReader(), new FakeProductPriceLookup(), new FakePromotionEvaluator(), new FakeGiftPromotionEvaluator(), new FakeStockAvailabilityReader(), DefaultShippingFeeCalculator(), new FakeOrderIdempotencyKeyRepository(), new FakeIdempotencyLock(), TimeProvider.System, DefaultCheckout());
 
         var result = await handler.Handle(new PlaceOrderCommand(userId, Guid.NewGuid(), "COD", null), CancellationToken.None);
 
@@ -75,7 +75,7 @@ public class PlaceOrderCommandHandlerTests
         var cart = new FakeCartReader().WithCart(userId, "VND", new CartSnapshotLine(productId, "Widget", 1, 100000m));
         var prices = new FakeProductPriceLookup().Add(productId, "Widget", 100000m);
 
-        var handler = new PlaceOrderCommandHandler(orders, db, cart, new FakeUserAddressReader(), prices, new FakePromotionEvaluator(), new FakeGiftPromotionEvaluator(), new FakeStockAvailabilityReader(), DefaultShippingFeeCalculator(), new FakeOrderIdempotencyKeyRepository(), TimeProvider.System, DefaultCheckout());
+        var handler = new PlaceOrderCommandHandler(orders, db, cart, new FakeUserAddressReader(), prices, new FakePromotionEvaluator(), new FakeGiftPromotionEvaluator(), new FakeStockAvailabilityReader(), DefaultShippingFeeCalculator(), new FakeOrderIdempotencyKeyRepository(), new FakeIdempotencyLock(), TimeProvider.System, DefaultCheckout());
         var result = await handler.Handle(new PlaceOrderCommand(userId, Guid.NewGuid(), "COD", null), CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
@@ -94,7 +94,7 @@ public class PlaceOrderCommandHandlerTests
         var addresses = new FakeUserAddressReader().WithAddress(userId, addressId);
         var prices = new FakeProductPriceLookup().Add(productId, "Widget", 100000m, isAvailable: false);
 
-        var handler = new PlaceOrderCommandHandler(orders, db, cart, addresses, prices, new FakePromotionEvaluator(), new FakeGiftPromotionEvaluator(), new FakeStockAvailabilityReader(), DefaultShippingFeeCalculator(), new FakeOrderIdempotencyKeyRepository(), TimeProvider.System, DefaultCheckout());
+        var handler = new PlaceOrderCommandHandler(orders, db, cart, addresses, prices, new FakePromotionEvaluator(), new FakeGiftPromotionEvaluator(), new FakeStockAvailabilityReader(), DefaultShippingFeeCalculator(), new FakeOrderIdempotencyKeyRepository(), new FakeIdempotencyLock(), TimeProvider.System, DefaultCheckout());
         var result = await handler.Handle(new PlaceOrderCommand(userId, addressId, "COD", null), CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
@@ -114,7 +114,7 @@ public class PlaceOrderCommandHandlerTests
         var prices = new FakeProductPriceLookup().Add(productId, "Widget", 100000m);
         var stock = new FakeStockAvailabilityReader().WithAvailable(productId, 2); // only 2 available, 3 requested
 
-        var handler = new PlaceOrderCommandHandler(orders, db, cart, addresses, prices, new FakePromotionEvaluator(), new FakeGiftPromotionEvaluator(), stock, DefaultShippingFeeCalculator(), new FakeOrderIdempotencyKeyRepository(), TimeProvider.System, DefaultCheckout());
+        var handler = new PlaceOrderCommandHandler(orders, db, cart, addresses, prices, new FakePromotionEvaluator(), new FakeGiftPromotionEvaluator(), stock, DefaultShippingFeeCalculator(), new FakeOrderIdempotencyKeyRepository(), new FakeIdempotencyLock(), TimeProvider.System, DefaultCheckout());
         var result = await handler.Handle(new PlaceOrderCommand(userId, addressId, "COD", null), CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
@@ -136,7 +136,7 @@ public class PlaceOrderCommandHandlerTests
         var prices = new FakeProductPriceLookup().Add(productId, "Widget", 100000m);
         var stock = new FakeStockAvailabilityReader().WithAvailable(productId, 5);
 
-        var handler = new PlaceOrderCommandHandler(orders, db, cart, addresses, prices, new FakePromotionEvaluator(), new FakeGiftPromotionEvaluator(), stock, DefaultShippingFeeCalculator(), new FakeOrderIdempotencyKeyRepository(), TimeProvider.System, DefaultCheckout());
+        var handler = new PlaceOrderCommandHandler(orders, db, cart, addresses, prices, new FakePromotionEvaluator(), new FakeGiftPromotionEvaluator(), stock, DefaultShippingFeeCalculator(), new FakeOrderIdempotencyKeyRepository(), new FakeIdempotencyLock(), TimeProvider.System, DefaultCheckout());
         var result = await handler.Handle(new PlaceOrderCommand(userId, addressId, "COD", null), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
@@ -159,7 +159,7 @@ public class PlaceOrderCommandHandlerTests
         var prices = new FakeProductPriceLookup().Add(productId, "Widget", 150000m);
         var stock = new FakeStockAvailabilityReader().WithAvailable(productId, 1);
 
-        var handler = new PlaceOrderCommandHandler(orders, db, cart, addresses, prices, new FakePromotionEvaluator(), new FakeGiftPromotionEvaluator(), stock, DefaultShippingFeeCalculator(), new FakeOrderIdempotencyKeyRepository(), TimeProvider.System, DefaultCheckout());
+        var handler = new PlaceOrderCommandHandler(orders, db, cart, addresses, prices, new FakePromotionEvaluator(), new FakeGiftPromotionEvaluator(), stock, DefaultShippingFeeCalculator(), new FakeOrderIdempotencyKeyRepository(), new FakeIdempotencyLock(), TimeProvider.System, DefaultCheckout());
         var result = await handler.Handle(new PlaceOrderCommand(userId, addressId, "Online", null), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
@@ -181,7 +181,7 @@ public class PlaceOrderCommandHandlerTests
         var promotions = new FakePromotionEvaluator().WithQuote("SALE10", 20000m, "Giảm 10%");
         var stock = new FakeStockAvailabilityReader().WithAvailable(productId, 2);
 
-        var handler = new PlaceOrderCommandHandler(orders, db, cart, addresses, prices, promotions, new FakeGiftPromotionEvaluator(), stock, DefaultShippingFeeCalculator(), new FakeOrderIdempotencyKeyRepository(), TimeProvider.System, DefaultCheckout());
+        var handler = new PlaceOrderCommandHandler(orders, db, cart, addresses, prices, promotions, new FakeGiftPromotionEvaluator(), stock, DefaultShippingFeeCalculator(), new FakeOrderIdempotencyKeyRepository(), new FakeIdempotencyLock(), TimeProvider.System, DefaultCheckout());
         var result = await handler.Handle(new PlaceOrderCommand(userId, addressId, "COD", null, "SALE10"), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
@@ -209,7 +209,7 @@ public class PlaceOrderCommandHandlerTests
         var promotions = new FakePromotionEvaluator().WithQuote("BIG", 50000m);
         var stock = new FakeStockAvailabilityReader().WithAvailable(productId, 5);
 
-        var handler = new PlaceOrderCommandHandler(orders, db, cart, addresses, prices, promotions, new FakeGiftPromotionEvaluator(), stock, DefaultShippingFeeCalculator(), new FakeOrderIdempotencyKeyRepository(), TimeProvider.System, DefaultCheckout());
+        var handler = new PlaceOrderCommandHandler(orders, db, cart, addresses, prices, promotions, new FakeGiftPromotionEvaluator(), stock, DefaultShippingFeeCalculator(), new FakeOrderIdempotencyKeyRepository(), new FakeIdempotencyLock(), TimeProvider.System, DefaultCheckout());
         var result = await handler.Handle(new PlaceOrderCommand(userId, addressId, "COD", null, "BIG"), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
@@ -231,7 +231,7 @@ public class PlaceOrderCommandHandlerTests
         var promotions = new FakePromotionEvaluator().WithQuote("FREESHIP", 30000m, discountTarget: "Shipping");
         var stock = new FakeStockAvailabilityReader().WithAvailable(productId, 1);
 
-        var handler = new PlaceOrderCommandHandler(orders, db, cart, addresses, prices, promotions, new FakeGiftPromotionEvaluator(), stock, DefaultShippingFeeCalculator(), new FakeOrderIdempotencyKeyRepository(), TimeProvider.System, DefaultCheckout());
+        var handler = new PlaceOrderCommandHandler(orders, db, cart, addresses, prices, promotions, new FakeGiftPromotionEvaluator(), stock, DefaultShippingFeeCalculator(), new FakeOrderIdempotencyKeyRepository(), new FakeIdempotencyLock(), TimeProvider.System, DefaultCheckout());
         var result = await handler.Handle(new PlaceOrderCommand(userId, addressId, "COD", null, "FREESHIP"), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
@@ -252,7 +252,7 @@ public class PlaceOrderCommandHandlerTests
         var promotions = new FakePromotionEvaluator().WithError("EXPIRED", "Mã giảm giá đã hết hạn");
         var stock = new FakeStockAvailabilityReader().WithAvailable(productId, 1);
 
-        var handler = new PlaceOrderCommandHandler(orders, db, cart, addresses, prices, promotions, new FakeGiftPromotionEvaluator(), stock, DefaultShippingFeeCalculator(), new FakeOrderIdempotencyKeyRepository(), TimeProvider.System, DefaultCheckout());
+        var handler = new PlaceOrderCommandHandler(orders, db, cart, addresses, prices, promotions, new FakeGiftPromotionEvaluator(), stock, DefaultShippingFeeCalculator(), new FakeOrderIdempotencyKeyRepository(), new FakeIdempotencyLock(), TimeProvider.System, DefaultCheckout());
         var result = await handler.Handle(new PlaceOrderCommand(userId, addressId, "COD", null, "EXPIRED"), CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
@@ -275,7 +275,7 @@ public class PlaceOrderCommandHandlerTests
         var promotions = new FakePromotionEvaluator().WithQuote("SALE10", 10000m);
         var stock = new FakeStockAvailabilityReader().WithAvailable(productId, 1);
 
-        var handler = new PlaceOrderCommandHandler(orders, new FakeFailingUnitOfWork(), cart, addresses, prices, promotions, new FakeGiftPromotionEvaluator(), stock, DefaultShippingFeeCalculator(), new FakeOrderIdempotencyKeyRepository(), TimeProvider.System, DefaultCheckout());
+        var handler = new PlaceOrderCommandHandler(orders, new FakeFailingUnitOfWork(), cart, addresses, prices, promotions, new FakeGiftPromotionEvaluator(), stock, DefaultShippingFeeCalculator(), new FakeOrderIdempotencyKeyRepository(), new FakeIdempotencyLock(), TimeProvider.System, DefaultCheckout());
 
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
             handler.Handle(new PlaceOrderCommand(userId, addressId, "COD", null, "SALE10"), CancellationToken.None));
@@ -298,7 +298,7 @@ public class PlaceOrderCommandHandlerTests
         var promotions = new FakePromotionEvaluator();
         var stock = new FakeStockAvailabilityReader().WithAvailable(productId, 1);
 
-        var handler = new PlaceOrderCommandHandler(orders, db, cart, addresses, prices, promotions, new FakeGiftPromotionEvaluator(), stock, DefaultShippingFeeCalculator(), new FakeOrderIdempotencyKeyRepository(), TimeProvider.System, DefaultCheckout());
+        var handler = new PlaceOrderCommandHandler(orders, db, cart, addresses, prices, promotions, new FakeGiftPromotionEvaluator(), stock, DefaultShippingFeeCalculator(), new FakeOrderIdempotencyKeyRepository(), new FakeIdempotencyLock(), TimeProvider.System, DefaultCheckout());
         var result = await handler.Handle(new PlaceOrderCommand(userId, addressId, "COD", null), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
@@ -323,7 +323,7 @@ public class PlaceOrderCommandHandlerTests
         var giftEvaluator = new FakeGiftPromotionEvaluator().WithGrant(promotionId, giftProductId, 1, "Mua 2 áo tặng nón");
         var stock = new FakeStockAvailabilityReader().WithAvailable(productId, 2).WithAvailable(giftProductId, 5);
 
-        var handler = new PlaceOrderCommandHandler(orders, db, cart, addresses, prices, new FakePromotionEvaluator(), giftEvaluator, stock, DefaultShippingFeeCalculator(), new FakeOrderIdempotencyKeyRepository(), TimeProvider.System, DefaultCheckout());
+        var handler = new PlaceOrderCommandHandler(orders, db, cart, addresses, prices, new FakePromotionEvaluator(), giftEvaluator, stock, DefaultShippingFeeCalculator(), new FakeOrderIdempotencyKeyRepository(), new FakeIdempotencyLock(), TimeProvider.System, DefaultCheckout());
         var result = await handler.Handle(new PlaceOrderCommand(userId, addressId, "COD", null), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
@@ -352,7 +352,7 @@ public class PlaceOrderCommandHandlerTests
         var giftEvaluator = new FakeGiftPromotionEvaluator().WithGrant(promotionId, productId, 5);
         var stock = new FakeStockAvailabilityReader().WithAvailable(productId, 6);
 
-        var handler = new PlaceOrderCommandHandler(orders, db, cart, addresses, prices, new FakePromotionEvaluator(), giftEvaluator, stock, DefaultShippingFeeCalculator(), new FakeOrderIdempotencyKeyRepository(), TimeProvider.System, DefaultCheckout());
+        var handler = new PlaceOrderCommandHandler(orders, db, cart, addresses, prices, new FakePromotionEvaluator(), giftEvaluator, stock, DefaultShippingFeeCalculator(), new FakeOrderIdempotencyKeyRepository(), new FakeIdempotencyLock(), TimeProvider.System, DefaultCheckout());
         var result = await handler.Handle(new PlaceOrderCommand(userId, addressId, "COD", null), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue(); // the order still places; the gift is simply dropped
@@ -376,7 +376,7 @@ public class PlaceOrderCommandHandlerTests
         var giftEvaluator = new FakeGiftPromotionEvaluator().WithGrant(promotionId, giftProductId, 1);
         var stock = new FakeStockAvailabilityReader().WithAvailable(productId, 1).WithAvailable(giftProductId, 5);
 
-        var handler = new PlaceOrderCommandHandler(orders, db, cart, addresses, prices, new FakePromotionEvaluator(), giftEvaluator, stock, DefaultShippingFeeCalculator(), new FakeOrderIdempotencyKeyRepository(), TimeProvider.System, DefaultCheckout());
+        var handler = new PlaceOrderCommandHandler(orders, db, cart, addresses, prices, new FakePromotionEvaluator(), giftEvaluator, stock, DefaultShippingFeeCalculator(), new FakeOrderIdempotencyKeyRepository(), new FakeIdempotencyLock(), TimeProvider.System, DefaultCheckout());
         var result = await handler.Handle(new PlaceOrderCommand(userId, addressId, "COD", null), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
@@ -400,7 +400,7 @@ public class PlaceOrderCommandHandlerTests
         var stock = new FakeStockAvailabilityReader().WithAvailable(productId, 1).WithAvailable(giftProductId, 5);
 
         var handler = new PlaceOrderCommandHandler(
-            orders, new FakeFailingUnitOfWork(), cart, addresses, prices, new FakePromotionEvaluator(), giftEvaluator, stock, DefaultShippingFeeCalculator(), new FakeOrderIdempotencyKeyRepository(), TimeProvider.System, DefaultCheckout());
+            orders, new FakeFailingUnitOfWork(), cart, addresses, prices, new FakePromotionEvaluator(), giftEvaluator, stock, DefaultShippingFeeCalculator(), new FakeOrderIdempotencyKeyRepository(), new FakeIdempotencyLock(), TimeProvider.System, DefaultCheckout());
 
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
             handler.Handle(new PlaceOrderCommand(userId, addressId, "COD", null), CancellationToken.None));
@@ -434,7 +434,7 @@ public class PlaceOrderCommandHandlerTests
             .WithAvailable(giftProductX, 0)
             .WithAvailable(giftProductY, 5);
 
-        var handler = new PlaceOrderCommandHandler(orders, db, cart, addresses, prices, new FakePromotionEvaluator(), giftEvaluator, stock, DefaultShippingFeeCalculator(), new FakeOrderIdempotencyKeyRepository(), TimeProvider.System, DefaultCheckout());
+        var handler = new PlaceOrderCommandHandler(orders, db, cart, addresses, prices, new FakePromotionEvaluator(), giftEvaluator, stock, DefaultShippingFeeCalculator(), new FakeOrderIdempotencyKeyRepository(), new FakeIdempotencyLock(), TimeProvider.System, DefaultCheckout());
         var result = await handler.Handle(new PlaceOrderCommand(userId, addressId, "COD", null), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
@@ -450,7 +450,7 @@ public class PlaceOrderCommandHandlerTests
         var userId = Guid.NewGuid();
 
         var handler = new PlaceOrderCommandHandler(
-            orders, db, new FakeCartReader(), new FakeUserAddressReader(), new FakeProductPriceLookup(), new FakePromotionEvaluator(), new FakeGiftPromotionEvaluator(), new FakeStockAvailabilityReader(), DefaultShippingFeeCalculator(), new FakeOrderIdempotencyKeyRepository(), TimeProvider.System, DefaultCheckout());
+            orders, db, new FakeCartReader(), new FakeUserAddressReader(), new FakeProductPriceLookup(), new FakePromotionEvaluator(), new FakeGiftPromotionEvaluator(), new FakeStockAvailabilityReader(), DefaultShippingFeeCalculator(), new FakeOrderIdempotencyKeyRepository(), new FakeIdempotencyLock(), TimeProvider.System, DefaultCheckout());
 
         var tooLong = new string('a', 101);
         var result = await handler.Handle(new PlaceOrderCommand(userId, Guid.NewGuid(), "COD", null, null, tooLong), CancellationToken.None);
@@ -466,7 +466,7 @@ public class PlaceOrderCommandHandlerTests
         var userId = Guid.NewGuid();
 
         var handler = new PlaceOrderCommandHandler(
-            orders, db, new FakeCartReader(), new FakeUserAddressReader(), new FakeProductPriceLookup(), new FakePromotionEvaluator(), new FakeGiftPromotionEvaluator(), new FakeStockAvailabilityReader(), DefaultShippingFeeCalculator(), new FakeOrderIdempotencyKeyRepository(), TimeProvider.System, DefaultCheckout());
+            orders, db, new FakeCartReader(), new FakeUserAddressReader(), new FakeProductPriceLookup(), new FakePromotionEvaluator(), new FakeGiftPromotionEvaluator(), new FakeStockAvailabilityReader(), DefaultShippingFeeCalculator(), new FakeOrderIdempotencyKeyRepository(), new FakeIdempotencyLock(), TimeProvider.System, DefaultCheckout());
 
         var result = await handler.Handle(new PlaceOrderCommand(userId, Guid.NewGuid(), "COD", null, null, "has space"), CancellationToken.None);
 
@@ -489,7 +489,7 @@ public class PlaceOrderCommandHandlerTests
         var stock = new FakeStockAvailabilityReader().WithAvailable(productId, 1);
         var idempotencyKeys = new FakeOrderIdempotencyKeyRepository();
 
-        var handler = new PlaceOrderCommandHandler(orders, db, cart, addresses, prices, new FakePromotionEvaluator(), new FakeGiftPromotionEvaluator(), stock, DefaultShippingFeeCalculator(), idempotencyKeys, TimeProvider.System, DefaultCheckout());
+        var handler = new PlaceOrderCommandHandler(orders, db, cart, addresses, prices, new FakePromotionEvaluator(), new FakeGiftPromotionEvaluator(), stock, DefaultShippingFeeCalculator(), idempotencyKeys, new FakeIdempotencyLock(), TimeProvider.System, DefaultCheckout());
 
         var first = await handler.Handle(new PlaceOrderCommand(userId, addressId, "COD", "note", null, key), CancellationToken.None);
         first.IsSuccess.Should().BeTrue();
@@ -518,7 +518,7 @@ public class PlaceOrderCommandHandlerTests
         var stock = new FakeStockAvailabilityReader().WithAvailable(productId, 1);
         var idempotencyKeys = new FakeOrderIdempotencyKeyRepository();
 
-        var handler = new PlaceOrderCommandHandler(orders, db, cart, addresses, prices, new FakePromotionEvaluator(), new FakeGiftPromotionEvaluator(), stock, DefaultShippingFeeCalculator(), idempotencyKeys, TimeProvider.System, DefaultCheckout());
+        var handler = new PlaceOrderCommandHandler(orders, db, cart, addresses, prices, new FakePromotionEvaluator(), new FakeGiftPromotionEvaluator(), stock, DefaultShippingFeeCalculator(), idempotencyKeys, new FakeIdempotencyLock(), TimeProvider.System, DefaultCheckout());
         var result = await handler.Handle(new PlaceOrderCommand(userId, addressId, "COD", "note", null, key), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
@@ -542,7 +542,7 @@ public class PlaceOrderCommandHandlerTests
         var stock = new FakeStockAvailabilityReader().WithAvailable(productId, 1);
         var idempotencyKeys = new FakeOrderIdempotencyKeyRepository();
 
-        var handler = new PlaceOrderCommandHandler(orders, db, cart, addresses, prices, new FakePromotionEvaluator(), new FakeGiftPromotionEvaluator(), stock, DefaultShippingFeeCalculator(), idempotencyKeys, TimeProvider.System, DefaultCheckout());
+        var handler = new PlaceOrderCommandHandler(orders, db, cart, addresses, prices, new FakePromotionEvaluator(), new FakeGiftPromotionEvaluator(), stock, DefaultShippingFeeCalculator(), idempotencyKeys, new FakeIdempotencyLock(), TimeProvider.System, DefaultCheckout());
 
         var first = await handler.Handle(new PlaceOrderCommand(userId, addressId, "COD", "note one", null, key), CancellationToken.None);
         first.IsSuccess.Should().BeTrue();
@@ -568,7 +568,7 @@ public class PlaceOrderCommandHandlerTests
         var stock = new FakeStockAvailabilityReader().WithAvailable(productId, 2);
         var idempotencyKeys = new FakeOrderIdempotencyKeyRepository();
 
-        var handler = new PlaceOrderCommandHandler(orders, db, cart, addresses, prices, new FakePromotionEvaluator(), new FakeGiftPromotionEvaluator(), stock, DefaultShippingFeeCalculator(), idempotencyKeys, TimeProvider.System, DefaultCheckout());
+        var handler = new PlaceOrderCommandHandler(orders, db, cart, addresses, prices, new FakePromotionEvaluator(), new FakeGiftPromotionEvaluator(), stock, DefaultShippingFeeCalculator(), idempotencyKeys, new FakeIdempotencyLock(), TimeProvider.System, DefaultCheckout());
 
         var first = await handler.Handle(new PlaceOrderCommand(userId, addressId, "COD", null), CancellationToken.None);
         var second = await handler.Handle(new PlaceOrderCommand(userId, addressId, "COD", null), CancellationToken.None);
@@ -577,5 +577,71 @@ public class PlaceOrderCommandHandlerTests
         second.IsSuccess.Should().BeTrue();
         second.Value.Order.Id.Should().NotBe(first.Value.Order.Id); // absent key -> no replay, two orders
         (await db.Orders.CountAsync()).Should().Be(2);
+    }
+
+    [Fact]
+    public async Task Handle_Should_NotAcquireLock_When_NoIdempotencyKeyProvided()
+    {
+        var (db, orders) = BuildScope();
+        var userId = Guid.NewGuid();
+        var addressId = Guid.NewGuid();
+        var productId = Guid.NewGuid();
+
+        var cart = new FakeCartReader().WithCart(userId, "VND", new CartSnapshotLine(productId, "Widget", 1, 100000m));
+        var addresses = new FakeUserAddressReader().WithAddress(userId, addressId);
+        var prices = new FakeProductPriceLookup().Add(productId, "Widget", 100000m);
+        var stock = new FakeStockAvailabilityReader().WithAvailable(productId, 1);
+        var idempotencyLock = new FakeIdempotencyLock();
+
+        var handler = new PlaceOrderCommandHandler(orders, db, cart, addresses, prices, new FakePromotionEvaluator(), new FakeGiftPromotionEvaluator(), stock, DefaultShippingFeeCalculator(), new FakeOrderIdempotencyKeyRepository(), idempotencyLock, TimeProvider.System, DefaultCheckout());
+        var result = await handler.Handle(new PlaceOrderCommand(userId, addressId, "COD", null), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        idempotencyLock.AcquireCalls.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Handle_Should_AcquireLock_When_IdempotencyKeyProvided()
+    {
+        var (db, orders) = BuildScope();
+        var userId = Guid.NewGuid();
+        var addressId = Guid.NewGuid();
+        var productId = Guid.NewGuid();
+        const string key = "key-lock";
+
+        var cart = new FakeCartReader().WithCart(userId, "VND", new CartSnapshotLine(productId, "Widget", 1, 100000m));
+        var addresses = new FakeUserAddressReader().WithAddress(userId, addressId);
+        var prices = new FakeProductPriceLookup().Add(productId, "Widget", 100000m);
+        var stock = new FakeStockAvailabilityReader().WithAvailable(productId, 1);
+        var idempotencyLock = new FakeIdempotencyLock();
+
+        var handler = new PlaceOrderCommandHandler(orders, db, cart, addresses, prices, new FakePromotionEvaluator(), new FakeGiftPromotionEvaluator(), stock, DefaultShippingFeeCalculator(), new FakeOrderIdempotencyKeyRepository(), idempotencyLock, TimeProvider.System, DefaultCheckout());
+        var result = await handler.Handle(new PlaceOrderCommand(userId, addressId, "COD", "note", null, key), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        idempotencyLock.AcquireCalls.Should().ContainSingle(c => c.UserId == userId && c.Key == key);
+    }
+
+    [Fact]
+    public async Task Handle_Should_ReturnConflict_When_IdempotencyLockTimesOut()
+    {
+        var (db, orders) = BuildScope();
+        var userId = Guid.NewGuid();
+        var addressId = Guid.NewGuid();
+        var productId = Guid.NewGuid();
+        const string key = "key-busy";
+
+        var cart = new FakeCartReader().WithCart(userId, "VND", new CartSnapshotLine(productId, "Widget", 1, 100000m));
+        var addresses = new FakeUserAddressReader().WithAddress(userId, addressId);
+        var prices = new FakeProductPriceLookup().Add(productId, "Widget", 100000m);
+        var stock = new FakeStockAvailabilityReader().WithAvailable(productId, 1);
+        var idempotencyLock = new FakeIdempotencyLock().WithNextAcquireFailing();
+
+        var handler = new PlaceOrderCommandHandler(orders, db, cart, addresses, prices, new FakePromotionEvaluator(), new FakeGiftPromotionEvaluator(), stock, DefaultShippingFeeCalculator(), new FakeOrderIdempotencyKeyRepository(), idempotencyLock, TimeProvider.System, DefaultCheckout());
+        var result = await handler.Handle(new PlaceOrderCommand(userId, addressId, "COD", "note", null, key), CancellationToken.None);
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Code.Should().Be("Orders.IdempotencyKeyInProgress");
+        (await db.Orders.CountAsync()).Should().Be(0);
     }
 }
