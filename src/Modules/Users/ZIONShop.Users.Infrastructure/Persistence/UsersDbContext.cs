@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using ZIONShop.EventBus.Inbox;
 using ZIONShop.Users.Application.Interfaces;
 using ZIONShop.Users.Domain.Entities;
 
@@ -17,6 +18,7 @@ public class UsersDbContext : DbContext, IUsersUnitOfWork
     {
         modelBuilder.HasDefaultSchema(Schema);
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(UsersDbContext).Assembly);
+        modelBuilder.AddInbox(Schema);
     }
 
     public new Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)

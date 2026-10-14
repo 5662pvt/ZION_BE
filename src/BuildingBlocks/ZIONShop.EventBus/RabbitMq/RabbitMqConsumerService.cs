@@ -21,6 +21,7 @@ public class RabbitMqConsumerService : BackgroundService
     private readonly RabbitMqConnection _connection;
     private readonly RabbitMqOptions _options;
     private readonly IntegrationEventTypeRegistry _registry;
+    private readonly RabbitMqPublisher _publisher;
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<RabbitMqConsumerService> _logger;
     private IModel? _channel;
@@ -29,12 +30,14 @@ public class RabbitMqConsumerService : BackgroundService
         RabbitMqConnection connection,
         IOptions<RabbitMqOptions> options,
         IntegrationEventTypeRegistry registry,
+        RabbitMqPublisher publisher,
         IServiceScopeFactory scopeFactory,
         ILogger<RabbitMqConsumerService> logger)
     {
         _connection = connection;
         _options = options.Value;
         _registry = registry;
+        _publisher = publisher;
         _scopeFactory = scopeFactory;
         _logger = logger;
     }
@@ -65,77 +68,95 @@ public class RabbitMqConsumerService : BackgroundService
 
     private void Initialize()
     {
-        _channel = _connection.GetConnection().CreateModel();
-        _channel.ExchangeDeclare(_options.Exchange, ExchangeType.Topic, durable: true);
-        _channel.QueueDeclare(_options.QueueName, durable: true, exclusive: false, autoDelete: false);
-        _channel.QueueDeclare(DeadLetterQueueName, durable: true, exclusive: false, autoDelete: false);
-
-        foreach (var eventType in _registry.RegisteredTypes)
-            _channel.QueueBind(_options.QueueName, _options.Exchange, eventType.Name);
-
-        _channel.BasicQos(0, prefetchCount: 20, global: false);
+        var connection = _connection.GetConnection();
+        var channel = connection.CreateModel();
+        channel = RabbitMqTopology.Declare(connection, channel, _options, _registry, _logger);
+        channel.BasicQos(0, prefetchCount: (ushort)_options.PrefetchCount, global: false);
+        _channel = channel;
     }
 
     private async Task OnMessageReceivedAsync(object sender, BasicDeliverEventArgs args)
     {
-        var routingKey = args.RoutingKey;
+        // The first delivery of an event carries Type = the real event type name and RoutingKey
+        // equal to it too. A message coming back from a retry queue (after its TTL expired and it
+        // was dead-lettered to the main queue) is redelivered with RoutingKey = the queue name
+        // (see RabbitMqTopology's x-dead-letter-routing-key), so Type is the only reliable source
+        // then -- it is preserved verbatim across every republish by RabbitMqPublisher.
+        var typeName = args.BasicProperties?.Type;
+        var resolvedTypeName = !string.IsNullOrEmpty(typeName) ? typeName : args.RoutingKey;
+
+        if (!_registry.TryGetType(resolvedTypeName, out var eventType))
+        {
+            _logger.LogWarning(
+                "No registered type for '{TypeName}' (routing key {RoutingKey}, MessageId {MessageId}); dead-lettering",
+                resolvedTypeName, args.RoutingKey, args.BasicProperties?.MessageId);
+            _channel!.BasicNack(args.DeliveryTag, multiple: false, requeue: false);
+            return;
+        }
+
+        IntegrationEvent @event;
         try
         {
-            if (!_registry.TryGetType(routingKey, out var eventType))
-            {
-                _logger.LogWarning("No registered type for routing key {RoutingKey}; dead-lettering", routingKey);
-                DeadLetter(args);
-                _channel!.BasicAck(args.DeliveryTag, multiple: false);
-                return;
-            }
-
             var json = Encoding.UTF8.GetString(args.Body.Span);
-            var @event = (IntegrationEvent)(JsonSerializer.Deserialize(json, eventType)
-                ?? throw new InvalidOperationException($"Message for '{routingKey}' deserialized to null."));
+            @event = (IntegrationEvent)(JsonSerializer.Deserialize(json, eventType)
+                ?? throw new InvalidOperationException($"Message for '{resolvedTypeName}' deserialized to null."));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex,
+                "Poison message for '{TypeName}' (MessageId {MessageId}); dead-lettering without retry",
+                resolvedTypeName, args.BasicProperties?.MessageId);
+            _channel!.BasicNack(args.DeliveryTag, multiple: false, requeue: false);
+            return;
+        }
 
+        try
+        {
             using var scope = _scopeFactory.CreateScope();
             var handlerType = typeof(IIntegrationEventHandler<>).MakeGenericType(eventType);
             var handlers = scope.ServiceProvider.GetServices(handlerType);
             var handleMethod = handlerType.GetMethod(nameof(IIntegrationEventHandler<IntegrationEvent>.HandleAsync))!;
 
             foreach (var handler in handlers)
-            {
                 await (Task)handleMethod.Invoke(handler, new object[] { @event, CancellationToken.None })!;
-            }
 
             _channel!.BasicAck(args.DeliveryTag, multiple: false);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to process message {RoutingKey} (EventId header {MessageId})", routingKey, args.BasicProperties?.MessageId);
-            RetryOrDeadLetter(args);
-            _channel!.BasicAck(args.DeliveryTag, multiple: false);
+            await HandleFailureAsync(args, resolvedTypeName, ex);
         }
     }
 
-    private void RetryOrDeadLetter(BasicDeliverEventArgs args)
+    private async Task HandleFailureAsync(BasicDeliverEventArgs args, string typeName, Exception ex)
     {
-        var retryCount = GetRetryCount(args.BasicProperties) + 1;
-        if (retryCount > _options.RetryCount)
+        var attempt = GetRetryCount(args.BasicProperties) + 1;
+        _logger.LogError(ex, "Failed to process message {MessageId} ({TypeName}), attempt {Attempt}",
+            args.BasicProperties?.MessageId, typeName, attempt);
+
+        if (attempt > _options.RetryCount)
         {
-            _logger.LogWarning("Message {RoutingKey} exceeded retry count {RetryCount}; dead-lettering", args.RoutingKey, _options.RetryCount);
-            DeadLetter(args);
+            _logger.LogWarning(
+                "Message {MessageId} ({TypeName}) exceeded retry count {RetryCount}; dead-lettering",
+                args.BasicProperties?.MessageId, typeName, _options.RetryCount);
+            _channel!.BasicNack(args.DeliveryTag, multiple: false, requeue: false);
             return;
         }
 
-        var props = _channel!.CreateBasicProperties();
-        props.Persistent = true;
-        props.MessageId = args.BasicProperties?.MessageId;
-        props.Type = args.BasicProperties?.Type;
-        props.Headers = new Dictionary<string, object> { [RetryCountHeader] = retryCount };
-
-        _channel.BasicPublish(_options.Exchange, args.RoutingKey, props, args.Body);
+        try
+        {
+            var messageId = args.BasicProperties?.MessageId ?? Guid.NewGuid().ToString();
+            await _publisher.PublishToRetryQueueAsync(attempt, messageId, typeName, args.Body.ToArray(), ex.Message, CancellationToken.None);
+            _channel!.BasicAck(args.DeliveryTag, multiple: false);
+        }
+        catch (Exception republishEx)
+        {
+            _logger.LogError(republishEx,
+                "Failed to republish {MessageId} ({TypeName}) to the retry queue; requeueing on the main queue",
+                args.BasicProperties?.MessageId, typeName);
+            _channel!.BasicNack(args.DeliveryTag, multiple: false, requeue: true);
+        }
     }
-
-    private void DeadLetter(BasicDeliverEventArgs args) =>
-        _channel!.BasicPublish(string.Empty, DeadLetterQueueName, args.BasicProperties, args.Body);
-
-    private string DeadLetterQueueName => $"{_options.QueueName}.dlq";
 
     private static int GetRetryCount(IBasicProperties? props)
     {

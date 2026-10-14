@@ -14,7 +14,13 @@ namespace ZIONShop.EventBus.Outbox;
 public class OutboxPublisherService<TDbContext> : BackgroundService where TDbContext : DbContext
 {
     private const int BatchSize = 50;
-    private const int MaxAttempts = 10;
+
+    /// <summary>
+    /// Rows with <c>Attempts >= MaxAttempts</c> and <c>ProcessedOn == null</c> are considered
+    /// failed (an admin screen lists them -- see roadmap W14); public so other layers can query
+    /// the same threshold instead of re-guessing it.
+    /// </summary>
+    public const int MaxAttempts = 10;
 
     private static readonly ConcurrentDictionary<Type, Func<IEventBus, IntegrationEvent, CancellationToken, Task>> Dispatchers = new();
 
@@ -85,12 +91,29 @@ public class OutboxPublisherService<TDbContext> : BackgroundService where TDbCon
                 message.ProcessedOn = DateTime.UtcNow;
                 message.Error = null;
             }
+            catch (BrokerUnavailableException ex)
+            {
+                // The broker is down, not this particular message's fault -- stop the batch
+                // immediately without penalizing this or any remaining message's Attempts, so an
+                // outage longer than MaxAttempts polls can never silently abandon an event.
+                _logger.LogWarning(ex,
+                    "RabbitMQ broker unavailable; stopping outbox batch for {DbContext} early ({Processed}/{Total} messages processed this batch)",
+                    typeof(TDbContext).Name, messages.IndexOf(message), messages.Count);
+                break;
+            }
             catch (Exception ex)
             {
                 message.Attempts++;
                 message.Error = ex.Message;
                 _logger.LogError(ex, "Failed to publish outbox message {MessageId} ({MessageType}), attempt {Attempts}",
                     message.Id, message.Type, message.Attempts);
+
+                if (message.Attempts >= MaxAttempts)
+                {
+                    _logger.LogCritical(
+                        "Outbox message {MessageId} ({MessageType}) moved to failed after {Attempts} attempts",
+                        message.Id, message.Type, message.Attempts);
+                }
             }
         }
 

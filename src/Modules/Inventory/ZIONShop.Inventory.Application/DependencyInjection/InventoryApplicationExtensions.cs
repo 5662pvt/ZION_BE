@@ -2,9 +2,6 @@ using System.Reflection;
 using FluentValidation;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using ZIONShop.Contracts.Orders;
-using ZIONShop.EventBus.DependencyInjection;
-using ZIONShop.Inventory.Application.IntegrationEventHandlers;
 using ZIONShop.Inventory.Application.Services;
 
 namespace ZIONShop.Inventory.Application.DependencyInjection;
@@ -20,9 +17,8 @@ public static class InventoryApplicationExtensions
         services.TryAddSingleton(TimeProvider.System);
         services.AddScoped<ReservationExpiryProcessor>();
 
-        services.AddIntegrationEventHandler<OrderCreatedIntegrationEvent, OrderCreatedIntegrationEventHandler>();
-        services.AddIntegrationEventHandler<OrderConfirmedIntegrationEvent, OrderConfirmedIntegrationEventHandler>();
-        services.AddIntegrationEventHandler<OrderCancelledIntegrationEvent, OrderCancelledIntegrationEventHandler>();
+        // Integration event handlers are registered in InventoryInfrastructureExtensions, since the
+        // inbox-idempotent registration overload needs InventoryDbContext (an Infrastructure type).
 
         return services;
     }

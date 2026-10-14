@@ -25,7 +25,7 @@ public static class CartInfrastructureExtensions
         services.AddScoped<ICartUnitOfWork>(sp => sp.GetRequiredService<CartDbContext>());
         services.AddScoped<ICartReader, CartReader>();
 
-        services.AddIntegrationEventHandler<OrderCreatedIntegrationEvent, OrderCreatedClearCartHandler>();
+        services.AddIntegrationEventHandler<OrderCreatedIntegrationEvent, OrderCreatedClearCartHandler, CartDbContext>();
 
         return services;
     }

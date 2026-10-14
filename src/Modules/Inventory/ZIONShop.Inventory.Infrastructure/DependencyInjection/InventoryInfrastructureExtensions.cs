@@ -2,8 +2,11 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using ZIONShop.Contracts.Inventory;
+using ZIONShop.Contracts.Orders;
+using ZIONShop.EventBus.DependencyInjection;
 using ZIONShop.EventBus.Outbox;
 using ZIONShop.Inventory.Application.Interfaces;
+using ZIONShop.Inventory.Application.IntegrationEventHandlers;
 using ZIONShop.Inventory.Domain.Repositories;
 using ZIONShop.Inventory.Infrastructure.BackgroundServices;
 using ZIONShop.Inventory.Infrastructure.Outbox;
@@ -31,6 +34,10 @@ public static class InventoryInfrastructureExtensions
 
         services.AddOutbox<InventoryDbContext>();
         services.AddHostedService<ReservationExpiryBackgroundService>();
+
+        services.AddIntegrationEventHandler<OrderCreatedIntegrationEvent, OrderCreatedIntegrationEventHandler, InventoryDbContext>();
+        services.AddIntegrationEventHandler<OrderConfirmedIntegrationEvent, OrderConfirmedIntegrationEventHandler, InventoryDbContext>();
+        services.AddIntegrationEventHandler<OrderCancelledIntegrationEvent, OrderCancelledIntegrationEventHandler, InventoryDbContext>();
 
         return services;
     }

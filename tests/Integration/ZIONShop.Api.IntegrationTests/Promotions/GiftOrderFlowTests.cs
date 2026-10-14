@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Http.Json;
 using ZIONShop.Api.IntegrationTests.Infrastructure;
 using static ZIONShop.Api.IntegrationTests.Checkout.CheckoutTestHelpers;
 using static ZIONShop.Api.IntegrationTests.Promotions.PromotionsTestHelpers;
@@ -96,13 +97,14 @@ public class GiftOrderFlowTests
     }
 
     [Fact]
-    public async Task PlaceOrder_Should_CancelImmediately_AndReleaseGiftUsage_When_PaidProductReservationFails()
+    public async Task PlaceOrder_Should_Return409InsufficientStock_And_LeaveGiftUsageAndCartUntouched_When_PaidProductNeverStocked()
     {
         var admin = await AdminClientAsync();
         var (paidProductId, _) = await CreatePublishedProductAsync(admin, price: 70000m);
         var (giftProductId, _) = await CreatePublishedProductAsync(admin, price: 5000m);
-        // paidProductId is never stocked, so it stays at 0 available and the reservation fails outright.
+        // paidProductId is never stocked, so it stays at 0 available and the synchronous stock pre-check rejects it.
         await AdjustStockAsync(admin, giftProductId, 10);
+        var paidProductName = await GetProductNameAsync(admin, paidProductId);
 
         var promotion = await CreatePromotionAsync(
             admin, type: "Gift", scope: "Order", minOrderSubtotal: 70000m,
@@ -111,14 +113,21 @@ public class GiftOrderFlowTests
 
         var (customer, addressId, _) = await CreateCustomerWithAddressAsync(_factory);
         await AddToCartAsync(customer, paidProductId, 1);
-        var placed = await PlaceOrderAsync(customer, addressId, "COD");
+        var ordersBefore = await GetMyOrdersCountAsync(customer);
 
-        // Reservation failure releases coupon/gift usage inline (InventoryReservationFailedIntegrationEventHandler),
-        // not via the 30-minute StaleReservationReleaseProcessor, so a short timeout is enough here.
-        var cancelled = await WaitForOrderStatusAsync(customer, placed.Id, "Cancelled", TimeSpan.FromSeconds(10));
-        cancelled.CancelReason.Should().Contain("Hết hàng");
+        var response = await PlaceOrderRawAsync(customer, addressId, "COD");
 
-        await WaitForPromotionUsedCountAsync(admin, promotion.Id, 0, TimeSpan.FromSeconds(10));
+        response.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        var envelope = await response.Content.ReadFromJsonAsync<ApiEnvelope<object>>(ApiEnvelopeJson.Options);
+        envelope!.Errors.Should().ContainSingle(e => e.Code == "Orders.InsufficientStock" && e.Message!.Contains(paidProductName));
+
+        (await GetMyOrdersCountAsync(customer)).Should().Be(ordersBefore);
+
+        var promotionAfter = await GetPromotionByIdAsync(admin, promotion.Id);
+        promotionAfter.UsedCount.Should().Be(0);
+
+        var cart = await GetCartAsync(customer);
+        cart.Items.Should().ContainSingle(i => i.ProductId == paidProductId && i.Quantity == 1);
     }
 
     [Fact]
@@ -156,5 +165,23 @@ public class GiftOrderFlowTests
         await WaitForOrderStatusAsync(customer, placed.Id, "Confirmed");
         await WaitForPromotionUsedCountAsync(admin, orderScopePromotion.Id, 1);
         await WaitForPromotionUsedCountAsync(admin, productsScopePromotion.Id, 1);
+    }
+
+    private sealed record ProductNameData(string Name);
+
+    private static async Task<string> GetProductNameAsync(HttpClient admin, Guid productId)
+    {
+        var response = await admin.GetAsync($"/api/v1/products/{productId}");
+        response.EnsureSuccessStatusCode();
+        var envelope = await response.Content.ReadFromJsonAsync<ApiEnvelope<ProductNameData>>(ApiEnvelopeJson.Options);
+        return envelope!.Data!.Name;
+    }
+
+    private static async Task<int> GetMyOrdersCountAsync(HttpClient customer)
+    {
+        var response = await customer.GetAsync("/api/v1/orders/mine?page=1&pageSize=50");
+        response.EnsureSuccessStatusCode();
+        var envelope = await response.Content.ReadFromJsonAsync<ApiEnvelope<List<object>>>(ApiEnvelopeJson.Options);
+        return envelope!.Pagination!.TotalCount;
     }
 }

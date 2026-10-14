@@ -1,5 +1,6 @@
 using FluentValidation;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using System.Reflection;
 using ZIONShop.Contracts.Orders;
 using ZIONShop.Orders.Application.Services;
@@ -14,6 +15,7 @@ public static class OrdersApplicationExtensions
         services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(assembly));
         services.AddValidatorsFromAssembly(assembly, includeInternalTypes: true);
         services.AddScoped<IShippingFeeCalculator, ShippingFeeCalculator>();
+        services.TryAddSingleton(TimeProvider.System);
         return services;
     }
 }

@@ -85,6 +85,7 @@
   </Folder>
   <Folder Name="/tests/Integration/">
     <Project Path="tests/Integration/ZIONShop.Api.IntegrationTests/ZIONShop.Api.IntegrationTests.csproj" />
+    <Project Path="tests/Integration/ZIONShop.EventBus.IntegrationTests/ZIONShop.EventBus.IntegrationTests.csproj" />
   </Folder>
   <Folder Name="/tests/Architecture/">
     <Project Path="tests/Architecture/ZIONShop.ArchitectureTests/ZIONShop.ArchitectureTests.csproj" />

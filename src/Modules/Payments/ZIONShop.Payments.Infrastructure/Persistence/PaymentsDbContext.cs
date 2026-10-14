@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using ZIONShop.EventBus.Abstractions;
+using ZIONShop.EventBus.Inbox;
 using ZIONShop.EventBus.Outbox;
 using ZIONShop.Payments.Application.Interfaces;
 using ZIONShop.Payments.Domain.Entities;
@@ -26,6 +27,7 @@ public class PaymentsDbContext : DbContext, IPaymentsUnitOfWork
         modelBuilder.HasDefaultSchema(Schema);
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(PaymentsDbContext).Assembly);
         modelBuilder.AddOutbox(Schema);
+        modelBuilder.AddInbox(Schema);
     }
 
     public void AddOutboxEvent(IntegrationEvent @event) => _outbox.Add(@event);

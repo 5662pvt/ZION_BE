@@ -1,7 +1,4 @@
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
-using RabbitMQ.Client;
-using System.Text;
 using System.Text.Json;
 using ZIONShop.EventBus.Abstractions;
 
@@ -9,40 +6,28 @@ namespace ZIONShop.EventBus.RabbitMq;
 
 public class RabbitMqEventBus : IEventBus
 {
-    private readonly RabbitMqConnection _connection;
-    private readonly RabbitMqOptions _options;
+    private readonly RabbitMqPublisher _publisher;
     private readonly ILogger<RabbitMqEventBus> _logger;
 
-    public RabbitMqEventBus(RabbitMqConnection connection, IOptions<RabbitMqOptions> options, ILogger<RabbitMqEventBus> logger)
+    public RabbitMqEventBus(RabbitMqPublisher publisher, ILogger<RabbitMqEventBus> logger)
     {
-        _connection = connection;
-        _options = options.Value;
+        _publisher = publisher;
         _logger = logger;
     }
 
-    public Task PublishAsync<TEvent>(TEvent @event, CancellationToken cancellationToken = default) where TEvent : IntegrationEvent
+    public async Task PublishAsync<TEvent>(TEvent @event, CancellationToken cancellationToken = default) where TEvent : IntegrationEvent
     {
         var routingKey = typeof(TEvent).Name;
+        var body = JsonSerializer.SerializeToUtf8Bytes<object>(@event);
         try
         {
-            using var channel = _connection.GetConnection().CreateModel();
-            channel.ExchangeDeclare(_options.Exchange, ExchangeType.Topic, durable: true);
-
-            var body = Encoding.UTF8.GetBytes(JsonSerializer.Serialize<object>(@event));
-
-            var props = channel.CreateBasicProperties();
-            props.Persistent = true;
-            props.MessageId = @event.EventId.ToString();
-            props.Type = routingKey;
-
-            channel.BasicPublish(_options.Exchange, routingKey, props, body);
-            _logger.LogInformation("Published {EventType} to {Exchange}/{RoutingKey}", routingKey, _options.Exchange, routingKey);
+            await _publisher.PublishEventAsync(routingKey, @event.EventId.ToString(), body, cancellationToken);
+            _logger.LogInformation("Published {EventType} (EventId {EventId}), confirmed by broker", routingKey, @event.EventId);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to publish {EventType}; rethrowing so the outbox can retry", routingKey);
+            _logger.LogError(ex, "Failed to publish {EventType} (EventId {EventId}); rethrowing so the outbox can retry", routingKey, @event.EventId);
             throw;
         }
-        return Task.CompletedTask;
     }
 }

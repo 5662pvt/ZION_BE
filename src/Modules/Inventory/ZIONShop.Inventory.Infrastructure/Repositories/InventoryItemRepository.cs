@@ -18,4 +18,13 @@ public class InventoryItemRepository : IInventoryItemRepository
         await _db.InventoryItems.AddAsync(item, cancellationToken);
 
     public IQueryable<InventoryItem> Query() => _db.InventoryItems.AsQueryable();
+
+    public async Task<bool> TryReserveAsync(Guid productId, int quantity, CancellationToken cancellationToken = default)
+    {
+        var rows = await _db.InventoryItems
+            .Where(i => i.ProductId == productId && i.OnHand - i.Reserved >= quantity)
+            .ExecuteUpdateAsync(setters => setters.SetProperty(i => i.Reserved, i => i.Reserved + quantity), cancellationToken);
+
+        return rows == 1;
+    }
 }

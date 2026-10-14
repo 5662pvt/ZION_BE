@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using MediatR;
 using Microsoft.Extensions.Options;
 using ZIONShop.Contracts.Cart;
@@ -6,21 +7,25 @@ using ZIONShop.Contracts.Orders;
 using ZIONShop.Contracts.Products;
 using ZIONShop.Contracts.Promotions;
 using ZIONShop.Contracts.Users;
-using ZIONShop.Orders.Application.DTOs;
+using ZIONShop.Orders.Application.Exceptions;
 using ZIONShop.Orders.Application.Interfaces;
 using ZIONShop.Orders.Application.Mappings;
 using ZIONShop.Orders.Application.Options;
+using ZIONShop.Orders.Domain.Entities;
 using ZIONShop.Orders.Domain.Exceptions;
 using ZIONShop.Orders.Domain.Repositories;
 using ZIONShop.Orders.Domain.ValueObjects;
 using ZIONShop.SharedKernel.Results;
+using ContractsOrderLine = ZIONShop.Contracts.Orders.OrderLine;
 using DomainOrder = ZIONShop.Orders.Domain.Entities.Order;
 using DomainPaymentMethod = ZIONShop.Orders.Domain.Enums.PaymentMethod;
 
 namespace ZIONShop.Orders.Application.Features.PlaceOrder;
 
-public class PlaceOrderCommandHandler : IRequestHandler<PlaceOrderCommand, Result<OrderDto>>
+public class PlaceOrderCommandHandler : IRequestHandler<PlaceOrderCommand, Result<PlaceOrderResult>>
 {
+    private static readonly Regex IdempotencyKeyPattern = new("^[A-Za-z0-9_\\-:.]{1,100}$", RegexOptions.Compiled);
+
     private readonly IOrderRepository _orders;
     private readonly IOrdersUnitOfWork _uow;
     private readonly ICartReader _cartReader;
@@ -30,6 +35,8 @@ public class PlaceOrderCommandHandler : IRequestHandler<PlaceOrderCommand, Resul
     private readonly IGiftPromotionEvaluator _giftPromotions;
     private readonly IStockAvailabilityReader _stockAvailability;
     private readonly IShippingFeeCalculator _shippingFeeCalculator;
+    private readonly IOrderIdempotencyKeyRepository _idempotencyKeys;
+    private readonly TimeProvider _timeProvider;
     private readonly CheckoutOptions _checkout;
 
     public PlaceOrderCommandHandler(
@@ -42,6 +49,8 @@ public class PlaceOrderCommandHandler : IRequestHandler<PlaceOrderCommand, Resul
         IGiftPromotionEvaluator giftPromotions,
         IStockAvailabilityReader stockAvailability,
         IShippingFeeCalculator shippingFeeCalculator,
+        IOrderIdempotencyKeyRepository idempotencyKeys,
+        TimeProvider timeProvider,
         IOptions<CheckoutOptions> checkout)
     {
         _orders = orders;
@@ -53,21 +62,38 @@ public class PlaceOrderCommandHandler : IRequestHandler<PlaceOrderCommand, Resul
         _giftPromotions = giftPromotions;
         _stockAvailability = stockAvailability;
         _shippingFeeCalculator = shippingFeeCalculator;
+        _idempotencyKeys = idempotencyKeys;
+        _timeProvider = timeProvider;
         _checkout = checkout.Value;
     }
 
-    public async Task<Result<OrderDto>> Handle(PlaceOrderCommand request, CancellationToken cancellationToken)
+    public async Task<Result<PlaceOrderResult>> Handle(PlaceOrderCommand request, CancellationToken cancellationToken)
     {
+        var hasIdempotencyKey = !string.IsNullOrEmpty(request.IdempotencyKey);
+        string? fingerprint = null;
+
+        if (hasIdempotencyKey)
+        {
+            if (!IdempotencyKeyPattern.IsMatch(request.IdempotencyKey!))
+                return Result.Failure<PlaceOrderResult>(OrdersErrors.InvalidIdempotencyKey);
+
+            fingerprint = IdempotencyFingerprint.Compute(request.AddressId, request.PaymentMethod, request.Note, request.CouponCode);
+
+            var existingKey = await _idempotencyKeys.GetAsync(request.UserId, request.IdempotencyKey!, cancellationToken);
+            var replay = await TryReplayAsync(existingKey, fingerprint, cancellationToken);
+            if (replay is not null) return replay;
+        }
+
         var cart = await _cartReader.GetForUserAsync(request.UserId, cancellationToken);
         if (cart is null || cart.Lines.Count == 0)
-            return Result.Failure<OrderDto>(OrdersErrors.CartEmpty);
+            return Result.Failure<PlaceOrderResult>(OrdersErrors.CartEmpty);
 
         var address = await _addresses.GetAsync(request.UserId, request.AddressId, cancellationToken);
         if (address is null)
-            return Result.Failure<OrderDto>(OrdersErrors.AddressNotFound);
+            return Result.Failure<PlaceOrderResult>(OrdersErrors.AddressNotFound);
 
         if (!Enum.TryParse<DomainPaymentMethod>(request.PaymentMethod, ignoreCase: true, out var paymentMethod))
-            return Result.Failure<OrderDto>(OrdersErrors.InvalidPaymentMethod);
+            return Result.Failure<PlaceOrderResult>(OrdersErrors.InvalidPaymentMethod);
 
         var lines = new List<(Guid ProductId, string ProductName, decimal UnitPrice, int Quantity)>();
         var unavailable = new List<string>();
@@ -87,7 +113,11 @@ public class PlaceOrderCommandHandler : IRequestHandler<PlaceOrderCommand, Resul
         }
 
         if (unavailable.Count > 0)
-            return Result.Failure<OrderDto>(OrdersErrors.ProductUnavailable(string.Join(", ", unavailable)));
+            return Result.Failure<PlaceOrderResult>(OrdersErrors.ProductUnavailable(string.Join(", ", unavailable)));
+
+        var insufficientStockNames = await GetInsufficientStockProductNamesAsync(lines, cancellationToken);
+        if (insufficientStockNames.Count > 0)
+            return Result.Failure<PlaceOrderResult>(OrdersErrors.InsufficientStock(string.Join(", ", insufficientStockNames)));
 
         var subtotal = lines.Sum(l => l.UnitPrice * l.Quantity);
         var shippingFee = _shippingFeeCalculator.Calculate(subtotal);
@@ -105,7 +135,7 @@ public class PlaceOrderCommandHandler : IRequestHandler<PlaceOrderCommand, Resul
             var couponRequest = new CouponRequest(request.CouponCode!, request.UserId, couponLines, subtotal, shippingFee);
             var (quote, error) = await _promotions.ReserveAsync(couponRequest, order.Id, cancellationToken);
             if (error is not null)
-                return Result.Failure<OrderDto>(OrdersErrors.InvalidCoupon(error.Message));
+                return Result.Failure<PlaceOrderResult>(OrdersErrors.InvalidCoupon(error.Message));
 
             order.ApplyCoupon(quote!.Code, quote.DiscountAmount, quote.DiscountTarget);
         }
@@ -161,11 +191,31 @@ public class PlaceOrderCommandHandler : IRequestHandler<PlaceOrderCommand, Resul
                 order.Id,
                 order.UserId,
                 order.Total,
-                order.Lines.Select(l => new OrderLine(l.ProductId, l.Quantity, l.UnitPrice, l.IsGift)).ToList(),
+                order.Lines.Select(l => new ContractsOrderLine(l.ProductId, l.Quantity, l.UnitPrice, l.IsGift)).ToList(),
                 order.PaymentMethod.ToString(),
                 order.Currency));
 
+            if (hasIdempotencyKey)
+            {
+                var keyRow = OrderIdempotencyKey.Create(
+                    request.UserId, request.IdempotencyKey!, fingerprint!, order.Id, _timeProvider.GetUtcNow().UtcDateTime);
+                _idempotencyKeys.Add(keyRow);
+            }
+
             await _uow.SaveChangesAsync(cancellationToken);
+        }
+        catch (DuplicateIdempotencyKeyException)
+        {
+            // Lost the race on the (UserId, Key) unique index: a concurrent request for the same key already
+            // committed first. Release what we speculatively reserved, then replay the winner's order.
+            if (hasCoupon)
+                await _promotions.ReleaseAsync(order.Id, cancellationToken);
+            if (hasGifts)
+                await _giftPromotions.ReleaseGiftsAsync(order.Id, cancellationToken);
+
+            var winner = await _idempotencyKeys.GetAsync(request.UserId, request.IdempotencyKey!, cancellationToken);
+            var replay = await TryReplayAsync(winner, fingerprint!, cancellationToken);
+            return replay ?? Result.Failure<PlaceOrderResult>(OrdersErrors.IdempotencyKeyReused);
         }
         catch
         {
@@ -176,6 +226,35 @@ public class PlaceOrderCommandHandler : IRequestHandler<PlaceOrderCommand, Resul
             throw;
         }
 
-        return Result.Success(order.ToDto());
+        return Result.Success(new PlaceOrderResult(order.ToDto(), Replayed: false));
+    }
+
+    /// <summary>Returns a replay/conflict result if <paramref name="existingKey"/> already settles this
+    /// Idempotency-Key, or null if the caller should proceed to place a new order.</summary>
+    private async Task<Result<PlaceOrderResult>?> TryReplayAsync(OrderIdempotencyKey? existingKey, string fingerprint, CancellationToken cancellationToken)
+    {
+        if (existingKey is null) return null;
+
+        if (existingKey.RequestHash != fingerprint)
+            return Result.Failure<PlaceOrderResult>(OrdersErrors.IdempotencyKeyReused);
+
+        var existingOrder = await _orders.GetByIdAsync(existingKey.OrderId, cancellationToken);
+        if (existingOrder is null) return Result.Failure<PlaceOrderResult>(OrdersErrors.IdempotencyKeyReused);
+
+        return Result.Success(new PlaceOrderResult(existingOrder.ToDto(), Replayed: true));
+    }
+
+    private async Task<List<string>> GetInsufficientStockProductNamesAsync(
+        List<(Guid ProductId, string ProductName, decimal UnitPrice, int Quantity)> lines,
+        CancellationToken cancellationToken)
+    {
+        var productIds = lines.Select(l => l.ProductId).Distinct().ToList();
+        var available = await _stockAvailability.GetAvailableAsync(productIds, cancellationToken);
+
+        return lines
+            .GroupBy(l => l.ProductId)
+            .Where(g => (available.TryGetValue(g.Key, out var a) ? a : 0) < g.Sum(l => l.Quantity))
+            .Select(g => g.First().ProductName)
+            .ToList();
     }
 }

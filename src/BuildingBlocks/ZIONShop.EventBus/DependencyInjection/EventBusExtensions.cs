@@ -20,6 +20,7 @@ public static class EventBusExtensions
         if (string.Equals(provider, "RabbitMq", StringComparison.OrdinalIgnoreCase))
         {
             services.AddSingleton<RabbitMqConnection>();
+            services.AddSingleton<RabbitMqPublisher>();
             services.AddSingleton<IEventBus, RabbitMqEventBus>();
             services.AddHostedService<RabbitMqConsumerService>();
         }

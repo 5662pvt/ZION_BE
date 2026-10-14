@@ -106,6 +106,30 @@ namespace ZIONShop.Cart.Infrastructure.Persistence.Migrations
                     b.ToTable("CartItems", "cart");
                 });
 
+            modelBuilder.Entity("ZIONShop.EventBus.Inbox.InboxMessage", b =>
+                {
+                    b.Property<Guid>("MessageId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Consumer")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<string>("EventType")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<DateTime>("ProcessedOn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("MessageId", "Consumer");
+
+                    b.HasIndex("ProcessedOn");
+
+                    b.ToTable("inbox_messages", "cart");
+                });
+
             modelBuilder.Entity("ZIONShop.Cart.Domain.Entities.CartItem", b =>
                 {
                     b.HasOne("ZIONShop.Cart.Domain.Entities.Cart", null)

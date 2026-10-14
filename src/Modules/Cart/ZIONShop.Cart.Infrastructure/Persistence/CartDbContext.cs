@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using ZIONShop.Cart.Application.Interfaces;
 using ZIONShop.Cart.Domain.Entities;
+using ZIONShop.EventBus.Inbox;
 using DomainCart = ZIONShop.Cart.Domain.Entities.Cart;
 
 namespace ZIONShop.Cart.Infrastructure.Persistence;
@@ -18,6 +19,7 @@ public class CartDbContext : DbContext, ICartUnitOfWork
     {
         modelBuilder.HasDefaultSchema(Schema);
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(CartDbContext).Assembly);
+        modelBuilder.AddInbox(Schema);
     }
 
     public new Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)

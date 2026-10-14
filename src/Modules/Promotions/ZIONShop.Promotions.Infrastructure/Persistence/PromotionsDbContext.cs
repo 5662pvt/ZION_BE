@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using ZIONShop.EventBus.Abstractions;
+using ZIONShop.EventBus.Inbox;
 using ZIONShop.EventBus.Outbox;
 using ZIONShop.Promotions.Application.Interfaces;
 using ZIONShop.Promotions.Domain.Entities;
@@ -27,6 +28,7 @@ public class PromotionsDbContext : DbContext, IPromotionsUnitOfWork
         modelBuilder.HasDefaultSchema(Schema);
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(PromotionsDbContext).Assembly);
         modelBuilder.AddOutbox(Schema);
+        modelBuilder.AddInbox(Schema);
     }
 
     public void AddOutboxEvent(IntegrationEvent @event) => _outbox.Add(@event);

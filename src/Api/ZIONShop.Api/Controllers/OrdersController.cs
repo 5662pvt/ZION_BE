@@ -11,6 +11,7 @@ using ZIONShop.Orders.Application.Features.GetOrder;
 using ZIONShop.Orders.Application.Features.PlaceOrder;
 using ZIONShop.Orders.Application.Features.SearchOrders;
 using ZIONShop.Orders.Application.Features.ShipOrder;
+using ZIONShop.SharedKernel.Results;
 
 namespace ZIONShop.Api.Controllers;
 
@@ -31,10 +32,18 @@ public class OrdersController : ControllerBase
     private bool IsStaffOrAdmin => _currentUser.Roles.Contains(Roles.Staff) || _currentUser.Roles.Contains(Roles.Admin);
 
     [HttpPost]
-    public async Task<IActionResult> Place([FromBody] PlaceOrderBody body, CancellationToken ct)
+    public async Task<IActionResult> Place(
+        [FromHeader(Name = "Idempotency-Key")] string? idempotencyKey,
+        [FromBody] PlaceOrderBody body,
+        CancellationToken ct)
     {
-        var cmd = new PlaceOrderCommand(_currentUser.UserId!.Value, body.AddressId, body.PaymentMethod, body.Note, body.CouponCode);
-        return (await _mediator.Send(cmd, ct)).ToActionResult("Order placed");
+        var cmd = new PlaceOrderCommand(_currentUser.UserId!.Value, body.AddressId, body.PaymentMethod, body.Note, body.CouponCode, idempotencyKey);
+        var result = await _mediator.Send(cmd, ct);
+
+        if (result.IsFailure) return Result.Failure<object>(result.Errors).ToActionResult("Order placed");
+
+        if (result.Value.Replayed) Response.Headers["Idempotent-Replayed"] = "true";
+        return Result.Success(result.Value.Order).ToActionResult("Order placed");
     }
 
     [HttpGet("mine")]

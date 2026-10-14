@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using ZIONShop.EventBus.Inbox;
 using ZIONShop.Notifications.Application.Interfaces;
 using ZIONShop.Notifications.Domain.Entities;
 
@@ -16,6 +17,7 @@ public class NotificationsDbContext : DbContext, INotificationsUnitOfWork
     {
         modelBuilder.HasDefaultSchema(Schema);
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(NotificationsDbContext).Assembly);
+        modelBuilder.AddInbox(Schema);
     }
 
     public new Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)

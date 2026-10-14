@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Http.Json;
 using ZIONShop.Api.IntegrationTests.Infrastructure;
 using static ZIONShop.Api.IntegrationTests.Checkout.CheckoutTestHelpers;
 
@@ -71,19 +72,24 @@ public class CheckoutFlowTests
     }
 
     [Fact]
-    public async Task Cod_Should_CancelWithOutOfStockReason_And_LeaveStockUnchanged_When_RequestedQuantityExceedsOnHand()
+    public async Task PlaceOrder_Should_Return409InsufficientStock_And_LeaveStockUnchanged_When_RequestedQuantityExceedsOnHand()
     {
         var admin = await AdminClientAsync();
         var (productId, sku) = await CreatePublishedProductAsync(admin);
         await AdjustStockAsync(admin, productId, 1);
+        var productName = await GetProductNameAsync(admin, productId);
 
         var (customer, addressId, _) = await CreateCustomerWithAddressAsync(_factory);
         await AddToCartAsync(customer, productId, 2);
+        var ordersBefore = await GetMyOrdersCountAsync(customer);
 
-        var placed = await PlaceOrderAsync(customer, addressId, "COD");
-        var cancelled = await WaitForOrderStatusAsync(customer, placed.Id, "Cancelled");
+        var response = await PlaceOrderRawAsync(customer, addressId, "COD");
 
-        cancelled.CancelReason.Should().Contain("Hết hàng");
+        response.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        var envelope = await response.Content.ReadFromJsonAsync<ApiEnvelope<object>>(ApiEnvelopeJson.Options);
+        envelope!.Errors.Should().ContainSingle(e => e.Code == "Orders.InsufficientStock" && e.Message!.Contains(productName));
+
+        (await GetMyOrdersCountAsync(customer)).Should().Be(ordersBefore);
 
         var item = await GetInventoryItemBySkuAsync(admin, sku);
         item.OnHand.Should().Be(1);
@@ -225,5 +231,23 @@ public class CheckoutFlowTests
         } while (DateTime.UtcNow < deadline);
 
         throw new TimeoutException($"Order {orderId} did not reach a terminal status within {timeout}. Last observed status: '{last.Status}'.");
+    }
+
+    private sealed record ProductNameData(string Name);
+
+    private static async Task<string> GetProductNameAsync(HttpClient admin, Guid productId)
+    {
+        var response = await admin.GetAsync($"/api/v1/products/{productId}");
+        response.EnsureSuccessStatusCode();
+        var envelope = await response.Content.ReadFromJsonAsync<ApiEnvelope<ProductNameData>>(ApiEnvelopeJson.Options);
+        return envelope!.Data!.Name;
+    }
+
+    private static async Task<int> GetMyOrdersCountAsync(HttpClient customer)
+    {
+        var response = await customer.GetAsync("/api/v1/orders/mine?page=1&pageSize=50");
+        response.EnsureSuccessStatusCode();
+        var envelope = await response.Content.ReadFromJsonAsync<ApiEnvelope<List<object>>>(ApiEnvelopeJson.Options);
+        return envelope!.Pagination!.TotalCount;
     }
 }

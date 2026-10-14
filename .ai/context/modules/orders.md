@@ -67,10 +67,26 @@ Status values: `PendingStock`, `AwaitingPayment`, `Confirmed`, `Paid`, `Shipped`
 Handled by `ZIONShop.Orders.Application.IntegrationEvents.*` (registered in `OrdersInfrastructureExtensions`), all idempotent via domain state-guard (a handler's domain transition fails silently/no-ops if the order is no longer in the expected source state — not via `EventId` dedup):
 
 - `InventoryReserved` → `PendingStock` → `Confirmed` (COD, publishes `OrderConfirmed`) or `AwaitingPayment` (Online).
-- `InventoryReservationFailed` → `PendingStock` → `Cancelled` ("Hết hàng"). No `OrderCancelled` is published — nothing was reserved, so there is nothing to compensate.
+- `InventoryReservationFailed` → `PendingStock` → `Cancelled` ("Hết hàng") + publishes `OrderCancelled` (W11). Inventory/Payments/Promotions also react to `InventoryReservationFailed` directly (nothing was reserved/paid for them to undo), and their `OrderCancelled` handlers are all guarded to no-op when there is nothing left to release, so Notifications seeing both events for the same order is safe — it only emails once, gated on `(EventId, NotificationType)`.
 - `InventoryReservationExpired` → `AwaitingPayment` → `Cancelled` ("Quá hạn thanh toán") + publishes `OrderCancelled`.
 - `PaymentCompleted` → `AwaitingPayment` → `Paid` + publishes `OrderConfirmed`.
 - `PaymentFailed` → `AwaitingPayment` → `Cancelled` ("Thanh toán thất bại") + publishes `OrderCancelled`.
+
+## Idempotency-Key on place order (W11)
+
+`POST /api/v1/orders` accepts an optional `Idempotency-Key` header (1..100 chars, `[A-Za-z0-9_\-:.]`; format enforced in `PlaceOrderCommandHandler`, not the FluentValidation validator — `ValidationBehavior` always prefixes a validator failure code with the property name, so it cannot produce the exact `Orders.InvalidIdempotencyKey` contract code; same reasoning already applied to `PaymentMethod`'s shape check).
+
+- Scope: `(UserId, Key)`, stored in `orders.idempotency_keys` (`OrderIdempotencyKey` entity/`IOrderIdempotencyKeyRepository`), unique index `IX_idempotency_keys_UserId_Key`.
+- Request fingerprint: SHA-256 of `addressId (lower) | paymentMethod (lower) | note (trim, null→"") | couponCode (trim, upper, null→"")` (`IdempotencyFingerprint.Compute`).
+- First request: order + key row saved in the same `SaveChangesAsync`. Same key + same fingerprint again (sequential or concurrent): no new order, 200 with the existing order + response header `Idempotent-Replayed: true`. Same key + different fingerprint: 409 `Orders.IdempotencyKeyReused`.
+- Concurrency: the loser hits the unique `(UserId, Key)` index on save. `OrdersDbContext.SaveChangesAsync` translates that Postgres `23505` into `DuplicateIdempotencyKeyException` (Application-level — Application never references Npgsql); the handler catches it, releases any coupon/gift reservations it had speculatively taken, then re-reads the key row and replays the winner's order (or returns `Orders.IdempotencyKeyReused` if the fingerprint differs).
+- Controller (`OrdersController.Place`) reads the header via `[FromHeader(Name = "Idempotency-Key")]`, passes it on `PlaceOrderCommand`, and sets the `Idempotent-Replayed` response header when the handler reports a replay — the 200 body (`OrderDto`) is unchanged either way.
+
+## Stock pre-check on place order (W11)
+
+Before placing the order (always, regardless of the key), the handler checks `IStockAvailabilityReader.GetAvailableAsync` for every **paid** cart line (gift lines are unaffected — they already have their own drop-if-insufficient check). If available < quantity for any product → 409 `Orders.InsufficientStock` with the unavailable product names, no order created.
+
+This is a **soft** check — the authoritative reservation is still the async Inventory step, so an order can still end up `Cancelled` ("Hết hàng") if stock is depleted by a concurrent order between this check and the real reservation.
 
 `OrderCreated` is also consumed by Cart (`ZIONShop.Cart.Application.IntegrationEvents.OrderCreatedClearCartHandler`) to clear the user's cart once an order is placed.
 

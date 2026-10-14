@@ -28,6 +28,7 @@ public static class OrdersInfrastructureExtensions
         services.Configure<CheckoutOptions>(configuration.GetSection(CheckoutOptions.SectionName));
 
         services.AddScoped<IOrderRepository, OrderRepository>();
+        services.AddScoped<IOrderIdempotencyKeyRepository, OrderIdempotencyKeyRepository>();
         services.AddScoped<IOrdersUnitOfWork>(sp => sp.GetRequiredService<OrdersDbContext>());
         services.AddScoped<IOrderDetailsReader, OrderDetailsReader>();
         services.AddScoped<IOrderReportReader, OrderReportReader>();
@@ -35,11 +36,11 @@ public static class OrdersInfrastructureExtensions
 
         services.AddOutbox<OrdersDbContext>();
 
-        services.AddIntegrationEventHandler<InventoryReservedIntegrationEvent, InventoryReservedIntegrationEventHandler>();
-        services.AddIntegrationEventHandler<InventoryReservationFailedIntegrationEvent, InventoryReservationFailedIntegrationEventHandler>();
-        services.AddIntegrationEventHandler<InventoryReservationExpiredIntegrationEvent, InventoryReservationExpiredIntegrationEventHandler>();
-        services.AddIntegrationEventHandler<PaymentCompletedIntegrationEvent, PaymentCompletedIntegrationEventHandler>();
-        services.AddIntegrationEventHandler<PaymentFailedIntegrationEvent, PaymentFailedIntegrationEventHandler>();
+        services.AddIntegrationEventHandler<InventoryReservedIntegrationEvent, InventoryReservedIntegrationEventHandler, OrdersDbContext>();
+        services.AddIntegrationEventHandler<InventoryReservationFailedIntegrationEvent, InventoryReservationFailedIntegrationEventHandler, OrdersDbContext>();
+        services.AddIntegrationEventHandler<InventoryReservationExpiredIntegrationEvent, InventoryReservationExpiredIntegrationEventHandler, OrdersDbContext>();
+        services.AddIntegrationEventHandler<PaymentCompletedIntegrationEvent, PaymentCompletedIntegrationEventHandler, OrdersDbContext>();
+        services.AddIntegrationEventHandler<PaymentFailedIntegrationEvent, PaymentFailedIntegrationEventHandler, OrdersDbContext>();
 
         return services;
     }

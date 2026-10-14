@@ -1,7 +1,11 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using ZIONShop.Contracts.Inventory;
+using ZIONShop.Contracts.Orders;
+using ZIONShop.EventBus.DependencyInjection;
 using ZIONShop.EventBus.Outbox;
+using ZIONShop.Payments.Application.IntegrationEvents;
 using ZIONShop.Payments.Application.Interfaces;
 using ZIONShop.Payments.Application.Options;
 using ZIONShop.Payments.Domain.Repositories;
@@ -36,6 +40,12 @@ public static class PaymentsInfrastructureExtensions
         services.AddScoped<IPaymentGateway, FakePaymentGateway>();
 
         services.AddOutbox<PaymentsDbContext>();
+
+        services.AddIntegrationEventHandler<OrderCreatedIntegrationEvent, OrderCreatedIntegrationEventHandler, PaymentsDbContext>();
+        services.AddIntegrationEventHandler<InventoryReservedIntegrationEvent, InventoryReservedIntegrationEventHandler, PaymentsDbContext>();
+        services.AddIntegrationEventHandler<OrderCancelledIntegrationEvent, OrderCancelledIntegrationEventHandler, PaymentsDbContext>();
+        services.AddIntegrationEventHandler<InventoryReservationExpiredIntegrationEvent, InventoryReservationExpiredIntegrationEventHandler, PaymentsDbContext>();
+        services.AddIntegrationEventHandler<InventoryReservationFailedIntegrationEvent, InventoryReservationFailedIntegrationEventHandler, PaymentsDbContext>();
 
         return services;
     }

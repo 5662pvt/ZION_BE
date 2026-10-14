@@ -27,6 +27,42 @@ Combine (see [07-database.md](07-database.md)):
 
 **MUST** catch `DbUpdateConcurrencyException` → return **409 Conflict**.
 
+### Reservation path: atomic conditional UPDATE, not xmin + retry
+
+`OrderCreatedIntegrationEventHandler` reserves stock with `IInventoryItemRepository.TryReserveAsync`,
+a single conditional `UPDATE "InventoryItems" SET "Reserved" = "Reserved" + @q WHERE "ProductId" = @p
+AND "OnHand" - "Reserved" >= @q` (EF Core `ExecuteUpdateAsync`), returning whether a row matched. There
+is no read-then-write window, so two concurrent reservations for the same product never race and never
+need a retry loop — the previous design (`item.Reserve()` + xmin-token `SaveChangesAsync`, retried up to
+3× in a fresh `IServiceScopeFactory` scope on conflict) could both falsely cancel an order ("Hết hàng")
+while stock was still available *and* bypass the inbox row added to the handler's own scope (the fresh
+retry scopes used a different `DbContext` instance than the one the `IdempotentIntegrationEventHandler`
+decorator recorded the inbox row on).
+
+Because `ExecuteUpdateAsync` bypasses the EF change tracker, the handler never loads/keeps a tracked
+`InventoryItem` for a product it reserves in the same scope — doing so risks later saving that stale
+tracked instance over the row `TryReserveAsync` just changed directly in the database.
+
+**Transaction boundary.** The handler opens one explicit transaction via
+`IInventoryUnitOfWork.BeginTransactionAsync()` (wraps `IDbContextTransaction` behind
+`IInventoryTransaction`, so Application code never references the EF type) for the whole order: every
+`TryReserveAsync` call enlists in it automatically, as does the final `SaveChangesAsync` that persists
+the new `StockReservation`/`StockMovement` rows, the outbox entry, and — critically — the inbox row the
+`IdempotentIntegrationEventHandler` decorator added on the *same* scoped `DbContext` before calling this
+handler. One commit makes the reservation effect and the inbox row durable together; one failed product
+rolls the whole transaction back (undoing every `TryReserveAsync` applied so far for that order), after
+which a fresh, non-transactional `SaveChangesAsync` persists just the failure outbox entry.
+
+**Lock ordering.** Multi-product orders process their product groups sorted by `ProductId`, so two
+concurrent orders that share two products always acquire row locks in the same order — avoiding a
+Postgres deadlock (`40P01`) between them.
+
+**Why not a Redis lock for this path**: an external lock only protects callers that remember to take it;
+a DB-level conditional UPDATE is enforced by Postgres itself for every writer, including anything that
+bypasses the lock by accident, and needs no extra infrastructure/TTL-expiry bookkeeping. Redis locks stay
+useful for coordinating non-transactional, cross-service work — not for a single conditional row update
+that Postgres can already make atomic.
+
 ## Integration events
 
 - Consumes: `OrderCreatedIntegrationEvent` (reserve)

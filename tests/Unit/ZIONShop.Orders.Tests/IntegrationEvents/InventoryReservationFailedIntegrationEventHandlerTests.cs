@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using ZIONShop.Contracts.Inventory;
+using ZIONShop.EventBus.Outbox;
 using ZIONShop.Orders.Application.IntegrationEvents;
 using ZIONShop.Orders.Domain.Entities;
 using ZIONShop.Orders.Domain.Enums;
@@ -44,6 +45,34 @@ public class InventoryReservationFailedIntegrationEventHandlerTests
         var reloaded = await orders.GetByIdAsync(order.Id);
         reloaded!.Status.Should().Be(OrderStatus.Cancelled);
         reloaded.CancelReason.Should().Be("Hết hàng");
+    }
+
+    [Fact]
+    public async Task HandleAsync_Should_PublishOrderCancelledEvent_When_PendingStock()
+    {
+        var (db, orders) = BuildScope();
+        var order = await SeedOrderAsync(db, orders);
+
+        var handler = new InventoryReservationFailedIntegrationEventHandler(orders, db);
+        await handler.HandleAsync(new InventoryReservationFailedIntegrationEvent(order.Id, "Hết hàng", new[] { order.Lines.First().ProductId }));
+
+        var outboxed = await db.Set<OutboxMessage>().ToListAsync();
+        outboxed.Should().ContainSingle(m => m.Type.Contains("OrderCancelledIntegrationEvent"));
+    }
+
+    [Fact]
+    public async Task HandleAsync_Should_NotPublishOrderCancelledEvent_When_AlreadyProcessed()
+    {
+        var (db, orders) = BuildScope();
+        var order = await SeedOrderAsync(db, orders);
+        var handler = new InventoryReservationFailedIntegrationEventHandler(orders, db);
+        var @event = new InventoryReservationFailedIntegrationEvent(order.Id, "Hết hàng", Array.Empty<Guid>());
+
+        await handler.HandleAsync(@event);
+        await handler.HandleAsync(@event); // second call is a no-op: order no longer PendingStock
+
+        var outboxed = await db.Set<OutboxMessage>().ToListAsync();
+        outboxed.Should().ContainSingle(m => m.Type.Contains("OrderCancelledIntegrationEvent"));
     }
 
     [Fact]
