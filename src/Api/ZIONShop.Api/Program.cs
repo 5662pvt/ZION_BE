@@ -178,7 +178,8 @@ builder.Services.AddRateLimiter(opts =>
     opts.AddPolicy("auth", httpContext =>
     {
         var limits = httpContext.RequestServices.GetRequiredService<IOptions<RateLimitingOptions>>().Value;
-        return RateLimitPartition.GetFixedWindowLimiter("auth", _ => new FixedWindowRateLimiterOptions
+        var key = AuthRateLimitKeyResolver.GetPartitionKey(httpContext);
+        return RateLimitPartition.GetFixedWindowLimiter(key, _ => new FixedWindowRateLimiterOptions
         {
             Window = TimeSpan.FromSeconds(limits.WindowSeconds),
             PermitLimit = limits.AuthPermitLimit,

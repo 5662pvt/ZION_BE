@@ -1,7 +1,10 @@
 using System.Net;
 using System.Net.Http.Json;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using ZIONShop.Api.IntegrationTests.Infrastructure;
 using static ZIONShop.Api.IntegrationTests.Checkout.CheckoutTestHelpers;
 
@@ -34,6 +37,79 @@ public class RateLimitingTests
 
     private static HttpClient CreateLowLimitClient(ApiFactory factory, int checkoutLimit, int searchLimit)
         => CreateLowLimitFactory(factory, checkoutLimit, searchLimit).CreateClient();
+
+    /// <summary>
+    /// TestServer leaves HttpContext.Connection.RemoteIpAddress null for every request (there is no
+    /// real socket), which the "auth" partition key treats as a single shared "ip:unknown" bucket --
+    /// unusable for proving per-IP isolation. This filter runs as the outermost middleware (startup
+    /// filters wrap the app's own Program.cs pipeline, so it executes before UseRateLimiter) and lets
+    /// each test HttpClient claim a distinct simulated IP via a test-only header, without touching the
+    /// app's own forwarded-header handling (there is none -- Program.cs reads RemoteIpAddress directly).
+    /// </summary>
+    private sealed class SimulatedClientIpStartupFilter : IStartupFilter
+    {
+        public const string HeaderName = "X-Test-Client-Ip";
+
+        public Action<IApplicationBuilder> Configure(Action<IApplicationBuilder> next) => app =>
+        {
+            app.Use(async (context, nextMiddleware) =>
+            {
+                if (context.Request.Headers.TryGetValue(HeaderName, out var ip) &&
+                    System.Net.IPAddress.TryParse(ip.ToString(), out var parsed))
+                {
+                    context.Connection.RemoteIpAddress = parsed;
+                }
+                await nextMiddleware();
+            });
+            next(app);
+        };
+    }
+
+    private static WebApplicationFactory<Program> CreateAuthLowLimitFactory(ApiFactory factory, int authLimit)
+        => factory.WithWebHostBuilder(builder =>
+        {
+            builder.ConfigureAppConfiguration((_, config) => config.AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["RateLimiting:AuthPermitLimit"] = authLimit.ToString(),
+            }));
+            builder.ConfigureServices(services =>
+                services.AddSingleton<IStartupFilter, SimulatedClientIpStartupFilter>());
+        });
+
+    private static HttpClient CreateSimulatedIpClient(WebApplicationFactory<Program> factory, string simulatedIp)
+    {
+        var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Add(SimulatedClientIpStartupFilter.HeaderName, simulatedIp);
+        return client;
+    }
+
+    [Fact]
+    public async Task Login_Should_RateLimitPerIp_NotGlobally_When_TwoClientsHaveDifferentIps()
+    {
+        // Both clients are built from the SAME low-limit factory/host (same in-memory rate limiter
+        // instance) but carry different simulated remote IPs -- this is what distinguishes true
+        // per-IP partitioning from the old bug where every client shared one hardcoded "auth" key.
+        var authLowLimitFactory = CreateAuthLowLimitFactory(_factory, authLimit: 2);
+        var clientA = CreateSimulatedIpClient(authLowLimitFactory, "10.0.0.1");
+        var clientB = CreateSimulatedIpClient(authLowLimitFactory, "10.0.0.2");
+
+        var aFirst = await clientA.LoginAsync("nobody-a@zionshop.local", "wrong-password");
+        var aSecond = await clientA.LoginAsync("nobody-a@zionshop.local", "wrong-password");
+        var bFirst = await clientB.LoginAsync("nobody-b@zionshop.local", "wrong-password");
+        var bSecond = await clientB.LoginAsync("nobody-b@zionshop.local", "wrong-password");
+
+        // With the old shared "auth" partition key, bFirst (the 3rd request overall) would already
+        // have been rejected -- a normal customer blocked purely because a different client (IP) was
+        // active in the same 60s window.
+        aFirst.StatusCode.Should().NotBe(HttpStatusCode.TooManyRequests);
+        aSecond.StatusCode.Should().NotBe(HttpStatusCode.TooManyRequests);
+        bFirst.StatusCode.Should().NotBe(HttpStatusCode.TooManyRequests);
+        bSecond.StatusCode.Should().NotBe(HttpStatusCode.TooManyRequests);
+
+        // Each IP still has its own cap -- a 3rd request from the SAME IP is still throttled.
+        var aThird = await clientA.LoginAsync("nobody-a@zionshop.local", "wrong-password");
+        aThird.StatusCode.Should().Be(HttpStatusCode.TooManyRequests);
+    }
 
     [Fact]
     public async Task Checkout_Should_Return429_OnThirdRequestWithinWindow_And_LeaveOtherEndpointsUnaffected()

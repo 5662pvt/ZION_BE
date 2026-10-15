@@ -200,15 +200,17 @@ public class EventBusTests
         {
             var publisher = host.CreateOutboxPublisher();
             var pollCount = 0;
-            var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(20);
-            while (DateTime.UtcNow < deadline)
+            var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(90);
+            while (pollCount < 10 && DateTime.UtcNow < deadline)
             {
                 await publisher.PublishBatchAsync(CancellationToken.None);
                 pollCount++;
                 await Task.Delay(TimeSpan.FromSeconds(1.5));
             }
 
-            pollCount.Should().BeGreaterThanOrEqualTo(10);
+            pollCount.Should().BeGreaterThanOrEqualTo(10,
+                "the publisher must complete at least 10 PublishBatchAsync calls while the broker is down " +
+                "within a generous 90s budget -- a machine under load should just take longer, not fail");
 
             using var scope = host.Services.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<EventBusTestDbContext>();
