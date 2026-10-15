@@ -60,6 +60,8 @@ dotnet test ZIONShop.slnx
 docker compose -f deploy/docker-compose.yml up -d --build api
 ```
 
+Aspire Dashboard (traces/metrics/logs, opt-in via `OTEL_EXPORTER_OTLP_ENDPOINT`): <http://localhost:18888> — see `docs/observability.md`.
+
 ```powershell
 cd ../ZION_FE
 npm run lint

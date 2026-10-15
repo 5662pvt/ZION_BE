@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.DependencyInjection;
@@ -7,6 +8,7 @@ using Microsoft.Extensions.Options;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
 using ZIONShop.EventBus.Abstractions;
+using ZIONShop.EventBus.Diagnostics;
 using ZIONShop.EventBus.Registry;
 
 namespace ZIONShop.EventBus.RabbitMq;
@@ -15,6 +17,7 @@ public class RabbitMqConsumerService : BackgroundService
 {
     private const string RetryCountHeader = "x-retry-count";
     private static readonly TimeSpan MaxReconnectDelay = TimeSpan.FromSeconds(30);
+    private static readonly TimeSpan QueueMetricsRefreshInterval = TimeSpan.FromSeconds(15);
 
     private readonly RabbitMqConnection _connection;
     private readonly RabbitMqOptions _options;
@@ -43,14 +46,64 @@ public class RabbitMqConsumerService : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        _stoppingToken = stoppingToken;
+
+        // Fire-and-forget: this loop owns its own cadence/error handling (it never throws) and must
+        // keep refreshing queue depth regardless of whether this instance ends up consuming anything.
+        _ = RefreshQueueMetricsLoopAsync(stoppingToken);
+
         if (_registry.RegisteredTypes.Count == 0)
         {
             _logger.LogInformation("No integration event handlers registered; RabbitMQ consumer stays idle.");
             return;
         }
 
-        _stoppingToken = stoppingToken;
         await StartConsumingWithRetryAsync(stoppingToken);
+    }
+
+    /// <summary>Refreshes <c>rabbitmq.queue.messages</c> (tags <c>queue=main|dlq</c>) every
+    /// <see cref="QueueMetricsRefreshInterval"/> using a passive declare on its own short-lived
+    /// channel, so it never competes with the consumer's own channel/consumer tag. Silently skips a
+    /// tick if the broker or queue is unavailable -- that is itself useful information (reflected by
+    /// the gauge simply not advancing), not a reason to log or crash.</summary>
+    private async Task RefreshQueueMetricsLoopAsync(CancellationToken stoppingToken)
+    {
+        while (!stoppingToken.IsCancellationRequested)
+        {
+            if (_connection.TryGetConnection(out var connection))
+            {
+                TryUpdateQueueDepth(connection, _options.QueueName, "main");
+                TryUpdateQueueDepth(connection, RabbitMqTopology.DeadLetterQueueName(_options.QueueName), "dlq");
+            }
+
+            try
+            {
+                await Task.Delay(QueueMetricsRefreshInterval, stoppingToken);
+            }
+            catch (OperationCanceledException)
+            {
+                return;
+            }
+        }
+    }
+
+    private static void TryUpdateQueueDepth(IConnection connection, string queueName, string queueTag)
+    {
+        IModel? channel = null;
+        try
+        {
+            channel = connection.CreateModel();
+            var result = channel.QueueDeclarePassive(queueName);
+            MessagingDiagnostics.SetQueueMessages(queueTag, result.MessageCount);
+        }
+        catch
+        {
+            // Queue not declared yet, or the broker hiccuped -- skip this tick silently, retry next one.
+        }
+        finally
+        {
+            try { channel?.Dispose(); } catch { /* a failed passive declare already closed it */ }
+        }
     }
 
     /// <summary>
@@ -157,6 +210,7 @@ public class RabbitMqConsumerService : BackgroundService
             _logger.LogWarning(
                 "No registered type for '{TypeName}' (routing key {RoutingKey}, MessageId {MessageId}); dead-lettering",
                 resolvedTypeName, args.RoutingKey, args.BasicProperties?.MessageId);
+            MessagingDiagnostics.DeadLettered.Add(1, new KeyValuePair<string, object?>("event.type", resolvedTypeName));
             TryNack(args.DeliveryTag, requeue: false);
             return;
         }
@@ -173,9 +227,27 @@ public class RabbitMqConsumerService : BackgroundService
             _logger.LogWarning(ex,
                 "Poison message for '{TypeName}' (MessageId {MessageId}); dead-lettering without retry",
                 resolvedTypeName, args.BasicProperties?.MessageId);
+            MessagingDiagnostics.DeadLettered.Add(1, new KeyValuePair<string, object?>("event.type", resolvedTypeName));
             TryNack(args.DeliveryTag, requeue: false);
             return;
         }
+
+        var attempt = GetRetryCount(args.BasicProperties) + 1;
+        var parentContext = MessagingDiagnostics.ExtractParentContext(args.BasicProperties?.Headers);
+
+        // Kept current for the whole method body -- including through HandleFailureAsync below -- so a
+        // retry-queue republish (via RabbitMqPublisher) picks it up as Activity.Current and keeps the
+        // same TraceId as this delivery.
+        using var activity = MessagingDiagnostics.ActivitySource.StartActivity(
+            $"{resolvedTypeName} process", ActivityKind.Consumer, parentContext);
+        activity?.SetTag("messaging.system", "rabbitmq");
+        activity?.SetTag("messaging.destination.name", _options.QueueName);
+        activity?.SetTag("messaging.operation", "process");
+        activity?.SetTag("messaging.message.id", args.BasicProperties?.MessageId);
+        activity?.SetTag("event.type", resolvedTypeName);
+        activity?.SetTag("retry.attempt", attempt);
+
+        using var logScope = IntegrationEventLogScope.Begin(_logger, @event.EventId, resolvedTypeName, @event);
 
         // Run every registered handler for this event type, even if an earlier one throws, so a failing
         // handler never prevents the others from applying their effect on this delivery -- a handler that
@@ -191,15 +263,28 @@ public class RabbitMqConsumerService : BackgroundService
 
             foreach (var handler in handlers)
             {
+                var handlerName = handler is not null ? MessagingDiagnostics.ResolveHandlerName(handler) : "Unknown";
+                using var handlerActivity = MessagingDiagnostics.ActivitySource.StartActivity(handlerName, ActivityKind.Internal);
+                handlerActivity?.SetTag("messaging.message.id", args.BasicProperties?.MessageId);
+                handlerActivity?.SetTag("retry.attempt", attempt);
+
+                var stopwatch = Stopwatch.StartNew();
                 try
                 {
                     await (Task)handleMethod.Invoke(handler, new object[] { @event, CancellationToken.None })!;
+                    RecordHandlerDuration(stopwatch, resolvedTypeName, handlerName, "success");
                 }
                 catch (Exception ex)
                 {
+                    RecordHandlerDuration(stopwatch, resolvedTypeName, handlerName, "failure");
+                    MessagingDiagnostics.RecordException(handlerActivity, ex);
+                    MessagingDiagnostics.HandlerFailed.Add(1,
+                        new KeyValuePair<string, object?>("event.type", resolvedTypeName),
+                        new KeyValuePair<string, object?>("consumer", handlerName));
+
                     _logger.LogError(ex,
                         "Handler {Handler} failed for {EventType} (MessageId {MessageId})",
-                        handler?.GetType().Name, resolvedTypeName, args.BasicProperties?.MessageId);
+                        handlerName, resolvedTypeName, args.BasicProperties?.MessageId);
                     failure ??= ex;
                 }
             }
@@ -211,11 +296,22 @@ public class RabbitMqConsumerService : BackgroundService
 
         if (failure is not null)
         {
+            MessagingDiagnostics.RecordException(activity, failure);
             await HandleFailureAsync(args, resolvedTypeName, failure);
             return;
         }
 
+        MessagingDiagnostics.Consumed.Add(1, new KeyValuePair<string, object?>("event.type", resolvedTypeName));
         TryAck(args.DeliveryTag);
+    }
+
+    private static void RecordHandlerDuration(Stopwatch stopwatch, string eventType, string handlerName, string outcome)
+    {
+        stopwatch.Stop();
+        MessagingDiagnostics.HandlerDuration.Record(stopwatch.Elapsed.TotalMilliseconds,
+            new KeyValuePair<string, object?>("event.type", eventType),
+            new KeyValuePair<string, object?>("consumer", handlerName),
+            new KeyValuePair<string, object?>("outcome", outcome));
     }
 
     private async Task HandleFailureAsync(BasicDeliverEventArgs args, string typeName, Exception ex)
@@ -229,6 +325,7 @@ public class RabbitMqConsumerService : BackgroundService
             _logger.LogWarning(
                 "Message {MessageId} ({TypeName}) exceeded retry count {RetryCount}; dead-lettering",
                 args.BasicProperties?.MessageId, typeName, _options.RetryCount);
+            MessagingDiagnostics.DeadLettered.Add(1, new KeyValuePair<string, object?>("event.type", typeName));
             TryNack(args.DeliveryTag, requeue: false);
             return;
         }
@@ -236,7 +333,9 @@ public class RabbitMqConsumerService : BackgroundService
         try
         {
             var messageId = args.BasicProperties?.MessageId ?? Guid.NewGuid().ToString();
-            await _publisher.PublishToRetryQueueAsync(attempt, messageId, typeName, args.Body.ToArray(), ex.Message, CancellationToken.None);
+            await _publisher.PublishToRetryQueueAsync(attempt, messageId, typeName, args.Body.ToArray(), ex.Message,
+                args.BasicProperties?.Headers, CancellationToken.None);
+            MessagingDiagnostics.Retried.Add(1, new KeyValuePair<string, object?>("event.type", typeName));
             TryAck(args.DeliveryTag);
         }
         catch (Exception republishEx)

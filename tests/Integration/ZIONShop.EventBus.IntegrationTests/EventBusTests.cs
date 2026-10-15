@@ -1,4 +1,6 @@
+using System.Collections.Concurrent;
 using System.Diagnostics;
+using System.Diagnostics.Metrics;
 using System.Text;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -6,6 +8,7 @@ using Microsoft.Extensions.Logging;
 using RabbitMQ.Client;
 using ZIONShop.EventBus.Abstractions;
 using ZIONShop.EventBus.DependencyInjection;
+using ZIONShop.EventBus.Diagnostics;
 using ZIONShop.EventBus.Inbox;
 using ZIONShop.EventBus.IntegrationTests.Infrastructure;
 using ZIONShop.EventBus.Outbox;
@@ -382,5 +385,233 @@ public class EventBusTests
         (await verifyDb.Effects.CountAsync(e => e.Name == "SecondHandler")).Should().Be(1); // not re-run on retry
         (await verifyDb.Effects.CountAsync(e => e.Name == "FirstHandler")).Should().Be(1);
         (await verifyDb.Set<InboxMessage>().CountAsync(m => m.MessageId == @event.EventId)).Should().Be(2); // one row per consumer
+    }
+
+    [Fact]
+    public async Task PublishBatchAsync_Should_CarryTraceParentHeaderOntoTheQueuedMessage_When_OutboxRowHasATraceContext()
+    {
+        await using var host = await EventBusTestHost.CreateAsync(_containers.RabbitMq, _containers.Postgres);
+
+        using var listener = new ActivityListener
+        {
+            ShouldListenTo = source => source.Name == MessagingDiagnostics.SourceName,
+            Sample = (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllData
+        };
+        ActivitySource.AddActivityListener(listener);
+
+        var parentActivity = new Activity("test-parent").Start();
+        try
+        {
+            using var scope = host.Services.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<EventBusTestDbContext>();
+            var outbox = scope.ServiceProvider.GetRequiredService<IOutbox<EventBusTestDbContext>>();
+            outbox.Add(new TestIntegrationEvent("traced"));
+            await db.SaveChangesAsync();
+        }
+        finally
+        {
+            parentActivity.Stop();
+        }
+
+        var publisher = host.CreateOutboxPublisher();
+        await publisher.PublishBatchAsync(CancellationToken.None);
+
+        using var channel = host.OpenRawChannel();
+        BasicGetResult? result = null;
+        await WaitUntilAsync(() =>
+        {
+            result = channel.BasicGet(host.Options.QueueName, autoAck: true);
+            return result is not null;
+        }, TimeSpan.FromSeconds(10));
+
+        result.Should().NotBeNull();
+        result!.BasicProperties.Headers.Should().ContainKey("traceparent");
+        var traceParent = Encoding.UTF8.GetString((byte[])result.BasicProperties.Headers!["traceparent"]);
+        ActivityContext.TryParse(traceParent, null, out var context).Should().BeTrue();
+        context.TraceId.Should().Be(parentActivity.TraceId);
+    }
+
+    [Fact]
+    public async Task Consumer_Should_ShareTraceId_WithThePublisherAndEachHandler_When_ProcessingADelivery()
+    {
+        var spans = new ConcurrentBag<Activity>();
+        await using var host = await EventBusTestHost.CreateAsync(_containers.RabbitMq, _containers.Postgres);
+
+        using var listener = new ActivityListener
+        {
+            ShouldListenTo = source => source.Name == MessagingDiagnostics.SourceName,
+            Sample = (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllData,
+            ActivityStopped = spans.Add
+        };
+        ActivitySource.AddActivityListener(listener);
+        await host.StartConsumerAsync();
+
+        var parentActivity = new Activity("test-parent").Start();
+        try
+        {
+            using var scope = host.Services.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<EventBusTestDbContext>();
+            var outbox = scope.ServiceProvider.GetRequiredService<IOutbox<EventBusTestDbContext>>();
+            outbox.Add(new TestIntegrationEvent("shared-trace"));
+            await db.SaveChangesAsync();
+        }
+        finally
+        {
+            parentActivity.Stop();
+        }
+
+        var publisher = host.CreateOutboxPublisher();
+        await publisher.PublishBatchAsync(CancellationToken.None);
+
+        await WaitUntilAsync(
+            () => spans.Any(a => a.OperationName.EndsWith("process", StringComparison.Ordinal)),
+            TimeSpan.FromSeconds(10));
+        await WaitUntilAsync(
+            () => spans.Any(a => a.OperationName == nameof(TestIntegrationEventHandler)),
+            TimeSpan.FromSeconds(10));
+
+        var publishSpan = spans.Should().ContainSingle(a => a.OperationName.EndsWith("publish", StringComparison.Ordinal)).Subject;
+        var processSpan = spans.Should().ContainSingle(a => a.OperationName.EndsWith("process", StringComparison.Ordinal)).Subject;
+        var handlerSpan = spans.Should().ContainSingle(a => a.OperationName == nameof(TestIntegrationEventHandler)).Subject;
+
+        publishSpan.TraceId.Should().Be(parentActivity.TraceId);
+        processSpan.TraceId.Should().Be(parentActivity.TraceId);
+        handlerSpan.TraceId.Should().Be(parentActivity.TraceId);
+        handlerSpan.ParentSpanId.Should().Be(processSpan.SpanId);
+    }
+
+    [Fact]
+    public async Task Consumer_Should_KeepSameTraceId_When_MessageIsRetried()
+    {
+        var processTraceIds = new ConcurrentBag<ActivityTraceId>();
+        await using var host = await EventBusTestHost.CreateAsync(_containers.RabbitMq, _containers.Postgres,
+            o =>
+            {
+                o.RetryCount = 2;
+                o.RetryDelaysSeconds = new[] { 1, 1, 1 };
+            });
+
+        using var listener = new ActivityListener
+        {
+            ShouldListenTo = source => source.Name == MessagingDiagnostics.SourceName,
+            Sample = (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllData,
+            ActivityStarted = activity =>
+            {
+                if (activity.OperationName.EndsWith("process", StringComparison.Ordinal))
+                    processTraceIds.Add(activity.TraceId);
+            }
+        };
+        ActivitySource.AddActivityListener(listener);
+        await host.StartConsumerAsync();
+
+        var bus = host.Services.GetRequiredService<IEventBus>();
+        await bus.PublishAsync(new AlwaysFailsIntegrationEvent("trace-me"));
+
+        await WaitUntilAsync(() => host.Recorder.Attempts >= host.Options.RetryCount + 1, TimeSpan.FromSeconds(30));
+
+        processTraceIds.Should().HaveCountGreaterThanOrEqualTo(host.Options.RetryCount + 1);
+        processTraceIds.Distinct().Should().ContainSingle("every retry of the same message must stay on the same trace");
+    }
+
+    [Fact]
+    public async Task PublishBatchAsync_And_Consumer_Should_ReportMetrics_When_MessageFlowsThrough()
+    {
+        await using var host = await EventBusTestHost.CreateAsync(_containers.RabbitMq, _containers.Postgres);
+
+        long published = 0, consumed = 0;
+        using var meterListener = new MeterListener
+        {
+            InstrumentPublished = (instrument, listener) =>
+            {
+                if (instrument.Meter.Name == MessagingDiagnostics.SourceName &&
+                    (instrument.Name == "messaging.published" || instrument.Name == "messaging.consumed"))
+                {
+                    listener.EnableMeasurementEvents(instrument);
+                }
+            }
+        };
+        meterListener.SetMeasurementEventCallback<long>((instrument, measurement, _, _) =>
+        {
+            if (instrument.Name == "messaging.published") Interlocked.Add(ref published, measurement);
+            if (instrument.Name == "messaging.consumed") Interlocked.Add(ref consumed, measurement);
+        });
+        meterListener.Start();
+
+        await host.StartConsumerAsync();
+
+        using (var scope = host.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<EventBusTestDbContext>();
+            var outbox = scope.ServiceProvider.GetRequiredService<IOutbox<EventBusTestDbContext>>();
+            outbox.Add(new TestIntegrationEvent("metrics"));
+            await db.SaveChangesAsync();
+        }
+
+        var publisher = host.CreateOutboxPublisher();
+        await publisher.PublishBatchAsync(CancellationToken.None);
+
+        await WaitUntilAsync(() => Interlocked.Read(ref published) >= 1, TimeSpan.FromSeconds(10));
+        await WaitUntilAsync(
+            () => host.Recorder.Received.Any(e => e is TestIntegrationEvent te && te.Payload == "metrics"),
+            TimeSpan.FromSeconds(10));
+        await WaitUntilAsync(() => Interlocked.Read(ref consumed) >= 1, TimeSpan.FromSeconds(10));
+    }
+
+    [Fact]
+    public async Task PublishBatchAsync_Should_ReportOutboxPendingGauge_When_RowsAreUnprocessed()
+    {
+        await using var host = await EventBusTestHost.CreateAsync(_containers.RabbitMq, _containers.Postgres);
+
+        using (var scope = host.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<EventBusTestDbContext>();
+            var outbox = scope.ServiceProvider.GetRequiredService<IOutbox<EventBusTestDbContext>>();
+            outbox.Add(new TestIntegrationEvent("pending-1"));
+            outbox.Add(new TestIntegrationEvent("pending-2"));
+            await db.SaveChangesAsync();
+        }
+
+        await _containers.RabbitMq.StopAsync();
+        try
+        {
+            var publisher = host.CreateOutboxPublisher();
+            await publisher.PublishBatchAsync(CancellationToken.None); // broker down -- both rows stay pending
+
+            long? pendingForThisModule = null;
+            using var meterListener = new MeterListener
+            {
+                InstrumentPublished = (instrument, listener) =>
+                {
+                    if (instrument.Meter.Name == MessagingDiagnostics.SourceName && instrument.Name == "outbox.pending")
+                        listener.EnableMeasurementEvents(instrument);
+                }
+            };
+            meterListener.SetMeasurementEventCallback<long>((_, measurement, tags, _) =>
+            {
+                foreach (var tag in tags)
+                {
+                    if (tag.Key == "module" && Equals(tag.Value, nameof(EventBusTestDbContext)))
+                        pendingForThisModule = measurement;
+                }
+            });
+            meterListener.Start();
+            meterListener.RecordObservableInstruments();
+
+            pendingForThisModule.Should().Be(2);
+        }
+        finally
+        {
+            await _containers.RabbitMq.StartAsync();
+        }
+
+        await WaitUntilAsync(async () =>
+        {
+            var publisher = host.CreateOutboxPublisher();
+            await publisher.PublishBatchAsync(CancellationToken.None);
+
+            using var scope = host.Services.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<EventBusTestDbContext>();
+            return await db.Set<OutboxMessage>().CountAsync(m => m.ProcessedOn != null) == 2;
+        }, TimeSpan.FromSeconds(20));
     }
 }

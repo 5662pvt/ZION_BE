@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using ZIONShop.EventBus.Abstractions;
@@ -19,7 +20,9 @@ public class Outbox<TDbContext> : IOutbox<TDbContext> where TDbContext : DbConte
             Type = eventType.AssemblyQualifiedName ?? throw new InvalidOperationException($"Event type '{eventType}' has no assembly-qualified name."),
             Content = JsonSerializer.Serialize(@event, eventType),
             OccurredOn = @event.OccurredOn,
-            Attempts = 0
+            Attempts = 0,
+            TraceParent = Activity.Current?.Id,
+            TraceState = Activity.Current?.TraceStateString
         };
         _db.Set<OutboxMessage>().Add(message);
     }

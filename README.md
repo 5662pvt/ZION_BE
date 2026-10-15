@@ -49,6 +49,7 @@ docker compose -f deploy/docker-compose.yml up -d --build api
 - Swagger via nginx: <http://localhost/swagger/>
 - Seq logs: <http://localhost:8081>
 - RabbitMQ UI: <http://localhost:15672>
+- Aspire Dashboard (traces/metrics/logs, opt-in via `OTEL_EXPORTER_OTLP_ENDPOINT`): <http://localhost:18888> — see [docs/observability.md](docs/observability.md)
 
 Seed account: `admin@zionshop.local` / `Admin@123`.
 

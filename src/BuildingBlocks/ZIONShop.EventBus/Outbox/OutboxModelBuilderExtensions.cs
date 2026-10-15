@@ -13,6 +13,8 @@ public static class OutboxModelBuilderExtensions
             b.Property(x => x.Type).IsRequired().HasMaxLength(512);
             b.Property(x => x.Content).IsRequired();
             b.Property(x => x.Error).HasMaxLength(2048);
+            b.Property(x => x.TraceParent).HasMaxLength(55);
+            b.Property(x => x.TraceState).HasMaxLength(256);
             b.HasIndex(x => x.ProcessedOn);
         });
     }

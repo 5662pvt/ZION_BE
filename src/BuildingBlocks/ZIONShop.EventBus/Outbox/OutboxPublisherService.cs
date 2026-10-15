@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Linq.Expressions;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
@@ -7,6 +8,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using ZIONShop.EventBus.Abstractions;
+using ZIONShop.EventBus.Diagnostics;
 using ZIONShop.EventBus.RabbitMq;
 
 namespace ZIONShop.EventBus.Outbox;
@@ -74,10 +76,13 @@ public class OutboxPublisherService<TDbContext> : BackgroundService where TDbCon
             .Take(BatchSize)
             .ToListAsync(cancellationToken);
 
+        await UpdateOutboxGaugesAsync(db, cancellationToken);
+
         if (messages.Count == 0) return;
 
         foreach (var message in messages)
         {
+            Activity? activity = null;
             try
             {
                 var eventType = Type.GetType(message.Type)
@@ -85,14 +90,29 @@ public class OutboxPublisherService<TDbContext> : BackgroundService where TDbCon
                 var @event = (IntegrationEvent)(JsonSerializer.Deserialize(message.Content, eventType)
                     ?? throw new InvalidOperationException($"Outbox message '{message.Id}' deserialized to null."));
 
+                var parentContext = MessagingDiagnostics.TryParseTraceParent(message.TraceParent, message.TraceState, out var context)
+                    ? context
+                    : default;
+                activity = MessagingDiagnostics.ActivitySource.StartActivity(
+                    $"{eventType.Name} publish", ActivityKind.Producer, parentContext);
+                activity?.SetTag("event.type", eventType.Name);
+                activity?.SetTag("messaging.message.id", message.Id.ToString());
+                activity?.SetTag("messaging.operation", "publish");
+
+                using var logScope = IntegrationEventLogScope.Begin(_logger, message.Id, eventType.Name, @event);
+
                 var dispatch = Dispatchers.GetOrAdd(eventType, BuildDispatcher);
                 await dispatch(eventBus, @event, cancellationToken);
+
+                MessagingDiagnostics.Published.Add(1, new KeyValuePair<string, object?>("event.type", eventType.Name));
 
                 message.ProcessedOn = DateTime.UtcNow;
                 message.Error = null;
             }
             catch (BrokerUnavailableException ex)
             {
+                MessagingDiagnostics.RecordException(activity, ex);
+
                 // The broker is down, not this particular message's fault -- stop the batch
                 // immediately without penalizing this or any remaining message's Attempts, so an
                 // outage longer than MaxAttempts polls can never silently abandon an event.
@@ -103,6 +123,8 @@ public class OutboxPublisherService<TDbContext> : BackgroundService where TDbCon
             }
             catch (Exception ex)
             {
+                MessagingDiagnostics.RecordException(activity, ex);
+
                 message.Attempts++;
                 message.Error = ex.Message;
                 _logger.LogError(ex, "Failed to publish outbox message {MessageId} ({MessageType}), attempt {Attempts}",
@@ -115,9 +137,25 @@ public class OutboxPublisherService<TDbContext> : BackgroundService where TDbCon
                         message.Id, message.Type, message.Attempts);
                 }
             }
+            finally
+            {
+                activity?.Dispose();
+            }
         }
 
         await db.SaveChangesAsync(cancellationToken);
+    }
+
+    private static async Task UpdateOutboxGaugesAsync(TDbContext db, CancellationToken cancellationToken)
+    {
+        var module = typeof(TDbContext).Name;
+        var pending = await db.Set<OutboxMessage>()
+            .CountAsync(m => m.ProcessedOn == null && m.Attempts < MaxAttempts, cancellationToken);
+        var failed = await db.Set<OutboxMessage>()
+            .CountAsync(m => m.ProcessedOn == null && m.Attempts >= MaxAttempts, cancellationToken);
+
+        MessagingDiagnostics.SetOutboxPending(module, pending);
+        MessagingDiagnostics.SetOutboxFailed(module, failed);
     }
 
     private static Func<IEventBus, IntegrationEvent, CancellationToken, Task> BuildDispatcher(Type eventType)

@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Microsoft.AspNetCore.Http;
 using Serilog.Context;
 
@@ -22,6 +23,12 @@ public class CorrelationIdMiddleware
                 context.Response.Headers[HeaderName] = correlationId;
             return Task.CompletedTask;
         });
+
+        // The ASP.NET Core instrumentation already started the request's root Activity by the time this
+        // middleware runs, so tagging it here (rather than only via an instrumentation Enrich callback)
+        // reliably covers both cases -- caller-supplied header and server-generated fallback -- with one
+        // write, and makes correlation.id queryable on the span itself, not just in logs.
+        Activity.Current?.SetTag("correlation.id", correlationId);
 
         using (LogContext.PushProperty("CorrelationId", correlationId))
         {

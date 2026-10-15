@@ -210,6 +210,7 @@ Luu y:
 - Nginx trong compose nay chi la reverse proxy cho API (`/api/`, `/swagger/`, `/healthz`); frontend (`ZION_FE`) deploy rieng, khong nam trong compose nay.
 - Neu deploy production bang Azure, khong nhat thiet phai dung Docker Compose tren server.
 - Docker Compose chu yeu de chay local full stack backend.
+- Observability (OpenTelemetry traces/metrics/logs qua Aspire Dashboard, opt-in): xem [observability.md](observability.md).
 
 ## 11. Health Check Endpoints
 

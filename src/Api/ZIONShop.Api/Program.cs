@@ -123,6 +123,7 @@ builder.Services.AddCors(opts => opts.AddDefaultPolicy(p => p
     .WithExposedHeaders("X-Correlation-Id", "Retry-After", "Idempotent-Replayed")));
 
 // Building blocks
+builder.Services.AddZionObservability(builder.Configuration, builder.Environment);
 builder.Services.AddZionAuth(builder.Configuration);
 builder.Services.AddZionEventBus(builder.Configuration);
 builder.Services.AddZionEmail(builder.Configuration);

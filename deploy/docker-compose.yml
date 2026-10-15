@@ -55,6 +55,18 @@ services:
     volumes:
       - seq-data:/data
 
+  # Dev-only OTLP receiver + UI for traces/metrics/logs. DOTNET_DASHBOARD_UNSECURED_ALLOW_ANONYMOUS
+  # disables the dashboard's auth token — fine for local Docker, never for staging/production.
+  aspire-dashboard:
+    image: mcr.microsoft.com/dotnet/aspire-dashboard:8.2
+    container_name: zionshop-aspire-dashboard
+    environment:
+      DOTNET_DASHBOARD_UNSECURED_ALLOW_ANONYMOUS: "true"
+    ports:
+      - "18888:18888"
+      - "4317:18889"
+    restart: unless-stopped
+
   api:
     build:
       context: ..
@@ -81,6 +93,8 @@ services:
       Serilog__WriteTo__1__Args__serverUrl: "http://seq:5341"
       Cors__AllowedOrigins__0: "http://localhost:5173"
       Cors__AllowedOrigins__1: "http://localhost"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://aspire-dashboard:18889"
+      OTEL_SERVICE_NAME: "zionshop-api"
     ports:
       - "8080:8080"
     volumes:
@@ -92,6 +106,8 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
+      aspire-dashboard:
+        condition: service_started
 
   nginx:
     image: nginx:1.27-alpine

@@ -70,6 +70,14 @@ namespace ZIONShop.Inventory.Infrastructure.Persistence.Migrations
                     b.Property<DateTime?>("ProcessedOn")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("TraceParent")
+                        .HasMaxLength(55)
+                        .HasColumnType("character varying(55)");
+
+                    b.Property<string>("TraceState")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
                     b.Property<string>("Type")
                         .IsRequired()
                         .HasMaxLength(512)

@@ -9,4 +9,9 @@ public class OutboxMessage
     public DateTime? ProcessedOn { get; set; }
     public int Attempts { get; set; }
     public string? Error { get; set; }
+
+    /// <summary>W3C traceparent of the activity active when this event was added to the outbox --
+    /// lets <c>OutboxPublisherService</c> resume the same trace when it eventually publishes.</summary>
+    public string? TraceParent { get; set; }
+    public string? TraceState { get; set; }
 }

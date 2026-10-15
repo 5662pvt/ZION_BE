@@ -3,6 +3,7 @@ using Microsoft.Extensions.Options;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
 using RabbitMQ.Client.Exceptions;
+using System.Diagnostics;
 using System.Net.Sockets;
 using ZIONShop.EventBus.Registry;
 
@@ -54,15 +55,19 @@ public sealed class RabbitMqPublisher : IDisposable
     /// exchange (routing key = queue name always resolves there), carrying <c>x-retry-count</c>
     /// and a truncated <c>x-last-error</c> header for diagnostics.
     /// </summary>
+    /// <param name="incomingHeaders">The failed delivery's own headers (if any) -- copied forward as
+    /// a baseline so the retry keeps carrying its original <c>traceparent</c>/<c>tracestate</c> even if
+    /// no activity happens to be current at republish time; <see cref="Publish"/> still overlays the
+    /// live <see cref="Activity.Current"/> trace context on top when one is present.</param>
     public Task PublishToRetryQueueAsync(int attempt, string messageId, string typeName, byte[] body,
-        string lastError, CancellationToken cancellationToken)
+        string lastError, IDictionary<string, object>? incomingHeaders, CancellationToken cancellationToken)
     {
         var routingKey = RabbitMqTopology.RetryQueueName(_options.QueueName, attempt);
-        var headers = new Dictionary<string, object>
-        {
-            ["x-retry-count"] = attempt,
-            ["x-last-error"] = Truncate(lastError, 500)
-        };
+        var headers = incomingHeaders is { Count: > 0 }
+            ? new Dictionary<string, object>(incomingHeaders)
+            : new Dictionary<string, object>();
+        headers["x-retry-count"] = attempt;
+        headers["x-last-error"] = Truncate(lastError, 500);
         return PublishAsync(string.Empty, routingKey, mandatory: true, messageId, typeName, body, headers, cancellationToken);
     }
 
@@ -91,7 +96,22 @@ public sealed class RabbitMqPublisher : IDisposable
         props.Type = typeName;
         props.ContentType = "application/json";
         props.Timestamp = new AmqpTimestamp(DateTimeOffset.UtcNow.ToUnixTimeSeconds());
+
+        // Propagate the live trace context (if any -- e.g. the outbox's "{EventType} publish" activity,
+        // or the consumer's "{EventType} process" activity when this is a retry-queue republish) onto
+        // the outgoing message so the next hop can continue the same trace.
+        if (Activity.Current is { } activity)
+        {
+            headers = headers is { Count: > 0 } ? new Dictionary<string, object>(headers) : new Dictionary<string, object>();
+            if (!string.IsNullOrEmpty(activity.Id)) headers["traceparent"] = activity.Id;
+            if (!string.IsNullOrEmpty(activity.TraceStateString)) headers["tracestate"] = activity.TraceStateString;
+        }
         if (headers is { Count: > 0 }) props.Headers = headers;
+
+        Activity.Current?.SetTag("messaging.system", "rabbitmq");
+        Activity.Current?.SetTag("messaging.destination.name", exchange);
+        Activity.Current?.SetTag("messaging.message.id", messageId);
+        Activity.Current?.SetTag("messaging.operation", "publish");
 
         _unroutableMessageId = null;
 

@@ -131,6 +131,56 @@ Message(s) to inspect payload, `x-death` (why/when it was dead-lettered), and `x
 | `ConfirmTimeoutSeconds` | 5 | How long a publish waits for the broker's confirm |
 | `OutboxPollSeconds` | 2 | Outbox polling interval |
 
+## Tracing & metrics
+
+`ZIONShop.EventBus.Diagnostics.MessagingDiagnostics` (`BuildingBlocks/ZIONShop.EventBus/Diagnostics/`)
+is the single `ActivitySource`/`Meter` (both named `ZIONShop.Messaging`) every piece of the bus reports
+into. This building block takes **no OpenTelemetry SDK dependency** -- only `System.Diagnostics`/
+`System.Diagnostics.Metrics` -- the host wires an actual exporter against these names separately (see
+`docs/observability.md`).
+
+### Span names and propagation
+
+| Span | Kind | Where | Parent |
+|---|---|---|---|
+| `{EventType} publish` | Producer | `OutboxPublisherService`, around each `IEventBus.PublishAsync` dispatch | `OutboxMessage.TraceParent`/`TraceState` (captured by `Outbox<T>.Add` from `Activity.Current` at the time the business code added the event) -- new root if absent |
+| `{EventType} process` | Consumer | `RabbitMqConsumerService.OnMessageReceivedAsync`, around the whole delivery | `traceparent`/`tracestate` headers on the RabbitMQ message |
+| `{HandlerName}` | Internal | once per handler, both `RabbitMqConsumerService` and `InMemoryEventBus` | the enclosing `{EventType} publish`/`process` activity (`Activity.Current`) |
+
+`RabbitMqPublisher.Publish` is the single place that writes the `traceparent`/`tracestate` headers,
+from whatever `Activity.Current` is at publish time -- this covers both a fresh publish from the outbox
+and a consumer's retry-queue republish (`PublishToRetryQueueAsync` also copies the failed delivery's own
+headers forward as a fallback baseline, so context survives even if no activity happens to be current).
+A retried message therefore keeps the same `TraceId` across every attempt. `Activity.DefaultIdFormat` is
+forced to W3C in `MessagingDiagnostics`'s static constructor so `Activity.Current?.Id` is always a
+parseable `traceparent` string, independent of whether the process is hosted by ASP.NET Core.
+
+Failures are recorded on the relevant activity via `MessagingDiagnostics.RecordException` (OTel
+`exception` event + `ActivityStatusCode.Error`), at the outbox publish, the consumer's overall
+delivery, and each handler.
+
+### Metrics
+
+| Instrument | Type | Tags | Meaning |
+|---|---|---|---|
+| `messaging.published` | Counter<long> | `event.type` | Outbox successfully dispatched an event via `IEventBus` |
+| `messaging.consumed` | Counter<long> | `event.type` | A delivery finished (every handler ran, RabbitMQ) / a publish's handlers all ran (InMemory) |
+| `messaging.handler.failed` | Counter<long> | `event.type`, `consumer` | A single handler threw |
+| `messaging.retried` | Counter<long> | `event.type` | A failed delivery was republished to a retry queue |
+| `messaging.dead_lettered` | Counter<long> | `event.type` | A message was nacked without requeue (unroutable type, poison body, or retries exhausted) |
+| `messaging.handler.duration` | Histogram<double> (ms) | `event.type`, `consumer`, `outcome` | Per-handler invocation time |
+| `outbox.pending` | ObservableGauge<long> | `module` (DbContext name) | Rows with `ProcessedOn == null && Attempts < MaxAttempts`, refreshed every `OutboxPublisherService` poll |
+| `outbox.failed` | ObservableGauge<long> | `module` | Rows with `ProcessedOn == null && Attempts >= MaxAttempts`, same cadence |
+| `rabbitmq.queue.messages` | ObservableGauge<long> | `queue` (`main`/`dlq`) | `QueueDeclarePassive` message count, refreshed every 15s by a background loop in `RabbitMqConsumerService`; a tick is skipped silently if the broker/queue is unavailable |
+
+### Logging
+
+`IntegrationEventLogScope.Begin` pushes `MessageId`/`EventType`/`OrderId` (when the event has that
+property -- reflected once per event type and cached) onto the logger scope via `ILogger.BeginScope`
+around each publish and each handler invocation, so every log line underneath is enrichable by them.
+This building block has no package reference on Serilog; `BeginScope` is enough since Serilog's own
+`ILogger` provider already surfaces scope state as `LogContext` properties.
+
 ## Related docs
 
 - Architecture diagram: [02-architecture.md](02-architecture.md)
