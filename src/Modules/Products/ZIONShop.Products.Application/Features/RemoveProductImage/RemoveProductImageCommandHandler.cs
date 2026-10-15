@@ -1,5 +1,7 @@
 using MediatR;
 using Microsoft.Extensions.Logging;
+using ZIONShop.Caching;
+using ZIONShop.Products.Application.Caching;
 using ZIONShop.Products.Application.Interfaces;
 using ZIONShop.Products.Domain.Exceptions;
 using ZIONShop.Products.Domain.Repositories;
@@ -12,17 +14,20 @@ public class RemoveProductImageCommandHandler : IRequestHandler<RemoveProductIma
     private readonly IProductRepository _products;
     private readonly IImageStorage _imageStorage;
     private readonly IProductsUnitOfWork _uow;
+    private readonly IDistributedCacheService _cache;
     private readonly ILogger<RemoveProductImageCommandHandler> _logger;
 
     public RemoveProductImageCommandHandler(
         IProductRepository products,
         IImageStorage imageStorage,
         IProductsUnitOfWork uow,
+        IDistributedCacheService cache,
         ILogger<RemoveProductImageCommandHandler> logger)
     {
         _products = products;
         _imageStorage = imageStorage;
         _uow = uow;
+        _cache = cache;
         _logger = logger;
     }
 
@@ -36,6 +41,8 @@ public class RemoveProductImageCommandHandler : IRequestHandler<RemoveProductIma
 
         _products.Update(product);
         await _uow.SaveChangesAsync(cancellationToken);
+
+        await _cache.RemoveManyAsync(ProductCacheKeys.DetailById(product.Id), ProductCacheKeys.DetailBySlug(product.Slug));
 
         var publicId = removeResult.Value.PublicId;
         if (!string.IsNullOrWhiteSpace(publicId))

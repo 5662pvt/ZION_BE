@@ -34,7 +34,7 @@ public class PaymentsController : ControllerBase
         if (string.IsNullOrWhiteSpace(idempotencyKey))
             return BadRequest(ApiResponse.Fail("Idempotency-Key header is required"));
 
-        var cmd = new CreatePaymentIntentCommand(body.OrderId, _currentUser.UserId!.Value, idempotencyKey);
+        var cmd = new CreatePaymentIntentCommand(body.OrderId, _currentUser.UserId!.Value, idempotencyKey, body.Channel);
         return (await _mediator.Send(cmd, ct)).ToActionResult("Payment intent created");
     }
 
@@ -72,5 +72,5 @@ public class PaymentsController : ControllerBase
     }
 }
 
-public record CreatePaymentIntentBody(Guid OrderId);
+public record CreatePaymentIntentBody(Guid OrderId, string? Channel = null);
 public record SimulateFakePaymentBody(string Result);

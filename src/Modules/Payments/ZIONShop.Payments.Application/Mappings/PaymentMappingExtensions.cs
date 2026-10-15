@@ -14,5 +14,6 @@ public static class PaymentMappingExtensions
         payment.Amount,
         payment.Currency,
         gateway.BuildRedirectUrl(payment.IntentId),
-        payment.ExpiresAt);
+        payment.ExpiresAt,
+        payment.Channel);
 }

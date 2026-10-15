@@ -1,5 +1,7 @@
 using MediatR;
 using Microsoft.EntityFrameworkCore;
+using ZIONShop.Caching;
+using ZIONShop.Products.Application.Caching;
 using ZIONShop.Products.Application.Interfaces;
 using ZIONShop.Products.Domain.Exceptions;
 using ZIONShop.Products.Domain.Repositories;
@@ -12,12 +14,14 @@ public class DeleteCategoryCommandHandler : IRequestHandler<DeleteCategoryComman
     private readonly ICategoryRepository _categories;
     private readonly IProductRepository _products;
     private readonly IProductsUnitOfWork _uow;
+    private readonly IDistributedCacheService _cache;
 
-    public DeleteCategoryCommandHandler(ICategoryRepository categories, IProductRepository products, IProductsUnitOfWork uow)
+    public DeleteCategoryCommandHandler(ICategoryRepository categories, IProductRepository products, IProductsUnitOfWork uow, IDistributedCacheService cache)
     {
         _categories = categories;
         _products = products;
         _uow = uow;
+        _cache = cache;
     }
 
     public async Task<Result> Handle(DeleteCategoryCommand request, CancellationToken cancellationToken)
@@ -35,6 +39,9 @@ public class DeleteCategoryCommandHandler : IRequestHandler<DeleteCategoryComman
 
         _categories.Remove(category);
         await _uow.SaveChangesAsync(cancellationToken);
+
+        await _cache.RemoveAsync(ProductCacheKeys.CategoryTree, cancellationToken);
+
         return Result.Success();
     }
 }

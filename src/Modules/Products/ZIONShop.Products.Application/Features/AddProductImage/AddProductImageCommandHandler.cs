@@ -1,4 +1,6 @@
 using MediatR;
+using ZIONShop.Caching;
+using ZIONShop.Products.Application.Caching;
 using ZIONShop.Products.Application.DTOs;
 using ZIONShop.Products.Application.Interfaces;
 using ZIONShop.Products.Domain.Exceptions;
@@ -12,12 +14,14 @@ public class AddProductImageCommandHandler : IRequestHandler<AddProductImageComm
     private readonly IProductRepository _products;
     private readonly IImageStorage _imageStorage;
     private readonly IProductsUnitOfWork _uow;
+    private readonly IDistributedCacheService _cache;
 
-    public AddProductImageCommandHandler(IProductRepository products, IImageStorage imageStorage, IProductsUnitOfWork uow)
+    public AddProductImageCommandHandler(IProductRepository products, IImageStorage imageStorage, IProductsUnitOfWork uow, IDistributedCacheService cache)
     {
         _products = products;
         _imageStorage = imageStorage;
         _uow = uow;
+        _cache = cache;
     }
 
     public async Task<Result<ProductImageDto>> Handle(AddProductImageCommand request, CancellationToken cancellationToken)
@@ -31,6 +35,8 @@ public class AddProductImageCommandHandler : IRequestHandler<AddProductImageComm
         var image = product.AddImage(uploadResult.Value.Url, request.Alt, uploadResult.Value.PublicId);
         _products.AddImage(image);
         await _uow.SaveChangesAsync(cancellationToken);
+
+        await _cache.RemoveManyAsync(ProductCacheKeys.DetailById(product.Id), ProductCacheKeys.DetailBySlug(product.Slug));
 
         return Result.Success(new ProductImageDto(image.Id, image.Url, image.Alt, image.DisplayOrder));
     }

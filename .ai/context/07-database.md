@@ -65,6 +65,44 @@ postgres:
     - "5432:5432"
 ```
 
+## Caching (Redis cache-aside)
+
+`ZIONShop.Caching` (`IDistributedCacheService`) backs read-heavy queries in Products and Admin. `RedisCacheService` is registered by `AddZionCaching()` when Redis is reachable; otherwise (incl. the `Testing` environment, and whenever Redis is down) `NullDistributedCacheService` is used instead — every module's `Add<Module>Application()` does `TryAddSingleton<IDistributedCacheService, NullDistributedCacheService>()` so DI always resolves even without Redis.
+
+**Fail-open, always.** Any Redis exception on get/set/remove is caught, logged as a rate-limited (30s) warning, and treated as a miss/no-op — a Redis outage never throws into a handler, it just means every read falls through to the database. The multiplexer itself uses `AbortOnConnectFail = false` with a 2s connect/sync timeout so a down Redis doesn't block requests.
+
+`GetOrCreateAsync<T>(key, factory, ttl, ct)` is cache-aside with in-process single-flight per key (a `SemaphoreSlim` per key, double-checked after acquiring) — on a cold key, only one caller runs `factory`, the rest wait and reuse its result. Stored TTLs get ±10% jitter so many keys set together don't expire in the same instant. Only non-null values are cached — callers pass the already-unwrapped DTO, never a `Result` failure, so failures/not-found are never cached.
+
+**Stock is never cached.** `ProductDto` has no stock/rating fields by design — those stay live reads.
+
+### Keys and TTLs
+
+| Area | Key | TTL | Built by |
+|---|---|---|---|
+| Product detail (by id) | `zion:products:detail:id:{id}` | 5 min | `ProductCacheKeys.DetailById` |
+| Product detail (by slug) | `zion:products:detail:slug:{slug}` | 5 min | `ProductCacheKeys.DetailBySlug` |
+| Category tree | `zion:categories:tree` | 30 min | `ProductCacheKeys.CategoryTree` |
+| Admin reports | `zion:reports:{query}:{from}:{to}:{...params}` | 60 s | `ReportCacheKeys.*` (Admin.Application) |
+
+Only **Published** products are cached under the detail keys (today's not-published → `NotFound` is never cached, so there's nothing to invalidate on create).
+
+### Invalidation table
+
+| Handler | Keys removed |
+|---|---|
+| `UpdateProduct` | detail id + detail slug (slug is immutable on update, so there's only one slug) |
+| `ArchiveProduct` / `PublishProduct` | detail id + detail slug |
+| `AddProductImage` / `RemoveProductImage` / `ReorderProductImages` | detail id + detail slug |
+| `CreateProduct` | none (nothing was ever cached for it) |
+| Category `Create` / `Update` / `Delete` | `zion:categories:tree` |
+| Admin reports | never explicitly invalidated — 60s TTL only |
+
+`ProductDto.CategoryName` is denormalized at read time, so renaming a category can leave a stale name on an already-cached product detail for up to 5 minutes. This is accepted as-is — no cache versioning scheme was built for it.
+
+### Metrics
+
+`System.Diagnostics.Metrics` Meter `"ZIONShop.Caching"` exposes counters `cache.hits` / `cache.misses` / `cache.errors`, tagged `cache.name` (derived from the key prefix, e.g. `products.detail`, `categories.tree`, `reports.dashboard`).
+
 ## Related docs
 
 - Inventory: [11-inventory.md](11-inventory.md)

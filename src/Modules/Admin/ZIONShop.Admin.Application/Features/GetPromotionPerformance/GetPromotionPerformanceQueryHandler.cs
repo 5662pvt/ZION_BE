@@ -1,6 +1,8 @@
 using MediatR;
+using ZIONShop.Admin.Application.Caching;
 using ZIONShop.Admin.Application.Common;
 using ZIONShop.Admin.Application.DTOs;
+using ZIONShop.Caching;
 using ZIONShop.Contracts.Orders;
 using ZIONShop.Contracts.Promotions;
 using ZIONShop.SharedKernel.Results;
@@ -12,12 +14,14 @@ public class GetPromotionPerformanceQueryHandler : IRequestHandler<GetPromotionP
     private readonly IOrderReportReader _orders;
     private readonly IPromotionLookup _promotions;
     private readonly TimeProvider _timeProvider;
+    private readonly IDistributedCacheService _cache;
 
-    public GetPromotionPerformanceQueryHandler(IOrderReportReader orders, IPromotionLookup promotions, TimeProvider timeProvider)
+    public GetPromotionPerformanceQueryHandler(IOrderReportReader orders, IPromotionLookup promotions, TimeProvider timeProvider, IDistributedCacheService cache)
     {
         _orders = orders;
         _promotions = promotions;
         _timeProvider = timeProvider;
+        _cache = cache;
     }
 
     public async Task<Result<IReadOnlyList<PromotionPerformanceDto>>> Handle(GetPromotionPerformanceQuery request, CancellationToken cancellationToken)
@@ -26,6 +30,17 @@ public class GetPromotionPerformanceQueryHandler : IRequestHandler<GetPromotionP
         if (rangeResult.IsFailure) return Result.Failure<IReadOnlyList<PromotionPerformanceDto>>(rangeResult.Error);
         var range = rangeResult.Value;
 
+        var results = await _cache.GetOrCreateAsync(
+            ReportCacheKeys.PromotionPerformance(range.From, range.To),
+            async ct => (IReadOnlyList<PromotionPerformanceDto>?)await BuildAsync(range, ct),
+            TimeSpan.FromSeconds(60),
+            cancellationToken);
+
+        return Result.Success(results ?? Array.Empty<PromotionPerformanceDto>());
+    }
+
+    private async Task<IReadOnlyList<PromotionPerformanceDto>> BuildAsync(ReportRange range, CancellationToken cancellationToken)
+    {
         var orders = await _orders.GetCompletedOrdersAsync(range.FromUtc, range.ToUtc, cancellationToken);
 
         var results = new List<PromotionPerformanceDto>();
@@ -82,7 +97,6 @@ public class GetPromotionPerformanceQueryHandler : IRequestHandler<GetPromotionP
             }
         }
 
-        var sorted = results.OrderByDescending(r => r.Orders).ToList();
-        return Result.Success<IReadOnlyList<PromotionPerformanceDto>>(sorted);
+        return results.OrderByDescending(r => r.Orders).ToList();
     }
 }

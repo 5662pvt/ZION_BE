@@ -20,8 +20,9 @@ public class Payment : AggregateRoot
     public string? FailureReason { get; private set; }
     public DateTime ExpiresAt { get; private set; }
     public DateTime? CompletedAt { get; private set; }
+    public string Channel { get; private set; } = "Card";
 
-    public static Payment Create(Guid orderId, Guid userId, decimal amount, string currency, string provider, string idempotencyKey, DateTime now)
+    public static Payment Create(Guid orderId, Guid userId, decimal amount, string currency, string provider, string idempotencyKey, DateTime now, string channel = "Card")
     {
         return new Payment
         {
@@ -33,7 +34,8 @@ public class Payment : AggregateRoot
             Provider = provider,
             IdempotencyKey = idempotencyKey,
             Status = PaymentStatus.Pending,
-            ExpiresAt = now.AddMinutes(15)
+            ExpiresAt = now.AddMinutes(15),
+            Channel = channel
         };
     }
 

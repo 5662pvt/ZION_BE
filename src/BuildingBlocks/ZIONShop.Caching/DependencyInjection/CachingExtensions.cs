@@ -10,7 +10,13 @@ public static class CachingExtensions
     {
         var connection = configuration.GetSection("Redis")["Configuration"] ?? "localhost:6379";
         services.AddSingleton<IConnectionMultiplexer>(_ =>
-            ConnectionMultiplexer.Connect(ConfigurationOptions.Parse(connection, true)));
+        {
+            var options = ConfigurationOptions.Parse(connection, true);
+            options.AbortOnConnectFail = false;
+            options.ConnectTimeout = 2000;
+            options.SyncTimeout = 2000;
+            return ConnectionMultiplexer.Connect(options);
+        });
         services.AddSingleton<IDistributedCacheService, RedisCacheService>();
         return services;
     }

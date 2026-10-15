@@ -171,4 +171,89 @@ public class CreatePaymentIntentCommandHandlerTests
         result.IsFailure.Should().BeTrue();
         result.Error.Code.Should().Be("Payments.OrderNotPayable");
     }
+
+    [Fact]
+    public async Task Handle_Should_DefaultToCardChannel_When_ChannelIsNotProvided()
+    {
+        var (db, payments, payableOrders, _) = PaymentsTestFactory.BuildScope();
+        var uow = new FakePaymentsUnitOfWork(db);
+        var gateway = PaymentsTestFactory.BuildGateway();
+        var orderId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+
+        var projection = PayableOrder.Create(orderId, userId, 250000m, "VND", DateTime.UtcNow);
+        projection.MarkPayable(DateTime.UtcNow);
+        await payableOrders.AddAsync(projection);
+        await db.SaveChangesAsync();
+
+        var handler = new CreatePaymentIntentCommandHandler(payments, payableOrders, uow, gateway, TimeProvider.System);
+        var result = await handler.Handle(new CreatePaymentIntentCommand(orderId, userId, "idem-key-1"), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Channel.Should().Be("Card");
+    }
+
+    [Fact]
+    public async Task Handle_Should_StoreChannel_When_EWalletProvidedCaseInsensitive()
+    {
+        var (db, payments, payableOrders, _) = PaymentsTestFactory.BuildScope();
+        var uow = new FakePaymentsUnitOfWork(db);
+        var gateway = PaymentsTestFactory.BuildGateway();
+        var orderId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+
+        var projection = PayableOrder.Create(orderId, userId, 250000m, "VND", DateTime.UtcNow);
+        projection.MarkPayable(DateTime.UtcNow);
+        await payableOrders.AddAsync(projection);
+        await db.SaveChangesAsync();
+
+        var handler = new CreatePaymentIntentCommandHandler(payments, payableOrders, uow, gateway, TimeProvider.System);
+        var result = await handler.Handle(new CreatePaymentIntentCommand(orderId, userId, "idem-key-1", "ewallet"), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Channel.Should().Be("EWallet");
+    }
+
+    [Fact]
+    public async Task Handle_Should_ReturnBadRequest_When_ChannelIsInvalid()
+    {
+        var (db, payments, payableOrders, _) = PaymentsTestFactory.BuildScope();
+        var uow = new FakePaymentsUnitOfWork(db);
+        var gateway = PaymentsTestFactory.BuildGateway();
+        var orderId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+
+        var projection = PayableOrder.Create(orderId, userId, 250000m, "VND", DateTime.UtcNow);
+        projection.MarkPayable(DateTime.UtcNow);
+        await payableOrders.AddAsync(projection);
+        await db.SaveChangesAsync();
+
+        var handler = new CreatePaymentIntentCommandHandler(payments, payableOrders, uow, gateway, TimeProvider.System);
+        var result = await handler.Handle(new CreatePaymentIntentCommand(orderId, userId, "idem-key-1", "PayPal"), CancellationToken.None);
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Code.Should().Be("Payments.InvalidChannel");
+    }
+
+    [Fact]
+    public async Task Handle_Should_KeepStoredChannel_When_IdempotencyKeyReplayed()
+    {
+        var (db, payments, payableOrders, _) = PaymentsTestFactory.BuildScope();
+        var uow = new FakePaymentsUnitOfWork(db);
+        var gateway = PaymentsTestFactory.BuildGateway();
+        var orderId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+
+        var projection = PayableOrder.Create(orderId, userId, 250000m, "VND", DateTime.UtcNow);
+        projection.MarkPayable(DateTime.UtcNow);
+        await payableOrders.AddAsync(projection);
+        await db.SaveChangesAsync();
+
+        var handler = new CreatePaymentIntentCommandHandler(payments, payableOrders, uow, gateway, TimeProvider.System);
+        var first = await handler.Handle(new CreatePaymentIntentCommand(orderId, userId, "idem-key-1", "BankTransfer"), CancellationToken.None);
+        var second = await handler.Handle(new CreatePaymentIntentCommand(orderId, userId, "idem-key-1"), CancellationToken.None);
+
+        second.IsSuccess.Should().BeTrue();
+        second.Value.Channel.Should().Be(first.Value.Channel).And.Be("BankTransfer");
+    }
 }

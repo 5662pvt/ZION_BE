@@ -6,6 +6,7 @@ using ZIONShop.Products.Domain.Entities;
 using ZIONShop.Products.Domain.ValueObjects;
 using ZIONShop.Products.Infrastructure.Persistence;
 using ZIONShop.Products.Infrastructure.Repositories;
+using ZIONShop.Products.Tests.TestSupport;
 using ZIONShop.SharedKernel.Results;
 
 namespace ZIONShop.Products.Tests.Features;
@@ -36,7 +37,9 @@ public class AddProductImageCommandHandlerTests
     public async Task Handle_Should_AddImage_When_UploadSucceeds()
     {
         var (db, products, product) = await SeedAsync();
-        var handler = new AddProductImageCommandHandler(products, new FakeImageStorage(), db);
+        var cache = new FakeDistributedCacheService();
+        await cache.SetAsync($"zion:products:detail:id:{product.Id}", new object());
+        var handler = new AddProductImageCommandHandler(products, new FakeImageStorage(), db, cache);
 
         using var content = new MemoryStream(new byte[] { 1, 2, 3 });
         var cmd = new AddProductImageCommand(product.Id, content, "photo.png", "image/png", content.Length, "Alt text");
@@ -48,13 +51,14 @@ public class AddProductImageCommandHandlerTests
 
         var reloaded = await products.GetByIdAsync(product.Id, CancellationToken.None);
         reloaded!.Images.Should().ContainSingle();
+        cache.Contains($"zion:products:detail:id:{product.Id}").Should().BeFalse();
     }
 
     [Fact]
     public async Task Handle_Should_ReturnNotFound_When_ProductMissing()
     {
         var (db, products, _) = await SeedAsync();
-        var handler = new AddProductImageCommandHandler(products, new FakeImageStorage(), db);
+        var handler = new AddProductImageCommandHandler(products, new FakeImageStorage(), db, new FakeDistributedCacheService());
 
         using var content = new MemoryStream(new byte[] { 1, 2, 3 });
         var cmd = new AddProductImageCommand(Guid.NewGuid(), content, "photo.png", "image/png", content.Length, null);

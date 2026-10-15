@@ -1,12 +1,21 @@
 using Asp.Versioning;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.OpenApi.Models;
 using Serilog;
+using System.IdentityModel.Tokens.Jwt;
 using System.Reflection;
+using System.Security.Claims;
+using System.Text.Json;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.Extensions.Options;
 using ZIONShop.Api.Extensions;
+using ZIONShop.Api.Health;
+using ZIONShop.Api.Middleware;
+using ZIONShop.Api.Options;
 using ZIONShop.Auth.Application.DependencyInjection;
 using ZIONShop.Auth.DependencyInjection;
 using ZIONShop.Auth.Infrastructure.DependencyInjection;
@@ -111,7 +120,7 @@ builder.Services.AddCors(opts => opts.AddDefaultPolicy(p => p
     .WithOrigins(corsOrigins)
     .AllowAnyHeader()
     .AllowAnyMethod()
-    .WithExposedHeaders("X-Correlation-Id")));
+    .WithExposedHeaders("X-Correlation-Id", "Retry-After", "Idempotent-Replayed")));
 
 // Building blocks
 builder.Services.AddZionAuth(builder.Configuration);
@@ -152,16 +161,73 @@ builder.Services
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 builder.Services.AddProblemDetails();
 
-// Rate limiting (auth endpoints)
-var authPermitLimit = builder.Configuration.GetValue("RateLimiting:AuthPermitLimit", 20);
+// Health checks
+builder.Services.AddHealthChecks()
+    .AddCheck<PostgresHealthCheck>("postgres", tags: new[] { "ready" })
+    .AddCheck<RedisHealthCheck>("redis", tags: new[] { "ready" })
+    .AddCheck<RabbitMqHealthCheck>("rabbitmq", tags: new[] { "ready" });
+
+// Rate limiting (auth, checkout, search endpoints). Limits are read from IOptions<RateLimitingOptions>
+// inside each partition factory (at request time, after DI/config is fully built) rather than off
+// builder.Configuration at this point in top-level code -- top-level reads run before
+// WebApplicationFactory-based test hosts get a chance to layer in ConfigureAppConfiguration overrides.
+builder.Services.Configure<RateLimitingOptions>(builder.Configuration.GetSection(RateLimitingOptions.SectionName));
+var rateLimitJsonOptions = new JsonSerializerOptions(JsonSerializerDefaults.Web);
 builder.Services.AddRateLimiter(opts =>
 {
-    opts.AddFixedWindowLimiter("auth", o =>
+    opts.AddPolicy("auth", httpContext =>
     {
-        o.Window = TimeSpan.FromMinutes(1);
-        o.PermitLimit = authPermitLimit;
-        o.QueueLimit = 0;
+        var limits = httpContext.RequestServices.GetRequiredService<IOptions<RateLimitingOptions>>().Value;
+        return RateLimitPartition.GetFixedWindowLimiter("auth", _ => new FixedWindowRateLimiterOptions
+        {
+            Window = TimeSpan.FromSeconds(limits.WindowSeconds),
+            PermitLimit = limits.AuthPermitLimit,
+            QueueLimit = 0
+        });
     });
+
+    opts.AddPolicy("checkout", httpContext =>
+    {
+        var limits = httpContext.RequestServices.GetRequiredService<IOptions<RateLimitingOptions>>().Value;
+        var userId = httpContext.User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value
+            ?? httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        var key = userId is not null
+            ? $"user:{userId}"
+            : $"ip:{httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown"}";
+        return RateLimitPartition.GetFixedWindowLimiter(key, _ => new FixedWindowRateLimiterOptions
+        {
+            Window = TimeSpan.FromSeconds(limits.WindowSeconds),
+            PermitLimit = limits.CheckoutPermitLimit,
+            QueueLimit = 0
+        });
+    });
+
+    opts.AddPolicy("search", httpContext =>
+    {
+        var limits = httpContext.RequestServices.GetRequiredService<IOptions<RateLimitingOptions>>().Value;
+        var key = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+        return RateLimitPartition.GetFixedWindowLimiter(key, _ => new FixedWindowRateLimiterOptions
+        {
+            Window = TimeSpan.FromSeconds(limits.WindowSeconds),
+            PermitLimit = limits.SearchPermitLimit,
+            QueueLimit = 0
+        });
+    });
+
+    opts.OnRejected = async (context, token) =>
+    {
+        var retryAfterSeconds = 60;
+        if (context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter))
+            retryAfterSeconds = (int)retryAfter.TotalSeconds;
+
+        context.HttpContext.Response.StatusCode = StatusCodes.Status429TooManyRequests;
+        context.HttpContext.Response.Headers["Retry-After"] = retryAfterSeconds.ToString();
+        context.HttpContext.Response.ContentType = "application/json";
+
+        const string message = "Bạn thao tác quá nhanh, vui lòng thử lại sau.";
+        var body = ApiResponse.Fail(message, new[] { new ErrorDetail { Code = "RateLimit.Exceeded", Message = message } });
+        await context.HttpContext.Response.WriteAsync(JsonSerializer.Serialize(body, rateLimitJsonOptions), token);
+    };
 });
 
 var app = builder.Build();
@@ -171,6 +237,14 @@ await app.MigrateAndSeedAsync();
 app.UseSerilogRequestLogging();
 app.UseMiddleware<CorrelationIdMiddleware>();
 app.UseExceptionHandler();
+
+if (app.Environment.IsProduction())
+{
+    app.UseHsts();
+    app.UseHttpsRedirection();
+}
+
+app.UseMiddleware<SecurityHeadersMiddleware>();
 app.UseCors();
 
 var uploadsRoot = app.Services.GetRequiredService<IUploadsRootProvider>().RootPath;
@@ -192,6 +266,23 @@ app.UseAuthorization();
 app.UseRateLimiter();
 
 app.MapControllers();
+
+app.MapHealthChecks("/health/live", new HealthCheckOptions
+{
+    Predicate = _ => false,
+    ResponseWriter = HealthCheckResponseWriter.WriteAsync
+});
+app.MapHealthChecks("/health/ready", new HealthCheckOptions
+{
+    Predicate = check => check.Tags.Contains("ready"),
+    ResultStatusCodes =
+    {
+        [HealthStatus.Healthy] = StatusCodes.Status200OK,
+        [HealthStatus.Degraded] = StatusCodes.Status200OK,
+        [HealthStatus.Unhealthy] = StatusCodes.Status503ServiceUnavailable
+    },
+    ResponseWriter = HealthCheckResponseWriter.WriteAsync
+});
 
 app.MapGet("/", () => Results.Redirect("/swagger"));
 app.MapGet("/healthz", () => Results.Ok(new { status = "ok", timestamp = DateTime.UtcNow }));

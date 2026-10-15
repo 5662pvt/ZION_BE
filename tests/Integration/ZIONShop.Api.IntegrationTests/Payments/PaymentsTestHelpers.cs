@@ -6,7 +6,7 @@ using ZIONShop.Api.IntegrationTests.Infrastructure;
 
 namespace ZIONShop.Api.IntegrationTests.Payments;
 
-public record PaymentIntentData(Guid PaymentId, string IntentId, Guid OrderId, string Status, decimal Amount, string Currency, string RedirectUrl, DateTime ExpiresAt);
+public record PaymentIntentData(Guid PaymentId, string IntentId, Guid OrderId, string Status, decimal Amount, string Currency, string RedirectUrl, DateTime ExpiresAt, string Channel);
 
 public static class PaymentsTestHelpers
 {
@@ -21,19 +21,19 @@ public static class PaymentsTestHelpers
         return Convert.ToHexString(hmac.ComputeHash(Encoding.UTF8.GetBytes(rawBody))).ToLowerInvariant();
     }
 
-    public static async Task<HttpResponseMessage> CreatePaymentIntentRawAsync(HttpClient client, Guid orderId, string idempotencyKey)
+    public static async Task<HttpResponseMessage> CreatePaymentIntentRawAsync(HttpClient client, Guid orderId, string idempotencyKey, string? channel = null)
     {
         using var request = new HttpRequestMessage(HttpMethod.Post, "/api/v1/payments/intents")
         {
-            Content = JsonContent.Create(new { orderId })
+            Content = JsonContent.Create(new { orderId, channel })
         };
         request.Headers.Add("Idempotency-Key", idempotencyKey);
         return await client.SendAsync(request);
     }
 
-    public static async Task<PaymentIntentData> CreatePaymentIntentAsync(HttpClient client, Guid orderId, string idempotencyKey)
+    public static async Task<PaymentIntentData> CreatePaymentIntentAsync(HttpClient client, Guid orderId, string idempotencyKey, string? channel = null)
     {
-        var response = await CreatePaymentIntentRawAsync(client, orderId, idempotencyKey);
+        var response = await CreatePaymentIntentRawAsync(client, orderId, idempotencyKey, channel);
         response.EnsureSuccessStatusCode();
         var envelope = await response.Content.ReadFromJsonAsync<ApiEnvelope<PaymentIntentData>>(ApiEnvelopeJson.Options);
         return envelope!.Data!;

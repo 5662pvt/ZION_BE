@@ -4,4 +4,4 @@ using ZIONShop.SharedKernel.Results;
 
 namespace ZIONShop.Payments.Application.Features.CreatePaymentIntent;
 
-public record CreatePaymentIntentCommand(Guid OrderId, Guid UserId, string IdempotencyKey) : IRequest<Result<PaymentIntentDto>>;
+public record CreatePaymentIntentCommand(Guid OrderId, Guid UserId, string IdempotencyKey, string? Channel = null) : IRequest<Result<PaymentIntentDto>>;

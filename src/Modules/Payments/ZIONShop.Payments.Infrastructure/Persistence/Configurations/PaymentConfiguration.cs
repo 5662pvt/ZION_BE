@@ -27,6 +27,7 @@ public class PaymentConfiguration : IEntityTypeConfiguration<Payment>
         builder.HasIndex(p => new { p.UserId, p.IdempotencyKey }).IsUnique();
 
         builder.Property(p => p.Status).HasConversion<string>().HasMaxLength(16).IsRequired();
+        builder.Property(p => p.Channel).IsRequired().HasMaxLength(20).HasDefaultValue("Card");
         builder.Property(p => p.FailureReason).HasMaxLength(500);
         builder.Property(p => p.ExpiresAt).IsRequired();
         builder.Property(p => p.CompletedAt);

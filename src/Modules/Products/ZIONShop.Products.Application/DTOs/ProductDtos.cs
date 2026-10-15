@@ -26,3 +26,12 @@ public record ProductSummaryDto(
     string Status,
     string? CategoryName,
     string? PrimaryImageUrl);
+
+public record ProductSuggestionDto(
+    Guid Id,
+    string Name,
+    string Slug,
+    string Sku,
+    decimal Price,
+    string Currency,
+    string? ThumbnailUrl);

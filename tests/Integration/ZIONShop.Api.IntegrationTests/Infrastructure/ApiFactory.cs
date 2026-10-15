@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.Configuration;
 using Testcontainers.PostgreSql;
 
 namespace ZIONShop.Api.IntegrationTests.Infrastructure;
@@ -36,8 +37,7 @@ public class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
 
         // Program.cs reads some of these eagerly from builder.Configuration during service
         // registration -- e.g. AuthInfrastructureExtensions checks Email:Host to decide between
-        // SmtpEmailSender/LoggingEmailSender, and the auth rate limiter reads
-        // RateLimiting:AuthPermitLimit -- both before WebApplicationFactory's ConfigureWebHost
+        // SmtpEmailSender/LoggingEmailSender -- before WebApplicationFactory's ConfigureWebHost
         // hook runs. ConfigureAppConfiguration overrides only apply once builder.Build() is
         // intercepted, which is too late for those reads, so set real process environment
         // variables instead: WebApplication.CreateBuilder(args) picks these up immediately.
@@ -54,8 +54,19 @@ public class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         // the path portion of the returned URL rather than assuming it's relative.
         Environment.SetEnvironmentVariable("ImageStorage__PublicBaseUrl", "http://test.local");
         Environment.SetEnvironmentVariable("ImageStorage__LocalRootPath", UploadsRootPath);
-        // The suite logs in/registers far more than 20 times/minute; raise the auth rate
-        // limiter's PermitLimit so it doesn't 429 unrelated test assertions.
-        Environment.SetEnvironmentVariable("RateLimiting__AuthPermitLimit", "1000");
+
+        // RateLimiting:* is bound into IOptions<RateLimitingOptions> and only read from DI inside
+        // the limiter partition factories at request time -- well after builder.Build() -- so,
+        // unlike the settings above, a plain ConfigureAppConfiguration override here is seen
+        // correctly. The suite logs in/registers/searches/checks out far more than the production
+        // defaults allow, so raise all three here. RateLimitingTests.cs layers its own low-limit
+        // ConfigureAppConfiguration on top via WithWebHostBuilder; being registered after this one,
+        // it wins for the keys it sets (last-registered configuration source wins).
+        builder.ConfigureAppConfiguration((_, config) => config.AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["RateLimiting:AuthPermitLimit"] = "1000",
+            ["RateLimiting:CheckoutPermitLimit"] = "1000",
+            ["RateLimiting:SearchPermitLimit"] = "1000",
+        }));
     }
 }

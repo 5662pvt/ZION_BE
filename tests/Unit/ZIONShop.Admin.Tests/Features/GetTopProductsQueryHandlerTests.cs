@@ -34,7 +34,7 @@ public class GetTopProductsQueryHandlerTests
             new ReportOrderLine(giftProductId, "Gift Product", 1, 50m, true, Guid.NewGuid()));
 
         var reader = ReaderReturning(range, new[] { order });
-        var handler = new GetTopProductsQueryHandler(reader.Object, Now);
+        var handler = new GetTopProductsQueryHandler(reader.Object, Now, new FakeDistributedCacheService());
 
         var result = await handler.Handle(new GetTopProductsQuery("2026-10-01", "2026-10-07", 10, "revenue"), CancellationToken.None);
 
@@ -56,7 +56,7 @@ public class GetTopProductsQueryHandlerTests
             new ReportOrderLine(lowRevenueHighQty, "Cheap", 50, 1m, false, null));
 
         var reader = ReaderReturning(range, new[] { order });
-        var handler = new GetTopProductsQueryHandler(reader.Object, Now);
+        var handler = new GetTopProductsQueryHandler(reader.Object, Now, new FakeDistributedCacheService());
 
         var result = await handler.Handle(new GetTopProductsQuery("2026-10-01", "2026-10-07", 10, "quantity"), CancellationToken.None);
 
@@ -73,11 +73,26 @@ public class GetTopProductsQueryHandlerTests
         var order = OrderWith(lines);
 
         var reader = ReaderReturning(range, new[] { order });
-        var handler = new GetTopProductsQueryHandler(reader.Object, Now);
+        var handler = new GetTopProductsQueryHandler(reader.Object, Now, new FakeDistributedCacheService());
 
         var result = await handler.Handle(new GetTopProductsQuery("2026-10-01", "2026-10-07", 2, "revenue"), CancellationToken.None);
 
         result.Value.Should().HaveCount(2);
         result.Value.Select(p => p.Revenue).Should().BeInDescendingOrder();
+    }
+
+    [Fact]
+    public async Task Handle_Should_HitCache_When_SameParametersRequestedTwice()
+    {
+        var range = ReportRange.Create("2026-10-01", "2026-10-07", Now).Value;
+        var order = OrderWith(new ReportOrderLine(Guid.NewGuid(), "Product", 1, 10m, false, null));
+        var reader = ReaderReturning(range, new[] { order });
+        var cache = new FakeDistributedCacheService();
+        var handler = new GetTopProductsQueryHandler(reader.Object, Now, cache);
+
+        await handler.Handle(new GetTopProductsQuery("2026-10-01", "2026-10-07", 10, "revenue"), CancellationToken.None);
+        await handler.Handle(new GetTopProductsQuery("2026-10-01", "2026-10-07", 10, "revenue"), CancellationToken.None);
+
+        reader.Verify(x => x.GetCompletedOrdersAsync(range.FromUtc, range.ToUtc, It.IsAny<CancellationToken>()), Times.Once);
     }
 }

@@ -49,7 +49,7 @@ public class GetDashboardQueryHandlerTests
         var inventory = new Mock<IInventoryStatsReader>();
         inventory.Setup(x => x.CountLowStockAsync(It.IsAny<CancellationToken>())).ReturnsAsync(2);
 
-        var handler = new GetDashboardQueryHandler(orders.Object, users.Object, inventory.Object, Now);
+        var handler = new GetDashboardQueryHandler(orders.Object, users.Object, inventory.Object, Now, new FakeDistributedCacheService());
         var result = await handler.Handle(new GetDashboardQuery("2026-10-01", "2026-10-07"), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
@@ -102,10 +102,37 @@ public class GetDashboardQueryHandlerTests
         var inventory = new Mock<IInventoryStatsReader>();
         inventory.Setup(x => x.CountLowStockAsync(It.IsAny<CancellationToken>())).ReturnsAsync(0);
 
-        var handler = new GetDashboardQueryHandler(orders.Object, users.Object, inventory.Object, Now);
+        var handler = new GetDashboardQueryHandler(orders.Object, users.Object, inventory.Object, Now, new FakeDistributedCacheService());
         var result = await handler.Handle(new GetDashboardQuery("2026-10-01", "2026-10-07"), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
         result.Value.Kpis.Revenue.ChangePercent.Should().Be(50.0m);
+    }
+
+    [Fact]
+    public async Task Handle_Should_HitCache_When_SameRangeRequestedTwice()
+    {
+        var range = ReportRange.Create("2026-10-01", "2026-10-07", Now).Value;
+
+        var orders = new Mock<IOrderReportReader>();
+        orders.Setup(x => x.GetCompletedOrdersAsync(It.IsAny<DateTime>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Array.Empty<CompletedOrderRow>());
+        orders.Setup(x => x.GetPlacedStatusCountsAsync(It.IsAny<DateTime>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(ZeroStatusCounts);
+        orders.Setup(x => x.CountAwaitingShipmentAsync(It.IsAny<CancellationToken>())).ReturnsAsync(0);
+
+        var users = new Mock<IUserStatsReader>();
+        users.Setup(x => x.CountCustomersRegisteredAsync(It.IsAny<DateTime>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>())).ReturnsAsync(0);
+
+        var inventory = new Mock<IInventoryStatsReader>();
+        inventory.Setup(x => x.CountLowStockAsync(It.IsAny<CancellationToken>())).ReturnsAsync(0);
+
+        var cache = new FakeDistributedCacheService();
+        var handler = new GetDashboardQueryHandler(orders.Object, users.Object, inventory.Object, Now, cache);
+
+        await handler.Handle(new GetDashboardQuery("2026-10-01", "2026-10-07"), CancellationToken.None);
+        await handler.Handle(new GetDashboardQuery("2026-10-01", "2026-10-07"), CancellationToken.None);
+
+        orders.Verify(x => x.GetCompletedOrdersAsync(range.FromUtc, range.ToUtc, It.IsAny<CancellationToken>()), Times.Once);
     }
 }

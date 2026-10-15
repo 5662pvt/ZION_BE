@@ -1,4 +1,6 @@
 using MediatR;
+using ZIONShop.Caching;
+using ZIONShop.Products.Application.Caching;
 using ZIONShop.Products.Application.DTOs;
 using ZIONShop.Products.Application.Interfaces;
 using ZIONShop.Products.Application.Mappings;
@@ -13,12 +15,14 @@ public class ArchiveProductCommandHandler : IRequestHandler<ArchiveProductComman
     private readonly IProductRepository _products;
     private readonly ICategoryRepository _categories;
     private readonly IProductsUnitOfWork _uow;
+    private readonly IDistributedCacheService _cache;
 
-    public ArchiveProductCommandHandler(IProductRepository products, ICategoryRepository categories, IProductsUnitOfWork uow)
+    public ArchiveProductCommandHandler(IProductRepository products, ICategoryRepository categories, IProductsUnitOfWork uow, IDistributedCacheService cache)
     {
         _products = products;
         _categories = categories;
         _uow = uow;
+        _cache = cache;
     }
 
     public async Task<Result<ProductDto>> Handle(ArchiveProductCommand request, CancellationToken cancellationToken)
@@ -29,6 +33,8 @@ public class ArchiveProductCommandHandler : IRequestHandler<ArchiveProductComman
         product.Archive();
         _products.Update(product);
         await _uow.SaveChangesAsync(cancellationToken);
+
+        await _cache.RemoveManyAsync(ProductCacheKeys.DetailById(product.Id), ProductCacheKeys.DetailBySlug(product.Slug));
 
         string? categoryName = null;
         if (product.CategoryId.HasValue)

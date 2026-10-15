@@ -5,6 +5,7 @@ using ZIONShop.Products.Domain.Entities;
 using ZIONShop.Products.Domain.ValueObjects;
 using ZIONShop.Products.Infrastructure.Persistence;
 using ZIONShop.Products.Infrastructure.Repositories;
+using ZIONShop.Products.Tests.TestSupport;
 
 namespace ZIONShop.Products.Tests.Features;
 
@@ -29,13 +30,16 @@ public class ReorderProductImagesCommandHandlerTests
     {
         var (db, products, product) = await SeedAsync();
         var ids = product.Images.OrderBy(i => i.DisplayOrder).Select(i => i.Id).Reverse().ToList();
-        var handler = new ReorderProductImagesCommandHandler(products, db);
+        var cache = new FakeDistributedCacheService();
+        await cache.SetAsync($"zion:products:detail:id:{product.Id}", new object());
+        var handler = new ReorderProductImagesCommandHandler(products, db, cache);
 
         var result = await handler.Handle(new ReorderProductImagesCommand(product.Id, ids), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
         var reloaded = await products.GetByIdAsync(product.Id, CancellationToken.None);
         reloaded!.Images.OrderBy(i => i.DisplayOrder).Select(i => i.Id).Should().BeEquivalentTo(ids, o => o.WithStrictOrdering());
+        cache.Contains($"zion:products:detail:id:{product.Id}").Should().BeFalse();
     }
 
     [Fact]
@@ -43,7 +47,7 @@ public class ReorderProductImagesCommandHandlerTests
     {
         var (db, products, product) = await SeedAsync();
         var mismatchedIds = new List<Guid> { Guid.NewGuid(), Guid.NewGuid() };
-        var handler = new ReorderProductImagesCommandHandler(products, db);
+        var handler = new ReorderProductImagesCommandHandler(products, db, new FakeDistributedCacheService());
 
         var result = await handler.Handle(new ReorderProductImagesCommand(product.Id, mismatchedIds), CancellationToken.None);
 

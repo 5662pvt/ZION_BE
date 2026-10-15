@@ -1,6 +1,7 @@
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using ZIONShop.Auth.Authorization;
 using ZIONShop.Auth.CurrentUser;
 using ZIONShop.Common.Api;
@@ -32,6 +33,7 @@ public class OrdersController : ControllerBase
     private bool IsStaffOrAdmin => _currentUser.Roles.Contains(Roles.Staff) || _currentUser.Roles.Contains(Roles.Admin);
 
     [HttpPost]
+    [EnableRateLimiting("checkout")]
     public async Task<IActionResult> Place(
         [FromHeader(Name = "Idempotency-Key")] string? idempotencyKey,
         [FromBody] PlaceOrderBody body,
@@ -49,7 +51,7 @@ public class OrdersController : ControllerBase
     [HttpGet("mine")]
     public async Task<IActionResult> GetMine([FromQuery] GetMyOrdersRequest req, CancellationToken ct)
     {
-        var query = new GetMyOrdersQuery(_currentUser.UserId!.Value, req.Page <= 0 ? 1 : req.Page, req.PageSize <= 0 ? 20 : req.PageSize, req.Status);
+        var query = new GetMyOrdersQuery(_currentUser.UserId!.Value, req.Page <= 0 ? 1 : req.Page, req.PageSize <= 0 ? 20 : req.PageSize, req.Status, req.From, req.To);
         return (await _mediator.Send(query, ct)).ToPagedActionResult();
     }
 
@@ -82,5 +84,5 @@ public class OrdersController : ControllerBase
 
 public record PlaceOrderBody(Guid AddressId, string PaymentMethod, string? Note, string? CouponCode = null);
 public record CancelOrderBody(string? Reason);
-public record GetMyOrdersRequest(int Page = 1, int PageSize = 20, string? Status = null);
+public record GetMyOrdersRequest(int Page = 1, int PageSize = 20, string? Status = null, string? From = null, string? To = null);
 public record AdminSearchOrdersRequest(int Page = 1, int PageSize = 20, string? Status = null, DateTime? From = null, DateTime? To = null, string? Keyword = null);

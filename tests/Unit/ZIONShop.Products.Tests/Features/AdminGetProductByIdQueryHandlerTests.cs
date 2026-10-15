@@ -5,6 +5,7 @@ using ZIONShop.Products.Domain.Entities;
 using ZIONShop.Products.Domain.ValueObjects;
 using ZIONShop.Products.Infrastructure.Persistence;
 using ZIONShop.Products.Infrastructure.Repositories;
+using ZIONShop.Products.Tests.TestSupport;
 
 namespace ZIONShop.Products.Tests.Features;
 
@@ -51,7 +52,7 @@ public class AdminGetProductByIdQueryHandlerTests
     public async Task Handle_Should_ReturnNotFound_When_PublicQueryGivenDraftProduct()
     {
         var (draft, products, categories) = await SeedAsync();
-        var handler = new GetProductByIdQueryHandler(products, categories);
+        var handler = new GetProductByIdQueryHandler(products, categories, new FakeDistributedCacheService());
 
         var result = await handler.Handle(new GetProductByIdQuery(draft.Id), CancellationToken.None);
 

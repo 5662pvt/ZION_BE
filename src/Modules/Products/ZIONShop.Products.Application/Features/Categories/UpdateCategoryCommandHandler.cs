@@ -1,4 +1,6 @@
 using MediatR;
+using ZIONShop.Caching;
+using ZIONShop.Products.Application.Caching;
 using ZIONShop.Products.Application.DTOs;
 using ZIONShop.Products.Application.Interfaces;
 using ZIONShop.Products.Domain.Exceptions;
@@ -11,11 +13,13 @@ public class UpdateCategoryCommandHandler : IRequestHandler<UpdateCategoryComman
 {
     private readonly ICategoryRepository _categories;
     private readonly IProductsUnitOfWork _uow;
+    private readonly IDistributedCacheService _cache;
 
-    public UpdateCategoryCommandHandler(ICategoryRepository categories, IProductsUnitOfWork uow)
+    public UpdateCategoryCommandHandler(ICategoryRepository categories, IProductsUnitOfWork uow, IDistributedCacheService cache)
     {
         _categories = categories;
         _uow = uow;
+        _cache = cache;
     }
 
     public async Task<Result<CategoryDto>> Handle(UpdateCategoryCommand request, CancellationToken cancellationToken)
@@ -26,6 +30,8 @@ public class UpdateCategoryCommandHandler : IRequestHandler<UpdateCategoryComman
         category.Update(request.Name, request.Description, request.DisplayOrder);
         _categories.Update(category);
         await _uow.SaveChangesAsync(cancellationToken);
+
+        await _cache.RemoveAsync(ProductCacheKeys.CategoryTree, cancellationToken);
 
         return Result.Success(new CategoryDto(category.Id, category.Name, category.Slug, category.Description, category.ParentId, category.DisplayOrder));
     }

@@ -14,4 +14,5 @@ public static class ProductsErrors
     public static readonly Error ImageNotFound = Error.NotFound("Products.ImageNotFound", "Product image not found");
     public static readonly Error InvalidImageOrder = Error.Validation("Products.InvalidImageOrder", "Image order must contain exactly the product's current image ids");
     public static readonly Error InvalidImageUpload = Error.Validation("Products.InvalidImageUpload", "Image upload failed");
+    public static readonly Error InvalidSuggestQuery = Error.Validation("Products.InvalidSuggestQuery", "q must be between 2 and 100 characters");
 }

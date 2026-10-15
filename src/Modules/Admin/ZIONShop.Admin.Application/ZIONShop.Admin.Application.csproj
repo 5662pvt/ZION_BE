@@ -7,5 +7,6 @@
   <ItemGroup>
     <ProjectReference Include="..\ZIONShop.Admin.Domain\ZIONShop.Admin.Domain.csproj" />
     <ProjectReference Include="..\..\..\BuildingBlocks\ZIONShop.Contracts\ZIONShop.Contracts.csproj" />
+    <ProjectReference Include="..\..\..\BuildingBlocks\ZIONShop.Caching\ZIONShop.Caching.csproj" />
   </ItemGroup>
 </Project>

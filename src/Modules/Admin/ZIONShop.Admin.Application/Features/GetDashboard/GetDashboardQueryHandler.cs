@@ -1,7 +1,9 @@
 using System.Globalization;
 using MediatR;
+using ZIONShop.Admin.Application.Caching;
 using ZIONShop.Admin.Application.Common;
 using ZIONShop.Admin.Application.DTOs;
+using ZIONShop.Caching;
 using ZIONShop.Contracts.Auth;
 using ZIONShop.Contracts.Inventory;
 using ZIONShop.Contracts.Orders;
@@ -20,13 +22,20 @@ public class GetDashboardQueryHandler : IRequestHandler<GetDashboardQuery, Resul
     private readonly IUserStatsReader _users;
     private readonly IInventoryStatsReader _inventory;
     private readonly TimeProvider _timeProvider;
+    private readonly IDistributedCacheService _cache;
 
-    public GetDashboardQueryHandler(IOrderReportReader orders, IUserStatsReader users, IInventoryStatsReader inventory, TimeProvider timeProvider)
+    public GetDashboardQueryHandler(
+        IOrderReportReader orders,
+        IUserStatsReader users,
+        IInventoryStatsReader inventory,
+        TimeProvider timeProvider,
+        IDistributedCacheService cache)
     {
         _orders = orders;
         _users = users;
         _inventory = inventory;
         _timeProvider = timeProvider;
+        _cache = cache;
     }
 
     public async Task<Result<DashboardReportDto>> Handle(GetDashboardQuery request, CancellationToken cancellationToken)
@@ -35,6 +44,17 @@ public class GetDashboardQueryHandler : IRequestHandler<GetDashboardQuery, Resul
         if (rangeResult.IsFailure) return Result.Failure<DashboardReportDto>(rangeResult.Error);
         var range = rangeResult.Value;
 
+        var dto = await _cache.GetOrCreateAsync(
+            ReportCacheKeys.Dashboard(range.From, range.To),
+            async ct => (DashboardReportDto?)await BuildAsync(range, ct),
+            TimeSpan.FromSeconds(60),
+            cancellationToken);
+
+        return Result.Success(dto!);
+    }
+
+    private async Task<DashboardReportDto> BuildAsync(ReportRange range, CancellationToken cancellationToken)
+    {
         var current = await _orders.GetCompletedOrdersAsync(range.FromUtc, range.ToUtc, cancellationToken);
         var previous = await _orders.GetCompletedOrdersAsync(range.PreviousFromUtc, range.PreviousToUtc, cancellationToken);
         var placedCounts = await _orders.GetPlacedStatusCountsAsync(range.FromUtc, range.ToUtc, cancellationToken);
@@ -99,6 +119,6 @@ public class GetDashboardQueryHandler : IRequestHandler<GetDashboardQuery, Resul
             statusBreakdown,
             paymentMethods);
 
-        return Result.Success(dto);
+        return dto;
     }
 }

@@ -32,8 +32,22 @@ public class CreatePaymentIntentCommandHandler : IRequestHandler<CreatePaymentIn
         _timeProvider = timeProvider;
     }
 
+    private static readonly string[] ValidChannels = { "Card", "EWallet", "BankTransfer" };
+
+    // Channel validation happens here rather than via FluentValidation: ValidationBehavior always prefixes
+    // a FluentValidation failure code with the property name, which cannot produce the contract-exact
+    // "Payments.InvalidChannel" code (same reasoning as PlaceOrderCommandValidator).
+    private static string? NormalizeChannel(string? input)
+    {
+        var value = string.IsNullOrWhiteSpace(input) ? "Card" : input.Trim();
+        return ValidChannels.FirstOrDefault(c => string.Equals(c, value, StringComparison.OrdinalIgnoreCase));
+    }
+
     public async Task<Result<PaymentIntentDto>> Handle(CreatePaymentIntentCommand request, CancellationToken cancellationToken)
     {
+        var channel = NormalizeChannel(request.Channel);
+        if (channel is null) return Result.Failure<PaymentIntentDto>(PaymentsErrors.InvalidChannel);
+
         var existingByKey = await _payments.GetByIdempotencyKeyAsync(request.UserId, request.IdempotencyKey, cancellationToken);
         if (existingByKey is not null) return Result.Success(existingByKey.ToDto(_gateway));
 
@@ -56,7 +70,7 @@ public class CreatePaymentIntentCommandHandler : IRequestHandler<CreatePaymentIn
         if (existingPending is not null) return Result.Success(existingPending.ToDto(_gateway));
 
         var now = _timeProvider.GetUtcNow().UtcDateTime;
-        var payment = Payment.Create(request.OrderId, request.UserId, payableOrder.Amount, payableOrder.Currency, "Fake", request.IdempotencyKey, now);
+        var payment = Payment.Create(request.OrderId, request.UserId, payableOrder.Amount, payableOrder.Currency, "Fake", request.IdempotencyKey, now, channel);
         var (intentId, _) = await _gateway.CreateIntentAsync(payment, cancellationToken);
         payment.AssignIntent(intentId);
 

@@ -7,6 +7,7 @@ using ZIONShop.Products.Domain.Entities;
 using ZIONShop.Products.Domain.ValueObjects;
 using ZIONShop.Products.Infrastructure.Persistence;
 using ZIONShop.Products.Infrastructure.Repositories;
+using ZIONShop.Products.Tests.TestSupport;
 using ZIONShop.SharedKernel.Results;
 
 namespace ZIONShop.Products.Tests.Features;
@@ -46,7 +47,9 @@ public class RemoveProductImageCommandHandlerTests
         var (db, products, product) = await SeedAsync();
         var imageId = product.Images.Single().Id;
         var storage = new FakeImageStorage();
-        var handler = new RemoveProductImageCommandHandler(products, storage, db, NullLogger<RemoveProductImageCommandHandler>.Instance);
+        var cache = new FakeDistributedCacheService();
+        await cache.SetAsync($"zion:products:detail:id:{product.Id}", new object());
+        var handler = new RemoveProductImageCommandHandler(products, storage, db, cache, NullLogger<RemoveProductImageCommandHandler>.Instance);
 
         var result = await handler.Handle(new RemoveProductImageCommand(product.Id, imageId), CancellationToken.None);
 
@@ -55,6 +58,7 @@ public class RemoveProductImageCommandHandlerTests
 
         var reloaded = await products.GetByIdAsync(product.Id, CancellationToken.None);
         reloaded!.Images.Should().BeEmpty();
+        cache.Contains($"zion:products:detail:id:{product.Id}").Should().BeFalse();
     }
 
     [Fact]
@@ -62,7 +66,7 @@ public class RemoveProductImageCommandHandlerTests
     {
         var (db, products, product) = await SeedAsync();
         var storage = new FakeImageStorage();
-        var handler = new RemoveProductImageCommandHandler(products, storage, db, NullLogger<RemoveProductImageCommandHandler>.Instance);
+        var handler = new RemoveProductImageCommandHandler(products, storage, db, new FakeDistributedCacheService(), NullLogger<RemoveProductImageCommandHandler>.Instance);
 
         var result = await handler.Handle(new RemoveProductImageCommand(product.Id, Guid.NewGuid()), CancellationToken.None);
 

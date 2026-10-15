@@ -1,6 +1,8 @@
 using MediatR;
+using ZIONShop.Admin.Application.Caching;
 using ZIONShop.Admin.Application.Common;
 using ZIONShop.Admin.Application.DTOs;
+using ZIONShop.Caching;
 using ZIONShop.Contracts.Orders;
 using ZIONShop.SharedKernel.Results;
 
@@ -10,11 +12,13 @@ public class GetTopProductsQueryHandler : IRequestHandler<GetTopProductsQuery, R
 {
     private readonly IOrderReportReader _orders;
     private readonly TimeProvider _timeProvider;
+    private readonly IDistributedCacheService _cache;
 
-    public GetTopProductsQueryHandler(IOrderReportReader orders, TimeProvider timeProvider)
+    public GetTopProductsQueryHandler(IOrderReportReader orders, TimeProvider timeProvider, IDistributedCacheService cache)
     {
         _orders = orders;
         _timeProvider = timeProvider;
+        _cache = cache;
     }
 
     public async Task<Result<IReadOnlyList<TopProductDto>>> Handle(GetTopProductsQuery request, CancellationToken cancellationToken)
@@ -23,6 +27,17 @@ public class GetTopProductsQueryHandler : IRequestHandler<GetTopProductsQuery, R
         if (rangeResult.IsFailure) return Result.Failure<IReadOnlyList<TopProductDto>>(rangeResult.Error);
         var range = rangeResult.Value;
 
+        var top = await _cache.GetOrCreateAsync(
+            ReportCacheKeys.TopProducts(range.From, range.To, request.Limit, request.SortBy),
+            async ct => (IReadOnlyList<TopProductDto>?)await BuildAsync(range, request, ct),
+            TimeSpan.FromSeconds(60),
+            cancellationToken);
+
+        return Result.Success(top ?? Array.Empty<TopProductDto>());
+    }
+
+    private async Task<IReadOnlyList<TopProductDto>> BuildAsync(ReportRange range, GetTopProductsQuery request, CancellationToken cancellationToken)
+    {
         var orders = await _orders.GetCompletedOrdersAsync(range.FromUtc, range.ToUtc, cancellationToken);
 
         var grouped = orders
@@ -41,7 +56,6 @@ public class GetTopProductsQueryHandler : IRequestHandler<GetTopProductsQuery, R
             ? grouped.OrderByDescending(p => p.Quantity)
             : grouped.OrderByDescending(p => p.Revenue);
 
-        IReadOnlyList<TopProductDto> top = sorted.Take(request.Limit).ToList();
-        return Result.Success(top);
+        return sorted.Take(request.Limit).ToList();
     }
 }

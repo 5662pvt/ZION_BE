@@ -1,6 +1,7 @@
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using ZIONShop.Auth.Authorization;
 using ZIONShop.Common.Api;
 using ZIONShop.Products.Application.Features.AddProductImage;
@@ -13,6 +14,7 @@ using ZIONShop.Products.Application.Features.PublishProduct;
 using ZIONShop.Products.Application.Features.RemoveProductImage;
 using ZIONShop.Products.Application.Features.ReorderProductImages;
 using ZIONShop.Products.Application.Features.SearchProducts;
+using ZIONShop.Products.Application.Features.SuggestProducts;
 using ZIONShop.Products.Application.Features.UpdateProduct;
 using ZIONShop.Products.Domain.Enums;
 using ZIONShop.SharedKernel.Results;
@@ -29,6 +31,7 @@ public class ProductsController : ControllerBase
 
     [HttpGet]
     [AllowAnonymous]
+    [EnableRateLimiting("search")]
     public async Task<IActionResult> Search([FromQuery] SearchProductsRequest req, CancellationToken ct)
     {
         var query = new SearchProductsQuery(
@@ -41,6 +44,12 @@ public class ProductsController : ControllerBase
             req.Sort);
         return (await _mediator.Send(query, ct)).ToPagedActionResult();
     }
+
+    [HttpGet("suggest")]
+    [AllowAnonymous]
+    [EnableRateLimiting("search")]
+    public async Task<IActionResult> Suggest([FromQuery] string? q, [FromQuery] int? limit, CancellationToken ct)
+        => (await _mediator.Send(new SuggestProductsQuery(q, limit), ct)).ToActionResult();
 
     [HttpGet("admin")]
     [Authorize(Policy = Policies.AdminOnly)]

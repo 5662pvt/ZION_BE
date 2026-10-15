@@ -2,6 +2,7 @@
 using FluentValidation;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using ZIONShop.Caching;
 
 namespace ZIONShop.Admin.Application.DependencyInjection;
 
@@ -13,6 +14,7 @@ public static class AdminApplicationExtensions
         services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(assembly));
         services.AddValidatorsFromAssembly(assembly, includeInternalTypes: true);
         services.TryAddSingleton(TimeProvider.System);
+        services.TryAddSingleton<IDistributedCacheService, NullDistributedCacheService>();
         return services;
     }
 }

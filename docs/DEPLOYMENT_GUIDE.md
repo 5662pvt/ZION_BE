@@ -211,7 +211,28 @@ Luu y:
 - Neu deploy production bang Azure, khong nhat thiet phai dung Docker Compose tren server.
 - Docker Compose chu yeu de chay local full stack backend.
 
-## 11. Database Migration Strategy
+## 11. Health Check Endpoints
+
+API co 3 endpoint health, ngoai `/healthz` (giu nguyen, tuong thich nguoc):
+
+```text
+GET /health/live                    - luon 200 khi process con song, khong check dependency
+GET /health/ready                   - 200 (Healthy/Degraded) hoac 503 (Unhealthy)
+GET /api/v1/admin/system/health     - nhu /health/ready, can JWT Admin, bao boc trong ApiResponse envelope
+```
+
+`/health/ready` check 3 dependency (tag `ready`): `postgres` (SELECT 1, timeout 3s, Unhealthy neu loi), `redis` (PING, timeout 2s; **Degraded** neu khong ket noi duoc -- Redis la optional, app fail open; Healthy "not configured" neu khong dang ky), `rabbitmq` (chi check khi `EventBus:Provider=RabbitMq`; Healthy "in-memory provider" khi dung InMemory).
+
+Response JSON khong bao gio chua connection string hay exception stack trace -- chi `{ status, totalDurationMs, checks: [{ name, status, durationMs, description }] }`.
+
+Dung cho load balancer / container orchestrator probe:
+
+```text
+liveness probe  -> /health/live
+readiness probe -> /health/ready
+```
+
+## 12. Database Migration Strategy
 
 Hien tai API co the chay EF Core migrations khi startup trong Development.
 
@@ -227,7 +248,7 @@ Thu tu production an toan:
 backup DB -> run migrations -> deploy API -> smoke test
 ```
 
-## 12. Contributor Access
+## 13. Contributor Access
 
 Voi nguoi ngoai/team mo rong:
 
@@ -242,7 +263,7 @@ Voi core team:
 - Staging chi dung cho kiem thu.
 - Production chi pipeline va maintainer duoc dung.
 
-## 13. Setup Checklist
+## 14. Setup Checklist
 
 Lam theo thu tu:
 
@@ -265,7 +286,7 @@ Lam theo thu tu:
 13. Chay migration production.
 14. Deploy production.
 
-## 14. Recommended Policy
+## 15. Recommended Policy
 
 Quy tac ngan gon:
 

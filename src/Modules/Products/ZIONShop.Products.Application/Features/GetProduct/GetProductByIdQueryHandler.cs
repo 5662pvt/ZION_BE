@@ -1,4 +1,6 @@
 using MediatR;
+using ZIONShop.Caching;
+using ZIONShop.Products.Application.Caching;
 using ZIONShop.Products.Application.DTOs;
 using ZIONShop.Products.Application.Mappings;
 using ZIONShop.Products.Domain.Enums;
@@ -12,18 +14,31 @@ public class GetProductByIdQueryHandler : IRequestHandler<GetProductByIdQuery, R
 {
     private readonly IProductRepository _products;
     private readonly ICategoryRepository _categories;
+    private readonly IDistributedCacheService _cache;
 
-    public GetProductByIdQueryHandler(IProductRepository products, ICategoryRepository categories)
+    public GetProductByIdQueryHandler(IProductRepository products, ICategoryRepository categories, IDistributedCacheService cache)
     {
         _products = products;
         _categories = categories;
+        _cache = cache;
     }
 
     public async Task<Result<ProductDto>> Handle(GetProductByIdQuery request, CancellationToken cancellationToken)
     {
-        var product = await _products.GetByIdAsync(request.Id, cancellationToken);
+        var cached = await _cache.GetOrCreateAsync(
+            ProductCacheKeys.DetailById(request.Id),
+            ct => LoadPublishedAsync(request.Id, ct),
+            TimeSpan.FromMinutes(5),
+            cancellationToken);
+
+        return cached is null ? Result.Failure<ProductDto>(ProductsErrors.ProductNotFound) : Result.Success(cached);
+    }
+
+    private async Task<ProductDto?> LoadPublishedAsync(Guid id, CancellationToken cancellationToken)
+    {
+        var product = await _products.GetByIdAsync(id, cancellationToken);
         if (product is null || product.Status != ProductStatus.Published)
-            return Result.Failure<ProductDto>(ProductsErrors.ProductNotFound);
+            return null;
 
         string? categoryName = null;
         if (product.CategoryId.HasValue)
@@ -31,6 +46,6 @@ public class GetProductByIdQueryHandler : IRequestHandler<GetProductByIdQuery, R
             var category = await _categories.GetByIdAsync(product.CategoryId.Value, cancellationToken);
             categoryName = category?.Name;
         }
-        return Result.Success(product.ToDto(categoryName));
+        return product.ToDto(categoryName);
     }
 }

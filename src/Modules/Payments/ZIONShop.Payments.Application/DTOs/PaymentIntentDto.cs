@@ -8,4 +8,5 @@ public record PaymentIntentDto(
     decimal Amount,
     string Currency,
     string RedirectUrl,
-    DateTime ExpiresAt);
+    DateTime ExpiresAt,
+    string Channel);

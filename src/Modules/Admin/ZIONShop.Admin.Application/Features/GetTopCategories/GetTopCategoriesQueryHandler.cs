@@ -1,6 +1,8 @@
 using MediatR;
+using ZIONShop.Admin.Application.Caching;
 using ZIONShop.Admin.Application.Common;
 using ZIONShop.Admin.Application.DTOs;
+using ZIONShop.Caching;
 using ZIONShop.Contracts.Orders;
 using ZIONShop.Contracts.Products;
 using ZIONShop.SharedKernel.Results;
@@ -15,13 +17,20 @@ public class GetTopCategoriesQueryHandler : IRequestHandler<GetTopCategoriesQuer
     private readonly IProductCatalogReader _catalog;
     private readonly ICategoryLookup _categories;
     private readonly TimeProvider _timeProvider;
+    private readonly IDistributedCacheService _cache;
 
-    public GetTopCategoriesQueryHandler(IOrderReportReader orders, IProductCatalogReader catalog, ICategoryLookup categories, TimeProvider timeProvider)
+    public GetTopCategoriesQueryHandler(
+        IOrderReportReader orders,
+        IProductCatalogReader catalog,
+        ICategoryLookup categories,
+        TimeProvider timeProvider,
+        IDistributedCacheService cache)
     {
         _orders = orders;
         _catalog = catalog;
         _categories = categories;
         _timeProvider = timeProvider;
+        _cache = cache;
     }
 
     public async Task<Result<IReadOnlyList<TopCategoryDto>>> Handle(GetTopCategoriesQuery request, CancellationToken cancellationToken)
@@ -30,6 +39,17 @@ public class GetTopCategoriesQueryHandler : IRequestHandler<GetTopCategoriesQuer
         if (rangeResult.IsFailure) return Result.Failure<IReadOnlyList<TopCategoryDto>>(rangeResult.Error);
         var range = rangeResult.Value;
 
+        var top = await _cache.GetOrCreateAsync(
+            ReportCacheKeys.TopCategories(range.From, range.To, request.SortBy),
+            async ct => (IReadOnlyList<TopCategoryDto>?)await BuildAsync(range, request, ct),
+            TimeSpan.FromSeconds(60),
+            cancellationToken);
+
+        return Result.Success(top ?? Array.Empty<TopCategoryDto>());
+    }
+
+    private async Task<IReadOnlyList<TopCategoryDto>> BuildAsync(ReportRange range, GetTopCategoriesQuery request, CancellationToken cancellationToken)
+    {
         var orders = await _orders.GetCompletedOrdersAsync(range.FromUtc, range.ToUtc, cancellationToken);
         var products = await _catalog.ListAsync(cancellationToken);
         var categories = await _categories.ListAsync(cancellationToken);
@@ -52,6 +72,6 @@ public class GetTopCategoriesQueryHandler : IRequestHandler<GetTopCategoriesQuer
             ? grouped.OrderByDescending(c => c.Quantity)
             : grouped.OrderByDescending(c => c.Revenue);
 
-        return Result.Success<IReadOnlyList<TopCategoryDto>>(sorted.ToList());
+        return sorted.ToList();
     }
 }

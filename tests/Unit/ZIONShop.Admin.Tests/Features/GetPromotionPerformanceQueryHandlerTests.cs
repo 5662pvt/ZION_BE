@@ -35,7 +35,7 @@ public class GetPromotionPerformanceQueryHandlerTests
         promotions.Setup(x => x.ResolveCouponCodesAsync(It.Is<IReadOnlyCollection<string>>(c => c.Contains("SALE10")), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Dictionary<string, PromotionRef> { ["SALE10"] = new(promotionId, "10% Sale", "PercentageOff") });
 
-        var handler = new GetPromotionPerformanceQueryHandler(orderReader.Object, promotions.Object, Now);
+        var handler = new GetPromotionPerformanceQueryHandler(orderReader.Object, promotions.Object, Now, new FakeDistributedCacheService());
         var result = await handler.Handle(new GetPromotionPerformanceQuery("2026-10-01", "2026-10-07"), CancellationToken.None);
 
         var entry = result.Value.Should().ContainSingle().Subject;
@@ -60,7 +60,7 @@ public class GetPromotionPerformanceQueryHandlerTests
         promotions.Setup(x => x.GetByIdsAsync(It.Is<IReadOnlyCollection<Guid>>(c => c.Contains(giftPromotionId)), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Dictionary<Guid, PromotionRef> { [giftPromotionId] = new(giftPromotionId, "Free Gift", "Gift") });
 
-        var handler = new GetPromotionPerformanceQueryHandler(orderReader.Object, promotions.Object, Now);
+        var handler = new GetPromotionPerformanceQueryHandler(orderReader.Object, promotions.Object, Now, new FakeDistributedCacheService());
         var result = await handler.Handle(new GetPromotionPerformanceQuery("2026-10-01", "2026-10-07"), CancellationToken.None);
 
         var entry = result.Value.Should().ContainSingle().Subject;
@@ -84,11 +84,33 @@ public class GetPromotionPerformanceQueryHandlerTests
         promotions.Setup(x => x.ResolveCouponCodesAsync(It.IsAny<IReadOnlyCollection<string>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Dictionary<string, PromotionRef>());
 
-        var handler = new GetPromotionPerformanceQueryHandler(orderReader.Object, promotions.Object, Now);
+        var handler = new GetPromotionPerformanceQueryHandler(orderReader.Object, promotions.Object, Now, new FakeDistributedCacheService());
         var result = await handler.Handle(new GetPromotionPerformanceQuery("2026-10-01", "2026-10-07"), CancellationToken.None);
 
         var entry = result.Value.Should().ContainSingle().Subject;
         entry.PromotionName.Should().Be("GONE");
         entry.Type.Should().Be("Unknown");
+    }
+
+    [Fact]
+    public async Task Handle_Should_HitCache_When_SameRangeRequestedTwice()
+    {
+        var range = ReportRange.Create("2026-10-01", "2026-10-07", Now).Value;
+        var orders = new[] { CouponOrder("SALE10", 10m) };
+
+        var orderReader = new Mock<IOrderReportReader>();
+        orderReader.Setup(x => x.GetCompletedOrdersAsync(range.FromUtc, range.ToUtc, It.IsAny<CancellationToken>())).ReturnsAsync(orders);
+
+        var promotions = new Mock<IPromotionLookup>();
+        promotions.Setup(x => x.ResolveCouponCodesAsync(It.IsAny<IReadOnlyCollection<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Dictionary<string, PromotionRef>());
+
+        var cache = new FakeDistributedCacheService();
+        var handler = new GetPromotionPerformanceQueryHandler(orderReader.Object, promotions.Object, Now, cache);
+
+        await handler.Handle(new GetPromotionPerformanceQuery("2026-10-01", "2026-10-07"), CancellationToken.None);
+        await handler.Handle(new GetPromotionPerformanceQuery("2026-10-01", "2026-10-07"), CancellationToken.None);
+
+        orderReader.Verify(x => x.GetCompletedOrdersAsync(range.FromUtc, range.ToUtc, It.IsAny<CancellationToken>()), Times.Once);
     }
 }

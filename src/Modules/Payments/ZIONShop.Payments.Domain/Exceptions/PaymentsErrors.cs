@@ -15,4 +15,5 @@ public static class PaymentsErrors
     public static readonly Error InvalidProjectionTransition = Error.Conflict("Payments.InvalidProjectionTransition", "Invalid projection state transition");
     public static readonly Error SimulationNotAvailable = Error.NotFound("Payments.SimulationNotAvailable", "Not found");
     public static readonly Error InvalidSimulationResult = Error.Validation("Payments.InvalidSimulationResult", "result phải là 'success' hoặc 'failure'");
+    public static readonly Error InvalidChannel = Error.Validation("Payments.InvalidChannel", "channel phải là 'Card', 'EWallet' hoặc 'BankTransfer'");
 }
