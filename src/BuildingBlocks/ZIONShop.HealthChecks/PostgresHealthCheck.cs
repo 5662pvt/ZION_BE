@@ -1,7 +1,8 @@
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Npgsql;
 
-namespace ZIONShop.Api.Health;
+namespace ZIONShop.HealthChecks;
 
 public class PostgresHealthCheck : IHealthCheck
 {

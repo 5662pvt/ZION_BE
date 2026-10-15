@@ -71,6 +71,28 @@ public sealed class RabbitMqPublisher : IDisposable
         return PublishAsync(string.Empty, routingKey, mandatory: true, messageId, typeName, body, headers, cancellationToken);
     }
 
+    /// <summary>
+    /// Republishes a message straight to the main exchange (used by the DLQ admin "requeue" action),
+    /// routing key = original event type name. Forwards the failed delivery's own headers minus
+    /// <c>x-death</c>/<c>x-retry-count</c>/<c>x-last-error</c> so the next delivery looks like a fresh
+    /// publish rather than a retry -- in particular this still carries forward the original
+    /// <c>traceparent</c>/<c>tracestate</c> headers (see <see cref="PublishToRetryQueueAsync"/> for the
+    /// same reasoning), overlaid by the live <see cref="Activity.Current"/> trace context if one happens
+    /// to be present at requeue time.
+    /// </summary>
+    public Task PublishRequeuedAsync(string messageId, string typeName, byte[] body,
+        IDictionary<string, object>? incomingHeaders, CancellationToken cancellationToken)
+    {
+        var headers = incomingHeaders is { Count: > 0 }
+            ? new Dictionary<string, object>(incomingHeaders)
+            : new Dictionary<string, object>();
+        headers.Remove("x-death");
+        headers.Remove("x-retry-count");
+        headers.Remove("x-last-error");
+        return PublishAsync(_options.Exchange, typeName, mandatory: true, messageId, typeName, body,
+            headers.Count > 0 ? headers : null, cancellationToken);
+    }
+
     private async Task PublishAsync(string exchange, string routingKey, bool mandatory, string messageId, string typeName,
         byte[] body, IDictionary<string, object>? headers, CancellationToken cancellationToken)
     {

@@ -6,7 +6,7 @@ Tai lieu nay mo ta nhung gi API xuat ra qua OpenTelemetry (OTLP), cach chay dash
 
 ## 1. Du lieu duoc thu thap
 
-Service name: `zionshop-api` (tu `OTEL_SERVICE_NAME`).
+Service name: `zionshop-api` cho API, `zionshop-worker` cho Worker (tu `OTEL_SERVICE_NAME`; moi host co default rieng neu bien nay khong duoc set — xem `ZIONShop.Observability.AddZionObservability`). Ca 2 host dung chung pipeline (`ZIONShop.Observability`), nen cung bo metric/trace nhu nhau duoi day; chi khac service name va host nao dang chay consumer/outbox/background job tai thoi diem do (xem `BackgroundProcessing:Enabled` trong README.md).
 
 ### Spans (traces)
 
@@ -94,7 +94,19 @@ Mo dashboard: <http://localhost:18888>
 5. Quan sat `outbox.pending` giam dan ve 0 khi outbox poll publish lai thanh cong cac message con lai.
 6. De tao mot "poison message" (message luon loi khi xu ly) de xem DLQ gauge (`rabbitmq.queue.messages` tag `dlq`) tang, can mot handler co loi that/that dedicated test — khong co san cong khai de "co tinh gay loi" ngoai viec can thiep code; ghi nhan day la buoc thu cong khi can kiem thu.
 
-## 6. Luu y production
+## 6. Cong cu admin cho outbox / inbox / DLQ / worker
+
+Thay vi chi xem metric/log, trang "Hệ thống" cua admin goi thang `api/v1/admin/system` (`AdminSystemController`, yeu cau `Policies.AdminOnly`) de tra cuu va can thiep:
+
+- `GET /modules` — danh sach module co outbox / co inbox.
+- `GET /outbox?module=&status=&page=&pageSize=`, `GET /outbox/{module}/{id}` — liet ke / xem chi tiet mot outbox message (status suy ra tu `Attempts`/`ProcessedOn`, giong cach `outbox.pending`/`outbox.failed` tinh). Payload trong response chi tiet da duoc mask cac field nhay cam (email, phone, recipientName, streetAddress, address, password, token, secret, card -> `"***"`).
+- `POST /outbox/{module}/{id}/retry`, `POST /outbox/retry-failed?module=` — reset `Attempts`/`Error` cua (cac) row dang Failed de outbox poll publish lai, khong can cho het `MaxAttempts` hoac can thiep DB tay.
+- `GET /dlq?limit=`, `POST /dlq/requeue`, `DELETE /dlq/{messageId}` — xem/day lai/xoa message trong DLQ qua API thay vi phai vao RabbitMQ management UI thao tac tay. Peek khong xoa message (chi set lai "redelivered" va co the doi thu tu trong queue); broker khong ket noi duoc tra ve 503.
+- `GET /health` (admin) co them check `worker`: Healthy `"consumers=N"` neu queue chinh co >= 1 consumer dang chay, Unhealthy `"no consumer: start the worker"` neu 0 — phat hien ngay truong hop quen chay Worker (hoac API voi `BackgroundProcessing:Enabled=false`) ma khong ai tieu thu queue, thay vi phai doi `rabbitmq.queue.messages` tang len moi biet. Check nay **khong** co tag `ready` nen **khong** anh huong `/health/ready` (readiness probe cua container/LB): khong ai chay Worker la mot tinh trang vận hành can canh bao, khong phai loi cua tung instance API — API van phai bao Healthy/200 de LB khong rut het instance ra khoi pool.
+
+Chi tiet thiet ke (store abstraction theo module, cach mask payload, cach peek/requeue/delete DLQ) o `.ai/context/10-event-driven.md`.
+
+## 7. Luu y production
 
 - Khong dung `DOTNET_DASHBOARD_UNSECURED_ALLOW_ANONYMOUS=true` ngoai moi truong local. Production/staging phai bat auth cho dashboard (hoac dung backend OTLP khac co auth, vi du collector rieng).
 - Dung sampling de giam chi phi/luong du lieu: cau hinh `Otel:SamplingRatio` (ty le span duoc giu lai) phu hop voi tai production, khong de 100% mac dinh tren moi truong tai cao.

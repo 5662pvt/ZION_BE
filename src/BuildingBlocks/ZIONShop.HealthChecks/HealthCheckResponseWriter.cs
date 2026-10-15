@@ -1,7 +1,8 @@
 using System.Text.Json;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 
-namespace ZIONShop.Api.Health;
+namespace ZIONShop.HealthChecks;
 
 public record SystemHealthCheckDto(string Name, string Status, double DurationMs, string? Description);
 
@@ -15,7 +16,7 @@ public static class HealthReportMapper
 
 /// <summary>Shared JSON body for /health/live and /health/ready -- never includes connection
 /// strings or exception detail, only the safe, fixed <see cref="IHealthCheck"/> descriptions set
-/// by each check in this folder.</summary>
+/// by each check in this project.</summary>
 public static class HealthCheckResponseWriter
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);

@@ -13,7 +13,6 @@ using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Options;
 using ZIONShop.Api.Extensions;
-using ZIONShop.Api.Health;
 using ZIONShop.Api.Middleware;
 using ZIONShop.Api.Options;
 using ZIONShop.Auth.Application.DependencyInjection;
@@ -29,8 +28,10 @@ using ZIONShop.Common.Behaviors;
 using ZIONShop.Common.Email;
 using ZIONShop.Common.Exceptions;
 using ZIONShop.EventBus.DependencyInjection;
+using ZIONShop.HealthChecks;
 using ZIONShop.Logging.Middleware;
 using ZIONShop.Logging.Serilog;
+using ZIONShop.Observability;
 using ZIONShop.Products.Application.DependencyInjection;
 using ZIONShop.Products.Application.Interfaces;
 using ZIONShop.Products.Application.Options;
@@ -123,7 +124,7 @@ builder.Services.AddCors(opts => opts.AddDefaultPolicy(p => p
     .WithExposedHeaders("X-Correlation-Id", "Retry-After", "Idempotent-Replayed")));
 
 // Building blocks
-builder.Services.AddZionObservability(builder.Configuration, builder.Environment);
+builder.Services.AddZionObservability(builder.Configuration, builder.Environment, "zionshop-api", $"/{ImageStorageOptions.UploadsFolderName}");
 builder.Services.AddZionAuth(builder.Configuration);
 builder.Services.AddZionEventBus(builder.Configuration);
 builder.Services.AddZionEmail(builder.Configuration);
@@ -163,10 +164,16 @@ builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 builder.Services.AddProblemDetails();
 
 // Health checks
+// "worker" is deliberately untagged: it reports whether anything is consuming the main queue, which
+// depends on an operational choice (is the Worker host running right now) rather than this API
+// instance's own ability to serve traffic, so it must never fail container/LB readiness probes
+// (/health/ready, tag "ready"). It still shows up in the admin system-health endpoint below, which
+// checks every registered health check regardless of tag.
 builder.Services.AddHealthChecks()
     .AddCheck<PostgresHealthCheck>("postgres", tags: new[] { "ready" })
     .AddCheck<RedisHealthCheck>("redis", tags: new[] { "ready" })
-    .AddCheck<RabbitMqHealthCheck>("rabbitmq", tags: new[] { "ready" });
+    .AddCheck<RabbitMqHealthCheck>("rabbitmq", tags: new[] { "ready" })
+    .AddCheck<WorkerHealthCheck>("worker");
 
 // Rate limiting (auth, checkout, search endpoints). Limits are read from IOptions<RateLimitingOptions>
 // inside each partition factory (at request time, after DI/config is fully built) rather than off

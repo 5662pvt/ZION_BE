@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using ZIONShop.Contracts.Inventory;
 using ZIONShop.Contracts.Orders;
 using ZIONShop.EventBus.DependencyInjection;
+using ZIONShop.EventBus.Inbox;
 using ZIONShop.EventBus.Outbox;
 using ZIONShop.Payments.Application.IntegrationEvents;
 using ZIONShop.Payments.Application.Interfaces;
@@ -39,7 +40,8 @@ public static class PaymentsInfrastructureExtensions
         services.AddScoped<IPaymentsUnitOfWork>(sp => sp.GetRequiredService<PaymentsDbContext>());
         services.AddScoped<IPaymentGateway, FakePaymentGateway>();
 
-        services.AddOutbox<PaymentsDbContext>();
+        services.AddOutbox<PaymentsDbContext>(configuration);
+        services.AddInboxAdmin<PaymentsDbContext>();
 
         services.AddIntegrationEventHandler<OrderCreatedIntegrationEvent, OrderCreatedIntegrationEventHandler, PaymentsDbContext>();
         services.AddIntegrationEventHandler<InventoryReservedIntegrationEvent, InventoryReservedIntegrationEventHandler, PaymentsDbContext>();

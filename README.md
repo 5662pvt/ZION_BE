@@ -21,6 +21,7 @@ ZION_BE/ (this repo)
 |   `-- DEPLOYMENT_GUIDE.md
 |-- src/
 |   |-- Api/ZIONShop.Api/
+|   |-- Worker/ZIONShop.Worker/
 |   |-- BuildingBlocks/
 |   `-- Modules/
 `-- tests/
@@ -42,7 +43,7 @@ ZION_BE/ (this repo)
 ```powershell
 cp deploy/.env.example deploy/.env
 docker compose -f deploy/docker-compose.yml up -d postgres redis rabbitmq seq
-docker compose -f deploy/docker-compose.yml up -d --build api
+docker compose -f deploy/docker-compose.yml up -d --build api worker
 ```
 
 - API: <http://localhost:8080/swagger>
@@ -53,6 +54,12 @@ docker compose -f deploy/docker-compose.yml up -d --build api
 
 Seed account: `admin@zionshop.local` / `Admin@123`.
 
+In this compose topology, `api` sets `BackgroundProcessing__Enabled=false` and `worker` (a separate
+container, same image family, built from `src/Worker/ZIONShop.Worker/Dockerfile`) owns every
+consumer/outbox/background job (RabbitMQ consumer, outbox publishers, reservation-expiry/stale-coupon
+scans, idempotency-key cleanup) instead. The API still owns EF Core migrations/seeding; the worker has
+no controllers and only serves `/health/live` + `/health/ready`.
+
 ## Run Backend Locally
 
 ```powershell
@@ -61,6 +68,25 @@ dotnet run --project src\Api\ZIONShop.Api\ZIONShop.Api.csproj
 ```
 
 Open <http://localhost:8080/swagger>.
+
+### Run API + Worker as two separate processes
+
+By default, running the API alone (as above) still runs every background job itself — behaviour is
+unchanged from before the Worker existed. To split them into two processes instead (closer to the
+Docker Compose topology):
+
+```powershell
+# Terminal 1 -- API only serves HTTP; hands background jobs to the Worker
+$env:BackgroundProcessing__Enabled = "false"
+dotnet run --project src\Api\ZIONShop.Api\ZIONShop.Api.csproj
+
+# Terminal 2 -- Worker owns every consumer/outbox/background job
+dotnet run --project src\Worker\ZIONShop.Worker\ZIONShop.Worker.csproj
+```
+
+The Worker needs the same `ConnectionStrings:DefaultConnection`/`EventBus:*`/`Redis:*`/`Email:*`
+settings as the API (via its own `appsettings.json`, user-secrets, or environment variables) but does
+not need `Jwt:*` (no authenticated HTTP endpoints) and never runs migrations itself.
 
 ## Run Frontend Locally
 

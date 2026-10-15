@@ -1,14 +1,17 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Npgsql;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 using ZIONShop.EventBus.Diagnostics;
 using ZIONShop.Logging.Resource;
-using ZIONShop.Products.Application.Options;
 
-namespace ZIONShop.Api.Extensions;
+namespace ZIONShop.Observability;
 
 /// <summary>
 /// Wires the OpenTelemetry SDK (traces + metrics) against the ActivitySource/Meter instruments
@@ -18,32 +21,40 @@ namespace ZIONShop.Api.Extensions;
 /// Activity.Current, independent of whether anything is actually exported -- but the OTLP exporter
 /// itself is only added when an endpoint is configured, and never in the Testing environment, so a
 /// dev box with nothing configured behaves exactly as before (no network calls, no console spam).
+/// Shared by every host (API, Worker) -- each passes its own <paramref name="serviceName"/>.
 /// </summary>
 public static class ObservabilityExtensions
 {
-    private static readonly string[] ExcludedPathPrefixes =
-    {
-        "/health", "/healthz", "/swagger", $"/{ImageStorageOptions.UploadsFolderName}"
-    };
+    private static readonly string[] DefaultExcludedPathPrefixes = { "/health", "/healthz", "/swagger" };
 
     private static readonly string[] OtlpWellKnownPaths = { "/v1/traces", "/v1/metrics", "/v1/logs" };
 
     public static IServiceCollection AddZionObservability(
-        this IServiceCollection services, IConfiguration configuration, IHostEnvironment environment)
+        this IServiceCollection services,
+        IConfiguration configuration,
+        IHostEnvironment environment,
+        string serviceName,
+        params string[] additionalExcludedPathPrefixes)
     {
+        // Must run before ZionResourceAttributes.ServiceName is read below, and before Serilog's
+        // deferred OpenTelemetry sink configuration (UseZionSerilog, built later at Build()) reads it
+        // too -- see ZionResourceAttributes.SetDefaultServiceName.
+        ZionResourceAttributes.SetDefaultServiceName(serviceName);
+
         var otlpEndpointSetting = configuration["Otel:Endpoint"] ?? Environment.GetEnvironmentVariable("OTEL_EXPORTER_OTLP_ENDPOINT");
         var otlpEndpoint = string.IsNullOrWhiteSpace(otlpEndpointSetting) ? null : new Uri(otlpEndpointSetting);
         var exportOtlp = !environment.IsEnvironment("Testing") && otlpEndpoint is not null;
 
-        var serviceName = ZionResourceAttributes.ServiceName;
+        var resourceServiceName = ZionResourceAttributes.ServiceName;
         var serviceVersion = ZionResourceAttributes.ServiceVersion;
         var samplingRatio = configuration.GetValue<double?>("Otel:SamplingRatio") ?? 1.0;
+        var excludedPathPrefixes = DefaultExcludedPathPrefixes.Concat(additionalExcludedPathPrefixes).ToArray();
 
         services.AddOpenTelemetry()
             .ConfigureResource(resource => resource
-                .AddService(serviceName, serviceVersion: serviceVersion, serviceInstanceId: ZionResourceAttributes.ServiceInstanceId)
+                .AddService(resourceServiceName, serviceVersion: serviceVersion, serviceInstanceId: ZionResourceAttributes.ServiceInstanceId)
                 .AddAttributes(new[] { new KeyValuePair<string, object>("deployment.environment", environment.EnvironmentName) }))
-            .WithTracing(tracing => tracing.ConfigureTracePipeline(samplingRatio, otlpEndpoint,
+            .WithTracing(tracing => tracing.ConfigureTracePipeline(samplingRatio, otlpEndpoint, excludedPathPrefixes,
                 addExporter: exportOtlp ? tracingBuilder => tracingBuilder.AddOtlpExporter(o => o.Endpoint = otlpEndpoint!) : null))
             .WithMetrics(metrics =>
             {
@@ -72,10 +83,15 @@ public static class ObservabilityExtensions
     /// processor for <see cref="NpgsqlRootDropProcessor"/> to protect, so it is skipped too.
     /// <paramref name="otlpEndpoint"/> is used only to recognize the exporter's own outgoing HTTP calls
     /// in the HttpClient instrumentation filter below -- it does not add the exporter itself.
+    /// <paramref name="excludedPathPrefixes"/> defaults to health/swagger when omitted (e.g. from a test
+    /// building a production-like pipeline that never serves those paths anyway).
     /// </summary>
     public static TracerProviderBuilder ConfigureTracePipeline(
-        this TracerProviderBuilder tracing, double samplingRatio, Uri? otlpEndpoint, Action<TracerProviderBuilder>? addExporter)
+        this TracerProviderBuilder tracing, double samplingRatio, Uri? otlpEndpoint,
+        IReadOnlyCollection<string>? excludedPathPrefixes = null, Action<TracerProviderBuilder>? addExporter = null)
     {
+        var effectiveExcludedPathPrefixes = excludedPathPrefixes ?? DefaultExcludedPathPrefixes;
+
         tracing
             .SetSampler(new ParentBasedSampler(new TraceIdRatioBasedSampler(samplingRatio)))
             .AddSource(MessagingDiagnostics.SourceName)
@@ -83,7 +99,7 @@ public static class ObservabilityExtensions
             .AddAspNetCoreInstrumentation(o =>
             {
                 o.RecordException = true;
-                o.Filter = httpContext => !IsExcludedPath(httpContext.Request.Path);
+                o.Filter = httpContext => !IsExcludedPath(httpContext.Request.Path, effectiveExcludedPathPrefixes);
                 o.EnrichWithHttpResponse = (activity, response) =>
                 {
                     var userId = response.HttpContext.User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value
@@ -132,9 +148,9 @@ public static class ObservabilityExtensions
         return false;
     }
 
-    private static bool IsExcludedPath(PathString path)
+    private static bool IsExcludedPath(PathString path, IReadOnlyCollection<string> excludedPathPrefixes)
     {
-        foreach (var prefix in ExcludedPathPrefixes)
+        foreach (var prefix in excludedPathPrefixes)
             if (path.StartsWithSegments(prefix))
                 return true;
         return false;

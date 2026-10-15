@@ -70,15 +70,49 @@ public class OutboxPublisherService<TDbContext> : BackgroundService where TDbCon
         var db = scope.ServiceProvider.GetRequiredService<TDbContext>();
         var eventBus = scope.ServiceProvider.GetRequiredService<IEventBus>();
 
-        var messages = await db.Set<OutboxMessage>()
-            .Where(m => m.ProcessedOn == null && m.Attempts < MaxAttempts)
-            .OrderBy(m => m.OccurredOn)
-            .Take(BatchSize)
-            .ToListAsync(cancellationToken);
+        // Row-level claim so multiple instances of this service (API + Worker, or several Worker
+        // replicas) can run PublishBatchAsync concurrently against the same table without
+        // double-publishing: FOR UPDATE SKIP LOCKED lets each instance grab a disjoint batch instead
+        // of blocking on (or re-selecting) rows another instance already claimed. The lock is only
+        // meaningful for the lifetime of one DB transaction, so claim + publish + status update +
+        // commit all happen inside it.
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
 
-        await UpdateOutboxGaugesAsync(db, cancellationToken);
+        List<OutboxMessage> messages;
+        try
+        {
+            var entityType = db.Model.FindEntityType(typeof(OutboxMessage))
+                ?? throw new InvalidOperationException(
+                    $"{nameof(OutboxMessage)} is not part of the {typeof(TDbContext).Name} model.");
+            var tableRef = $"\"{entityType.GetSchema()}\".\"{entityType.GetTableName()}\"";
 
-        if (messages.Count == 0) return;
+            // {{0}}/{{1}} (escaped braces in this verbatim interpolated string) become the literal
+            // tokens "{0}"/"{1}" that FromSqlRaw itself resolves into real parameters -- tableRef is
+            // the only part substituted by C# interpolation, and it comes from trusted model
+            // metadata, never user input.
+            var sql = $@"
+SELECT * FROM {tableRef}
+WHERE ""ProcessedOn"" IS NULL AND ""Attempts"" < {{0}}
+ORDER BY ""OccurredOn""
+LIMIT {{1}}
+FOR UPDATE SKIP LOCKED";
+
+            messages = await db.Set<OutboxMessage>()
+                .FromSqlRaw(sql, MaxAttempts, BatchSize)
+                .ToListAsync(cancellationToken);
+        }
+        catch
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            throw;
+        }
+
+        if (messages.Count == 0)
+        {
+            await transaction.CommitAsync(cancellationToken);
+            await UpdateOutboxGaugesAsync(db, cancellationToken);
+            return;
+        }
 
         foreach (var message in messages)
         {
@@ -143,7 +177,18 @@ public class OutboxPublisherService<TDbContext> : BackgroundService where TDbCon
             }
         }
 
-        await db.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await db.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+        }
+        catch
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            throw;
+        }
+
+        await UpdateOutboxGaugesAsync(db, cancellationToken);
     }
 
     private static async Task UpdateOutboxGaugesAsync(TDbContext db, CancellationToken cancellationToken)

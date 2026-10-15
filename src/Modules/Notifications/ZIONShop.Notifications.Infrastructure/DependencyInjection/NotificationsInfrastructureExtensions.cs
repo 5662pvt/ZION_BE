@@ -3,6 +3,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using ZIONShop.Contracts.Orders;
 using ZIONShop.EventBus.DependencyInjection;
+using ZIONShop.EventBus.Inbox;
 using ZIONShop.Notifications.Application.IntegrationEvents;
 using ZIONShop.Notifications.Application.Interfaces;
 using ZIONShop.Notifications.Application.Options;
@@ -24,6 +25,8 @@ public static class NotificationsInfrastructureExtensions
 
         services.AddScoped<INotificationLogRepository, NotificationLogRepository>();
         services.AddScoped<INotificationsUnitOfWork>(sp => sp.GetRequiredService<NotificationsDbContext>());
+
+        services.AddInboxAdmin<NotificationsDbContext>();
 
         services.AddIntegrationEventHandler<OrderConfirmedIntegrationEvent, OrderConfirmedIntegrationEventHandler, NotificationsDbContext>();
         services.AddIntegrationEventHandler<OrderShippedIntegrationEvent, OrderShippedIntegrationEventHandler, NotificationsDbContext>();

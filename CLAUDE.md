@@ -17,7 +17,7 @@ ZION_BE/ (this repo)
 |-- .ai/            # agent context
 |-- deploy/         # docker-compose.yml, .env.example, nginx/
 |-- docs/           # DEPLOYMENT_GUIDE.md
-|-- src/            # Api/, BuildingBlocks/, Modules/
+|-- src/            # Api/, Worker/, BuildingBlocks/, Modules/
 |-- tests/          # Unit/, Integration/, Architecture/
 |-- ZIONShop.slnx, global.json, Directory.Build.props, Directory.Packages.props
 |-- .gitignore
@@ -57,8 +57,14 @@ ZION_BE/ (this repo)
 ```powershell
 dotnet build ZIONShop.slnx
 dotnet test ZIONShop.slnx
-docker compose -f deploy/docker-compose.yml up -d --build api
+docker compose -f deploy/docker-compose.yml up -d --build api worker
 ```
+
+`src/Worker/ZIONShop.Worker` is a separate minimal host that runs every consumer/outbox/background
+job (RabbitMQ consumer, outbox publishers, reservation-expiry/stale-coupon scans, idempotency-key
+cleanup). By default the API still runs them itself (single-process dev run, unchanged); set
+`BackgroundProcessing__Enabled=false` on the API to hand them to the Worker instead (docker-compose
+already does this). See README.md's "Run API + Worker as two separate processes".
 
 Aspire Dashboard (traces/metrics/logs, opt-in via `OTEL_EXPORTER_OTLP_ENDPOINT`): <http://localhost:18888> — see `docs/observability.md`.
 

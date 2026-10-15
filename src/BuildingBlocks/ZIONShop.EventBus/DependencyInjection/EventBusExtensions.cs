@@ -22,11 +22,13 @@ public static class EventBusExtensions
             services.AddSingleton<RabbitMqConnection>();
             services.AddSingleton<RabbitMqPublisher>();
             services.AddSingleton<IEventBus, RabbitMqEventBus>();
-            services.AddHostedService<RabbitMqConsumerService>();
+            services.AddSingleton<IDeadLetterAdmin, RabbitMqDeadLetterAdmin>();
+            services.AddZionBackgroundService<RabbitMqConsumerService>(configuration);
         }
         else
         {
             services.AddSingleton<IEventBus, InMemoryEventBus>();
+            services.AddSingleton<IDeadLetterAdmin, InMemoryDeadLetterAdmin>();
         }
         return services;
     }

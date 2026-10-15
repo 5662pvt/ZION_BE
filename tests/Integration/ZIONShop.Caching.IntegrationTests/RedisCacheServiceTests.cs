@@ -73,8 +73,17 @@ public class RedisCacheServiceTests
     [Fact]
     public async Task GetOrCreateAsync_Should_FailOpenToFactory_When_RedisIsDown()
     {
-        var (multiplexer, cache) = CreateCache();
-        using var _ = multiplexer;
+        // CreateCache()'s default options carry the fixture's production-sized 2000ms ConnectTimeout/
+        // SyncTimeout, which leaves barely any margin under the 3s assertion below once the stopped
+        // container's down-detection eats into that same 2000ms budget -- intermittently timing out
+        // under machine load. Use the same tight, deterministic timeouts as the contention test further
+        // below so the down-detection budget (and therefore this assertion's margin) stays small and
+        // reliable regardless of load.
+        var options = _fixture.BuildOptions();
+        options.ConnectTimeout = 300;
+        options.SyncTimeout = 300;
+        using var multiplexer = ConnectionMultiplexer.Connect(options);
+        var cache = new RedisCacheService(multiplexer, NullLogger<RedisCacheService>.Instance);
         var key = $"zion:test:failopen:{Guid.NewGuid()}";
 
         await _fixture.Redis.StopAsync();
@@ -87,7 +96,7 @@ public class RedisCacheServiceTests
             stopwatch.Stop();
 
             value.Subject.Should().Be("fallback");
-            stopwatch.Elapsed.Should().BeLessThan(TimeSpan.FromSeconds(3));
+            stopwatch.Elapsed.Should().BeLessThan(TimeSpan.FromSeconds(2));
         }
         finally
         {

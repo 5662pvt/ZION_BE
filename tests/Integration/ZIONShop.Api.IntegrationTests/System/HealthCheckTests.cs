@@ -43,5 +43,9 @@ public class HealthCheckTests
         // Redis is optional and fails open -- it must never make readiness fail, whether or not a
         // local Redis happens to be reachable in the environment running this test.
         report.Checks.Should().ContainSingle(c => c.Name == "redis" && c.Status != "Unhealthy");
+        // "worker" is registered without the "ready" tag (Program.cs) -- whether anyone runs the
+        // Worker is an operational fact, not a reason for a load balancer to fail this probe. It must
+        // never appear in /health/ready at all, regardless of its own status.
+        report.Checks.Should().NotContain(c => c.Name == "worker");
     }
 }

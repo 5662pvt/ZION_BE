@@ -111,7 +111,7 @@ called by both the publisher (`RabbitMqPublisher`, lazily on first publish) and 
     type) -> `Attempts++`, `Error` set, continue with the next message. `ProcessedOn` is set only
     after the broker has confirmed the publish.
   - `Attempts >= OutboxPublisherService<T>.MaxAttempts` (10) with `ProcessedOn == null` is
-    considered **failed** and logged Critical -- an admin screen will list these (roadmap W14).
+    considered **failed** and logged Critical -- listed and retriable via the admin API below.
 
 ## Inspecting the DLQ
 
@@ -119,6 +119,40 @@ RabbitMQ management UI: `http://localhost:15672` (`deploy/docker-compose.yml` ex
 `EventBus__User`/`EventBus__Pass` credentials as the app). Queues tab -> `{QueueName}.dlq` -> Get
 Message(s) to inspect payload, `x-death` (why/when it was dead-lettered), and `x-last-error`/
 `x-retry-count` headers left by the consumer's last retry attempt.
+
+## Admin "Hệ thống" API (outbox / inbox / DLQ / worker health)
+
+`AdminSystemController` (`api/v1/admin/system`, `Policies.AdminOnly`) exposes the outbox/inbox tables
+and the DLQ without the Admin/API layer ever referencing a module's Infrastructure project:
+
+- `GET /modules` -- outbox/inbox module names, derived from each DbContext type name
+  (`ModuleNameResolver.FromDbContext`, e.g. `OrdersDbContext` -> `"Orders"`).
+- `GET /outbox` / `GET /outbox/{module}/{id}` / `POST /outbox/{module}/{id}/retry` /
+  `POST /outbox/retry-failed` -- backed by `IOutboxAdminStore` (`EventBus/Outbox/`), one instance per
+  module registered automatically by `AddOutbox<TDbContext>()`. Status (`Pending`/`Failed`/`Processed`)
+  uses the same `Attempts`/`ProcessedOn` classification as `OutboxPublisherService<T>.MaxAttempts`.
+  Retry resets `Attempts`/`Error` so the next outbox poll republishes the row.
+- `GET /inbox` -- backed by `IInboxAdminStore` (`EventBus/Inbox/`), registered per module via
+  `AddInboxAdmin<TDbContext>()` (called once from each module's `Add<Module>Infrastructure`, since
+  nothing else implies which modules have an inbox table the way `AddOutbox` does for outbox).
+- `GET /dlq`, `POST /dlq/requeue`, `DELETE /dlq/{messageId}` -- backed by `IDeadLetterAdmin`
+  (`EventBus/RabbitMq/RabbitMqDeadLetterAdmin.cs`, `EventBus/InMemory/InMemoryDeadLetterAdmin.cs`), its
+  own short-lived channel on the existing `RabbitMqConnection`. Peek does `BasicGet(autoAck:false)` then
+  `BasicNack(requeue:true)` for everything it read, so peeking never removes a message but does set its
+  AMQP "redelivered" flag and may reorder the queue. Requeue republishes via
+  `RabbitMqPublisher.PublishRequeuedAsync` (drops `x-death`/`x-retry-count`/`x-last-error`, keeps
+  `traceparent`/`tracestate`). Broker unreachable -> 503 `System.BrokerUnavailable`.
+- Outbox/DLQ payloads are masked by the shared `PayloadMasker` (`EventBus/Admin/`) before they reach the
+  response: any JSON key containing (case-insensitively) email/phone/recipientname/streetaddress/
+  address/password/token/secret/card is replaced with `"***"`.
+- `GET /health` (admin) gained a `worker` check (`WorkerHealthCheck`,
+  `BuildingBlocks/ZIONShop.HealthChecks/`): Healthy `"consumers=N"` when the main queue has >= 1
+  consumer, Unhealthy `"no consumer: start the worker"` at 0, Healthy `"in-memory provider"` under the
+  InMemory provider. Registered without the `"ready"` tag, so it is excluded from `/health/ready`
+  (Program.cs's `Predicate = check => check.Tags.Contains("ready")`) -- whether anyone is running the
+  Worker is an operational fact about the deployment, not this API instance's own readiness, so it
+  must never flip a load balancer's health probe. The admin controller's `/health` action has no tag
+  predicate at all, so it still surfaces `worker` alongside `postgres`/`redis`/`rabbitmq`.
 
 ## Configuration (`EventBus:*`, see `RabbitMqOptions`)
 

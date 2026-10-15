@@ -166,13 +166,18 @@ Ly do:
 - De scale sau nay.
 - Phu hop voi CI/CD tu GitHub Actions.
 
+Backend gom 2 container rieng, build tu cung repo:
+
+- `src/Api/ZIONShop.Api/Dockerfile` — API: controllers, EF Core migrations/seed, chi phuc vu HTTP khi `BackgroundProcessing:Enabled=false`.
+- `src/Worker/ZIONShop.Worker/Dockerfile` — Worker: RabbitMQ consumer, outbox publisher, cac background job (reservation-expiry, stale-coupon release, idempotency-key cleanup); khong co controller, chi co `/health/live` + `/health/ready`.
+
 Deploy backend theo huong:
 
-1. Build Docker image tu `src/Api/ZIONShop.Api/Dockerfile` (build context la repo root).
-2. Push image len container registry.
-3. Deploy image vao Azure Container Apps.
-4. Set environment variables cho API.
-5. API ket noi PostgreSQL staging/prod bang secret.
+1. Build 2 Docker image (API + Worker) tu 2 Dockerfile tren (build context deu la repo root).
+2. Push ca 2 image len container registry.
+3. Deploy ca 2 image vao Azure Container Apps (2 app rieng, cung mang/VNet).
+4. Set environment variables cho API (them `BackgroundProcessing__Enabled=false`) va Worker (cung `ConnectionStrings`/`EventBus`/`Redis`/`Email`, khong can `Jwt:*`).
+5. API/Worker ket noi PostgreSQL staging/prod bang secret.
 
 ## 9. Frontend Deployment Target
 
@@ -198,15 +203,16 @@ production frontend -> production API
 
 ## 10. Docker Compose Usage
 
-File `deploy/docker-compose.yml` phu hop cho local/dev stack (postgres, redis, rabbitmq, seq, api, nginx).
+File `deploy/docker-compose.yml` phu hop cho local/dev stack (postgres, redis, rabbitmq, seq, api, worker, nginx).
 
 ```powershell
 docker compose -f deploy/docker-compose.yml up -d postgres redis rabbitmq seq
-docker compose -f deploy/docker-compose.yml up -d --build api
+docker compose -f deploy/docker-compose.yml up -d --build api worker
 ```
 
 Luu y:
 
+- `api` chay voi `BackgroundProcessing__Enabled=false`; `worker` (service rieng, cung build tu repo nay qua `src/Worker/ZIONShop.Worker/Dockerfile`) moi la noi RabbitMQ consumer/outbox publisher/cac background job thuc su chay. Chi mot noi chay nhung job nay tai 1 thoi diem trong moi truong binh thuong — khong bat ca hai cung luc voi `BackgroundProcessing:Enabled=true`.
 - Nginx trong compose nay chi la reverse proxy cho API (`/api/`, `/swagger/`, `/healthz`); frontend (`ZION_FE`) deploy rieng, khong nam trong compose nay.
 - Neu deploy production bang Azure, khong nhat thiet phai dung Docker Compose tren server.
 - Docker Compose chu yeu de chay local full stack backend.
@@ -214,15 +220,17 @@ Luu y:
 
 ## 11. Health Check Endpoints
 
-API co 3 endpoint health, ngoai `/healthz` (giu nguyen, tuong thich nguoc):
+API (va Worker, cung check) co 3 endpoint health, ngoai `/healthz` tren API (giu nguyen, tuong thich nguoc):
 
 ```text
 GET /health/live                    - luon 200 khi process con song, khong check dependency
 GET /health/ready                   - 200 (Healthy/Degraded) hoac 503 (Unhealthy)
-GET /api/v1/admin/system/health     - nhu /health/ready, can JWT Admin, bao boc trong ApiResponse envelope
+GET /api/v1/admin/system/health     - can JWT Admin, bao boc trong ApiResponse envelope, check nhieu hon /health/ready
 ```
 
 `/health/ready` check 3 dependency (tag `ready`): `postgres` (SELECT 1, timeout 3s, Unhealthy neu loi), `redis` (PING, timeout 2s; **Degraded** neu khong ket noi duoc -- Redis la optional, app fail open; Healthy "not configured" neu khong dang ky), `rabbitmq` (chi check khi `EventBus:Provider=RabbitMq`; Healthy "in-memory provider" khi dung InMemory).
+
+`GET /api/v1/admin/system/health` chay **toan bo** health check da dang ky (khong loc theo tag `ready`), nen ngoai 3 dependency tren con co them `worker` (`WorkerHealthCheck`): Healthy `"consumers=N"` neu queue chinh dang co consumer, Unhealthy `"no consumer: start the worker"` neu khong ai tieu thu queue. `worker` khong mang tag `ready` nen **khong** anh huong `/health/ready` -- quen chay Worker la van de vận hành can admin biet, khong phai ly do de container/LB coi instance API la khong san sang.
 
 Response JSON khong bao gio chua connection string hay exception stack trace -- chi `{ status, totalDurationMs, checks: [{ name, status, durationMs, description }] }`.
 

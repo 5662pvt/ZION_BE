@@ -95,6 +95,10 @@ services:
       Cors__AllowedOrigins__1: "http://localhost"
       OTEL_EXPORTER_OTLP_ENDPOINT: "http://aspire-dashboard:18889"
       OTEL_SERVICE_NAME: "zionshop-api"
+      # Consumers/outbox publishers/scan jobs run on the separate `worker` service instead -- keeping
+      # both on would double-process the same outbox rows/queues (at-least-once delivery tolerates
+      # it, but it's wasted work and noisier traces for no benefit).
+      BackgroundProcessing__Enabled: "false"
     ports:
       - "8080:8080"
     volumes:
@@ -107,6 +111,43 @@ services:
       rabbitmq:
         condition: service_healthy
       aspire-dashboard:
+        condition: service_started
+
+  worker:
+    build:
+      context: ..
+      dockerfile: src/Worker/ZIONShop.Worker/Dockerfile
+    container_name: zionshop-worker
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__DefaultConnection: "Host=postgres;Port=5432;Database=ZionShop;Username=postgres;Password=${DB_PASSWORD:-123@123a}"
+      EventBus__Provider: "RabbitMq"
+      EventBus__Host: rabbitmq
+      EventBus__User: "${RABBITMQ_USER:-guest}"
+      EventBus__Pass: "${RABBITMQ_PASS:-guest}"
+      Redis__Configuration: "redis:6379"
+      Email__Host: "${EMAIL_HOST:-}"
+      Email__Port: "${EMAIL_PORT:-587}"
+      Email__UseSsl: "${EMAIL_USE_SSL:-true}"
+      Email__UserName: "${EMAIL_USERNAME:-}"
+      Email__Password: "${EMAIL_PASSWORD:-}"
+      Email__FromAddress: "${EMAIL_FROM_ADDRESS:-noreply@zionshop.local}"
+      Email__FromName: "${EMAIL_FROM_NAME:-ZIONShop}"
+      Serilog__WriteTo__1__Name: Seq
+      Serilog__WriteTo__1__Args__serverUrl: "http://seq:5341"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://aspire-dashboard:18889"
+      OTEL_SERVICE_NAME: "zionshop-worker"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      aspire-dashboard:
+        condition: service_started
+      api:
         condition: service_started
 
   nginx:

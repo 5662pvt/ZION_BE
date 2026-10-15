@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
@@ -6,9 +7,9 @@ using OpenTelemetry;
 using OpenTelemetry.Exporter;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
-using ZIONShop.Api.Extensions;
 using ZIONShop.Api.IntegrationTests.Infrastructure;
 using ZIONShop.Logging.Resource;
+using ZIONShop.Observability;
 
 namespace ZIONShop.Api.IntegrationTests.Observability;
 
@@ -33,27 +34,33 @@ public class NpgsqlExportFilterTests
     [Fact]
     public async Task OnEnd_Should_DropExportedNpgsqlActivity_When_CommandHasNoParent()
     {
-        var exportedItems = new List<Activity>();
+        var marker = CreateCommandMarker();
+        var exportedItems = new ThreadSafeActivityCollection();
         using var provider = BuildProviderExportingTo(exportedItems);
 
-        await RunSelectOneAsync();
+        await RunSelectOneAsync(marker);
 
-        exportedItems.Should().BeEmpty(
+        provider.ForceFlush();
+        var snapshot = exportedItems.Snapshot();
+        snapshot.Should().NotContain(a => IsTestCommand(a, marker),
             "a root (parentless) Npgsql command activity is background-poll noise and should be dropped at export time");
     }
 
     [Fact]
     public async Task OnEnd_Should_ExportNpgsqlActivity_When_CommandHasAParent()
     {
-        var exportedItems = new List<Activity>();
+        var marker = CreateCommandMarker();
+        var exportedItems = new ThreadSafeActivityCollection();
         using var provider = BuildProviderExportingTo(exportedItems);
 
         using (ParentSource.StartActivity("parent-operation"))
         {
-            await RunSelectOneAsync();
+            await RunSelectOneAsync(marker);
         }
 
-        exportedItems.Should().Contain(a => a.Source.Name == "Npgsql",
+        provider.ForceFlush();
+        var snapshot = exportedItems.Snapshot();
+        snapshot.Should().Contain(a => IsTestCommand(a, marker),
             "a Npgsql command activity that has a parent should flow through the filter unchanged");
     }
 
@@ -86,18 +93,21 @@ public class NpgsqlExportFilterTests
         var otherPort = GetUnusedLoopbackPort();
         var otlpEndpoint = new Uri($"http://127.0.0.1:{otlpPort}/v1/traces");
 
-        var exportedItems = new List<Activity>();
+        var exportedItems = new ThreadSafeActivityCollection();
         using var provider = BuildProviderExportingTo(exportedItems, otlpEndpoint);
 
         using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
         await TryGetAsync(client, otlpEndpoint);
         await TryGetAsync(client, new Uri($"http://127.0.0.1:{otherPort}/"));
 
+        provider.ForceFlush();
+        var snapshot = exportedItems.Snapshot();
+
         // Scoped to the HttpClient source: the shared ApiFactory host's own outbox-publisher
         // background job keeps polling Postgres for the lifetime of the test run and lands on the
         // same process-wide "Npgsql" ActivitySource this provider also listens to via AddNpgsql() --
         // unrelated to what this test is about, but a real risk during a multi-second HTTP timeout.
-        exportedItems.Where(a => a.Source.Name == "System.Net.Http").Should().ContainSingle(
+        snapshot.Where(a => a.Source.Name == "System.Net.Http").Should().ContainSingle(
             "the request to the configured OTLP endpoint must be filtered out while the other request is still recorded");
     }
 
@@ -115,7 +125,7 @@ public class NpgsqlExportFilterTests
                 tracing.AddProcessor(new SimpleActivityExportProcessor(new InMemoryExporter<Activity>(exportedItems))))
             .Build();
 
-    private async Task RunSelectOneAsync()
+    private async Task RunSelectOneAsync(string? commandMarker = null)
     {
         // ApiFactory only sets ConnectionStrings__DefaultConnection (from its Postgres Testcontainer)
         // once the host is actually built, which happens lazily -- force that via CreateClient(), same
@@ -124,11 +134,26 @@ public class NpgsqlExportFilterTests
         var connectionString = Environment.GetEnvironmentVariable("ConnectionStrings__DefaultConnection")
             ?? throw new InvalidOperationException("ApiFactory did not set ConnectionStrings__DefaultConnection.");
 
+        var commandText = commandMarker is null ? "SELECT 1" : $"SELECT 1 /* {commandMarker} */";
+
         await using var connection = new NpgsqlConnection(connectionString);
         await connection.OpenAsync();
-        await using var command = new NpgsqlCommand("SELECT 1", connection);
+        await using var command = new NpgsqlCommand(commandText, connection);
         await command.ExecuteScalarAsync();
     }
+
+    // The shared ApiFactory host's background services (outbox publishers, cleanup, consumer gauges)
+    // run their own SQL concurrently with these tests, on the same process-wide "Npgsql"
+    // ActivitySource this provider listens to -- some of those are legitimately exported (children of
+    // messaging spans). A unique SQL comment lets us find this test's own command activity regardless
+    // of which OTel semantic-convention tag Npgsql records the statement text under.
+    private static string CreateCommandMarker() => $"npgsql-filter-test-{Guid.NewGuid():N}";
+
+    private static bool IsTestCommand(Activity activity, string marker) =>
+        activity.Source.Name == "Npgsql"
+        && (activity.DisplayName.Contains(marker, StringComparison.Ordinal)
+            || activity.OperationName.Contains(marker, StringComparison.Ordinal)
+            || activity.Tags.Any(tag => tag.Value?.Contains(marker, StringComparison.Ordinal) == true));
 
     private static async Task TryGetAsync(HttpClient client, Uri uri)
     {
@@ -153,6 +178,37 @@ public class NpgsqlExportFilterTests
         var port = ((IPEndPoint)listener.LocalEndpoint).Port;
         listener.Stop();
         return port;
+    }
+
+    // InMemoryExporter<T>.Export() adds to this collection on whatever thread ended the activity --
+    // including the shared ApiFactory host's background jobs, concurrently with the test's own
+    // activity. A plain List<Activity> corrupts under that, and enumerating it (via LINQ/Should())
+    // while a background Add is in flight throws "Collection was modified". Serialize both sides on
+    // the same lock and only ever read a snapshot taken under that lock.
+    private sealed class ThreadSafeActivityCollection : ICollection<Activity>
+    {
+        private readonly List<Activity> _items = new();
+        private readonly object _gate = new();
+
+        public int Count { get { lock (_gate) { return _items.Count; } } }
+
+        public bool IsReadOnly => false;
+
+        public void Add(Activity item) { lock (_gate) { _items.Add(item); } }
+
+        public void Clear() { lock (_gate) { _items.Clear(); } }
+
+        public bool Contains(Activity item) { lock (_gate) { return _items.Contains(item); } }
+
+        public void CopyTo(Activity[] array, int arrayIndex) { lock (_gate) { _items.CopyTo(array, arrayIndex); } }
+
+        public bool Remove(Activity item) { lock (_gate) { return _items.Remove(item); } }
+
+        public Activity[] Snapshot() { lock (_gate) { return _items.ToArray(); } }
+
+        public IEnumerator<Activity> GetEnumerator() => ((IEnumerable<Activity>)Snapshot()).GetEnumerator();
+
+        IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
     }
 
     private sealed class ResourceCapturingExporter : BaseExporter<Activity>

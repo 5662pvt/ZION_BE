@@ -1,7 +1,8 @@
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using StackExchange.Redis;
 
-namespace ZIONShop.Api.Health;
+namespace ZIONShop.HealthChecks;
 
 /// <summary>Redis is optional (the app fails open when it's unavailable) -- so an unreachable
 /// Redis degrades readiness instead of failing it, and a Redis that was never registered at all

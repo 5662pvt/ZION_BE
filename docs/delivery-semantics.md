@@ -14,6 +14,31 @@ cho cùng một consumer. Lý do:
 Không có cơ chế nào trong hệ thống (DB, broker, mạng) đảm bảo "exactly once" từ đầu đến cuối — bất kỳ consumer
 nào không tự idempotent sẽ chạy lại business logic nhiều lần cho cùng một event.
 
+## Nhiều instance cùng publish outbox (API + Worker, hoặc nhiều Worker)
+
+`OutboxPublisherService<TDbContext>.PublishBatchAsync` có thể chạy đồng thời từ nhiều instance của
+ứng dụng (ví dụ API host và một Worker host riêng, hoặc nhiều replica Worker) cùng trỏ vào một
+database — mỗi instance poll theo chu kỳ riêng (`RabbitMq:OutboxPollSeconds`), không biết gì về các
+instance khác. Để một row không bị publish trùng bởi hai instance cùng lúc, mỗi lần poll:
+
+1. Mở một transaction DB tường minh trên `TDbContext`.
+2. Lấy schema/table thật của `OutboxMessage` từ model (`db.Model.FindEntityType(typeof(OutboxMessage))`)
+   — không hardcode tên schema/table, vì mỗi module tự đặt schema riêng.
+3. Claim batch bằng raw SQL:
+   `SELECT * FROM "<schema>"."outbox_messages" WHERE "ProcessedOn" IS NULL AND "Attempts" < @max ORDER BY "OccurredOn" LIMIT @batch FOR UPDATE SKIP LOCKED`.
+   `FOR UPDATE SKIP LOCKED` khóa từng row được chọn trong phạm vi transaction này và bỏ qua (không
+   chờ, không lỗi) bất kỳ row nào một transaction khác đang giữ khóa — nên hai instance chạy cùng
+   lúc sẽ luôn claim hai tập row rời nhau (không giao nhau), không bao giờ cùng publish một row.
+4. Publish từng message trong batch đã claim (logic retry/`BrokerUnavailableException` giữ nguyên
+   như trước), rồi `SaveChangesAsync` + `CommitAsync` trên cùng transaction đó — khóa chỉ được giữ
+   trong đúng thời gian xử lý batch này.
+
+Đây **không** biến hệ thống thành exactly-once: nếu instance publish xong (broker đã nhận) nhưng
+crash **trước khi** transaction commit, `ProcessedOn` sẽ không được ghi, row vẫn `null` và lần poll
+kế tiếp (bởi instance nào còn sống) sẽ claim lại và publish lại — vẫn là at-least-once, chỉ là giữa
+nhiều instance thay vì một. Inbox pattern ở phía consumer (xem phần dưới) vẫn là cơ chế chống trùng
+duy nhất, không đổi.
+
 ## Outbox (producer) và Inbox (consumer)
 
 Hai bảng riêng, hai vai trò riêng, mỗi module tự quản lý bảng của mình trong schema của nó:

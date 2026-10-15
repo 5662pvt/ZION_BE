@@ -62,5 +62,7 @@
     <ProjectReference Include="..\..\..\src\Modules\Users\ZIONShop.Users.Infrastructure\ZIONShop.Users.Infrastructure.csproj" />
     <!-- Api -->
     <ProjectReference Include="..\..\..\src\Api\ZIONShop.Api\ZIONShop.Api.csproj" />
+    <!-- Worker -->
+    <ProjectReference Include="..\..\..\src\Worker\ZIONShop.Worker\ZIONShop.Worker.csproj" />
   </ItemGroup>
 </Project>

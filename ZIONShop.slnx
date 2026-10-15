@@ -10,7 +10,11 @@
     <Project Path="src/BuildingBlocks/ZIONShop.Contracts/ZIONShop.Contracts.csproj" />
     <Project Path="src/BuildingBlocks/ZIONShop.EventBus/ZIONShop.EventBus.csproj" />
     <Project Path="src/BuildingBlocks/ZIONShop.Logging/ZIONShop.Logging.csproj" />
+    <Project Path="src/BuildingBlocks/ZIONShop.Observability/ZIONShop.Observability.csproj" />
     <Project Path="src/BuildingBlocks/ZIONShop.SharedKernel/ZIONShop.SharedKernel.csproj" />
+  </Folder>
+  <Folder Name="/src/Worker/">
+    <Project Path="src/Worker/ZIONShop.Worker/ZIONShop.Worker.csproj" />
   </Folder>
   <Folder Name="/src/Modules/" />
   <Folder Name="/src/Modules/Admin/">
@@ -87,6 +91,7 @@
     <Project Path="tests/Integration/ZIONShop.Api.IntegrationTests/ZIONShop.Api.IntegrationTests.csproj" />
     <Project Path="tests/Integration/ZIONShop.Caching.IntegrationTests/ZIONShop.Caching.IntegrationTests.csproj" />
     <Project Path="tests/Integration/ZIONShop.EventBus.IntegrationTests/ZIONShop.EventBus.IntegrationTests.csproj" />
+    <Project Path="tests/Integration/ZIONShop.Worker.Tests/ZIONShop.Worker.Tests.csproj" />
   </Folder>
   <Folder Name="/tests/Architecture/">
     <Project Path="tests/Architecture/ZIONShop.ArchitectureTests/ZIONShop.ArchitectureTests.csproj" />

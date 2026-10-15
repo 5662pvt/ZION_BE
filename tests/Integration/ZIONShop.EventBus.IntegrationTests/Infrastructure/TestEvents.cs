@@ -149,3 +149,14 @@ public sealed class AlwaysFailsIntegrationEventHandler : IIntegrationEventHandle
         throw new InvalidOperationException("Simulated handler failure.");
     }
 }
+
+/// <summary>Swapped in for the real <see cref="IEventBus"/> (via <c>EventBusTestHost.CreateAsync</c>'s
+/// <c>configureServices</c> seam) to simulate a publish failure that is the message's own fault -- e.g. a
+/// serialization bug -- rather than a broker outage. <see cref="OutboxPublisherService{TDbContext}"/> must
+/// treat this distinctly from <c>BrokerUnavailableException</c>: increment <c>Attempts</c>, record
+/// <c>Error</c>, and leave the row unprocessed, instead of stopping the batch without penalty.</summary>
+public sealed class ThrowingEventBus : IEventBus
+{
+    public Task PublishAsync<TEvent>(TEvent @event, CancellationToken cancellationToken = default) where TEvent : IntegrationEvent =>
+        throw new InvalidOperationException("Simulated non-broker publish failure.");
+}

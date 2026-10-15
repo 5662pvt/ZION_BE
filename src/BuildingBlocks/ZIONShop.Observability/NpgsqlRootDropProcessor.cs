@@ -1,7 +1,7 @@
 using System.Diagnostics;
 using OpenTelemetry;
 
-namespace ZIONShop.Api.Extensions;
+namespace ZIONShop.Observability;
 
 /// <summary>
 /// Clears the Recorded flag on root (parentless) Npgsql command activities in OnEnd. Npgsql's own

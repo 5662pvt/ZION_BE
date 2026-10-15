@@ -5,6 +5,7 @@ using ZIONShop.Contracts.Inventory;
 using ZIONShop.Contracts.Orders;
 using ZIONShop.Contracts.Payments;
 using ZIONShop.EventBus.DependencyInjection;
+using ZIONShop.EventBus.Inbox;
 using ZIONShop.EventBus.Outbox;
 using ZIONShop.Orders.Infrastructure.BackgroundServices;
 using ZIONShop.Orders.Application.IntegrationEvents;
@@ -36,10 +37,11 @@ public static class OrdersInfrastructureExtensions
         services.AddScoped<IPurchaseVerifier, PurchaseVerifier>();
         services.AddScoped<IIdempotencyLock, PostgresIdempotencyLock>();
 
-        services.AddOutbox<OrdersDbContext>();
+        services.AddOutbox<OrdersDbContext>(configuration);
+        services.AddInboxAdmin<OrdersDbContext>();
 
         services.AddSingleton<IdempotencyKeyCleanupBackgroundService>();
-        services.AddHostedService(sp => sp.GetRequiredService<IdempotencyKeyCleanupBackgroundService>());
+        services.AddZionBackgroundService(configuration, sp => sp.GetRequiredService<IdempotencyKeyCleanupBackgroundService>());
 
         services.AddIntegrationEventHandler<InventoryReservedIntegrationEvent, InventoryReservedIntegrationEventHandler, OrdersDbContext>();
         services.AddIntegrationEventHandler<InventoryReservationFailedIntegrationEvent, InventoryReservationFailedIntegrationEventHandler, OrdersDbContext>();

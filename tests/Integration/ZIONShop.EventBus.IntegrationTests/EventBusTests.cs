@@ -558,6 +558,31 @@ public class EventBusTests
     }
 
     [Fact]
+    public async Task PublishBatchAsync_Should_IncrementAttemptsAndKeepUnprocessed_When_PublishFailsForANonBrokerReason()
+    {
+        await using var host = await EventBusTestHost.CreateAsync(_containers.RabbitMq, _containers.Postgres,
+            configureServices: services => services.AddSingleton<IEventBus, ThrowingEventBus>());
+
+        using (var scope = host.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<EventBusTestDbContext>();
+            var outbox = scope.ServiceProvider.GetRequiredService<IOutbox<EventBusTestDbContext>>();
+            outbox.Add(new TestIntegrationEvent("boom"));
+            await db.SaveChangesAsync();
+        }
+
+        var publisher = host.CreateOutboxPublisher();
+        await publisher.PublishBatchAsync(CancellationToken.None);
+
+        using var verifyScope = host.Services.CreateScope();
+        var verifyDb = verifyScope.ServiceProvider.GetRequiredService<EventBusTestDbContext>();
+        var message = await verifyDb.Set<OutboxMessage>().SingleAsync();
+        message.ProcessedOn.Should().BeNull();
+        message.Attempts.Should().Be(1);
+        message.Error.Should().NotBeNullOrEmpty();
+    }
+
+    [Fact]
     public async Task PublishBatchAsync_Should_ReportOutboxPendingGauge_When_RowsAreUnprocessed()
     {
         await using var host = await EventBusTestHost.CreateAsync(_containers.RabbitMq, _containers.Postgres);
@@ -613,5 +638,83 @@ public class EventBusTests
             var db = scope.ServiceProvider.GetRequiredService<EventBusTestDbContext>();
             return await db.Set<OutboxMessage>().CountAsync(m => m.ProcessedOn != null) == 2;
         }, TimeSpan.FromSeconds(20));
+    }
+
+    /// <summary>
+    /// Reproduces running two instances of this service at once (API + Worker, or two Worker
+    /// replicas) against the same outbox table: without a row-level claim, both instances would
+    /// select the same unprocessed rows and each publish them, double-delivering every event. The
+    /// FOR UPDATE SKIP LOCKED claim in PublishBatchAsync must make each row visible to exactly one
+    /// instance's transaction at a time.
+    /// </summary>
+    [Fact]
+    public async Task PublishBatchAsync_Should_ClaimEachRowExactlyOnce_When_TwoInstancesRunConcurrently()
+    {
+        await using var host = await EventBusTestHost.CreateAsync(_containers.RabbitMq, _containers.Postgres);
+        await host.StartConsumerAsync();
+
+        const int RowCount = 200;
+        var eventIds = new List<Guid>(RowCount);
+        using (var scope = host.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<EventBusTestDbContext>();
+            var outbox = scope.ServiceProvider.GetRequiredService<IOutbox<EventBusTestDbContext>>();
+            for (var i = 0; i < RowCount; i++)
+            {
+                var @event = new TestIntegrationEvent($"concurrent-{i}");
+                eventIds.Add(@event.EventId);
+                outbox.Add(@event);
+            }
+            await db.SaveChangesAsync();
+        }
+
+        var publisherA = host.CreateOutboxPublisher();
+        var publisherB = host.CreateOutboxPublisher();
+
+        using var cts = new CancellationTokenSource();
+        async Task DrainAsync(OutboxPublisherService<EventBusTestDbContext> publisher)
+        {
+            while (!cts.IsCancellationRequested)
+            {
+                await publisher.PublishBatchAsync(CancellationToken.None);
+            }
+        }
+
+        var drainTasks = new[] { DrainAsync(publisherA), DrainAsync(publisherB) };
+        try
+        {
+            await WaitUntilAsync(async () =>
+            {
+                using var scope = host.Services.CreateScope();
+                var db = scope.ServiceProvider.GetRequiredService<EventBusTestDbContext>();
+                return await db.Set<OutboxMessage>()
+                    .CountAsync(m => eventIds.Contains(m.Id) && m.ProcessedOn != null) == RowCount;
+            }, TimeSpan.FromSeconds(30));
+        }
+        finally
+        {
+            cts.Cancel();
+            await Task.WhenAll(drainTasks);
+        }
+
+        using (var scope = host.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<EventBusTestDbContext>();
+            var rows = await db.Set<OutboxMessage>().Where(m => eventIds.Contains(m.Id)).ToListAsync();
+            rows.Should().HaveCount(RowCount);
+            rows.Should().OnlyContain(m => m.ProcessedOn != null && m.Attempts == 0);
+        }
+
+        await WaitUntilAsync(
+            () => eventIds.All(id => host.Recorder.Received.Count(e => e.EventId == id) >= 1),
+            TimeSpan.FromSeconds(30));
+
+        var deliveriesPerEventId = eventIds.ToDictionary(
+            id => id,
+            id => host.Recorder.Received.Count(e => e.EventId == id));
+
+        deliveriesPerEventId.Values.Should().OnlyContain(count => count == 1,
+            "FOR UPDATE SKIP LOCKED must give each outbox row to exactly one of the two concurrent " +
+            "publisher instances, so the consumer must see each EventId delivered exactly once");
     }
 }

@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using ZIONShop.Contracts.Auth;
 using ZIONShop.Contracts.Users;
 using ZIONShop.EventBus.DependencyInjection;
+using ZIONShop.EventBus.Inbox;
 using ZIONShop.Users.Application.IntegrationEventHandlers;
 using ZIONShop.Users.Application.Interfaces;
 using ZIONShop.Users.Domain.Repositories;
@@ -24,6 +25,8 @@ public static class UsersInfrastructureExtensions
         services.AddScoped<IUserProfileRepository, UserProfileRepository>();
         services.AddScoped<IUsersUnitOfWork>(sp => sp.GetRequiredService<UsersDbContext>());
         services.AddScoped<IUserAddressReader, UserAddressReader>();
+
+        services.AddInboxAdmin<UsersDbContext>();
 
         services.AddIntegrationEventHandler<UserRegisteredIntegrationEvent, UserRegisteredIntegrationEventHandler, UsersDbContext>();
 

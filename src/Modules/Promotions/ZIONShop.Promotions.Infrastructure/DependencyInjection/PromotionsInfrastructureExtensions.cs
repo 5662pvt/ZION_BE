@@ -6,6 +6,7 @@ using ZIONShop.Contracts.Inventory;
 using ZIONShop.Contracts.Orders;
 using ZIONShop.Contracts.Promotions;
 using ZIONShop.EventBus.DependencyInjection;
+using ZIONShop.EventBus.Inbox;
 using ZIONShop.EventBus.Outbox;
 using ZIONShop.Promotions.Application.IntegrationEvents;
 using ZIONShop.Promotions.Application.Interfaces;
@@ -39,9 +40,10 @@ public static class PromotionsInfrastructureExtensions
         services.AddScoped<IPromotionLookup, PromotionLookup>();
 
         services.AddScoped<StaleReservationReleaseProcessor>();
-        services.AddHostedService<StaleReservationReleaseBackgroundService>();
+        services.AddZionBackgroundService<StaleReservationReleaseBackgroundService>(configuration);
 
-        services.AddOutbox<PromotionsDbContext>();
+        services.AddOutbox<PromotionsDbContext>(configuration);
+        services.AddInboxAdmin<PromotionsDbContext>();
 
         services.AddIntegrationEventHandler<OrderConfirmedIntegrationEvent, OrderConfirmedIntegrationEventHandler, PromotionsDbContext>();
         services.AddIntegrationEventHandler<OrderCancelledIntegrationEvent, OrderCancelledIntegrationEventHandler, PromotionsDbContext>();

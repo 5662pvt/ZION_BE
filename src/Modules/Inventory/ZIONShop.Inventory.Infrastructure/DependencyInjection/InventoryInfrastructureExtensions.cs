@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using ZIONShop.Contracts.Inventory;
 using ZIONShop.Contracts.Orders;
 using ZIONShop.EventBus.DependencyInjection;
+using ZIONShop.EventBus.Inbox;
 using ZIONShop.EventBus.Outbox;
 using ZIONShop.Inventory.Application.Interfaces;
 using ZIONShop.Inventory.Application.IntegrationEventHandlers;
@@ -32,8 +33,9 @@ public static class InventoryInfrastructureExtensions
         services.AddScoped<IStockAvailabilityReader, StockAvailabilityReader>();
         services.AddScoped<IInventoryStatsReader, InventoryStatsReader>();
 
-        services.AddOutbox<InventoryDbContext>();
-        services.AddHostedService<ReservationExpiryBackgroundService>();
+        services.AddOutbox<InventoryDbContext>(configuration);
+        services.AddInboxAdmin<InventoryDbContext>();
+        services.AddZionBackgroundService<ReservationExpiryBackgroundService>(configuration);
 
         services.AddIntegrationEventHandler<OrderCreatedIntegrationEvent, OrderCreatedIntegrationEventHandler, InventoryDbContext>();
         services.AddIntegrationEventHandler<OrderConfirmedIntegrationEvent, OrderConfirmedIntegrationEventHandler, InventoryDbContext>();

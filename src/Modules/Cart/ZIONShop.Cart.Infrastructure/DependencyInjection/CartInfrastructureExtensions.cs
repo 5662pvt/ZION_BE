@@ -10,6 +10,7 @@ using ZIONShop.Cart.Infrastructure.Repositories;
 using ZIONShop.Contracts.Cart;
 using ZIONShop.Contracts.Orders;
 using ZIONShop.EventBus.DependencyInjection;
+using ZIONShop.EventBus.Inbox;
 
 namespace ZIONShop.Cart.Infrastructure.DependencyInjection;
 
@@ -24,6 +25,8 @@ public static class CartInfrastructureExtensions
         services.AddScoped<ICartRepository, CartRepository>();
         services.AddScoped<ICartUnitOfWork>(sp => sp.GetRequiredService<CartDbContext>());
         services.AddScoped<ICartReader, CartReader>();
+
+        services.AddInboxAdmin<CartDbContext>();
 
         services.AddIntegrationEventHandler<OrderCreatedIntegrationEvent, OrderCreatedClearCartHandler, CartDbContext>();
 
