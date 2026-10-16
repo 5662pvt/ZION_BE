@@ -31,6 +31,13 @@ public class WishlistTests
         return envelope!.Data!;
     }
 
+    private static async Task<ApiEnvelope<List<WishlistItemData>>> GetWishlistEnvelopeAsync(HttpClient client, int page, int pageSize)
+    {
+        var response = await client.GetAsync($"/api/v1/users/me/wishlist?page={page}&pageSize={pageSize}");
+        response.EnsureSuccessStatusCode();
+        return (await response.Content.ReadFromJsonAsync<ApiEnvelope<List<WishlistItemData>>>(ApiEnvelopeJson.Options))!;
+    }
+
     private static async Task<List<Guid>> GetWishlistIdsAsync(HttpClient client)
     {
         var response = await client.GetAsync("/api/v1/users/me/wishlist/ids");
@@ -115,6 +122,28 @@ public class WishlistTests
 
         (await GetWishlistAsync(customerA)).Should().ContainSingle(i => i.ProductId == productId);
         (await GetWishlistAsync(customerB)).Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task GetWishlist_Should_ComputeTotalAfterFilteringArchived_When_PagingAcrossThem()
+    {
+        var admin = await AdminClientAsync();
+        var (oldestId, _) = await CreatePublishedProductAsync(admin);
+        var (middleId, _) = await CreatePublishedProductAsync(admin);
+        var (newestId, _) = await CreatePublishedProductAsync(admin);
+
+        var (customer, _, _) = await CreateCustomerWithAddressAsync(_factory);
+        (await customer.PutAsync($"/api/v1/users/me/wishlist/{oldestId}", null)).EnsureSuccessStatusCode();
+        (await customer.PutAsync($"/api/v1/users/me/wishlist/{middleId}", null)).EnsureSuccessStatusCode();
+        (await customer.PutAsync($"/api/v1/users/me/wishlist/{newestId}", null)).EnsureSuccessStatusCode();
+
+        (await admin.PostAsync($"/api/v1/products/{middleId}/archive", null)).EnsureSuccessStatusCode();
+
+        var page1 = await GetWishlistEnvelopeAsync(customer, page: 1, pageSize: 2);
+
+        page1.Data.Should().HaveCount(2);
+        page1.Data!.Select(i => i.ProductId).Should().Equal(newestId, oldestId);
+        page1.Pagination!.TotalCount.Should().Be(2);
     }
 
     [Fact]

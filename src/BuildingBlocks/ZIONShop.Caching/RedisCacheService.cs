@@ -25,6 +25,8 @@ public class RedisCacheService : IDistributedCacheService
 
     public async Task<T?> GetAsync<T>(string key, CancellationToken cancellationToken = default)
     {
+        if (IsRedisUnavailable()) return default;
+
         try
         {
             var db = _redis.GetDatabase();
@@ -41,6 +43,8 @@ public class RedisCacheService : IDistributedCacheService
 
     public async Task SetAsync<T>(string key, T value, TimeSpan? expiration = null, CancellationToken cancellationToken = default)
     {
+        if (IsRedisUnavailable()) return;
+
         try
         {
             var db = _redis.GetDatabase();
@@ -55,6 +59,8 @@ public class RedisCacheService : IDistributedCacheService
 
     public async Task RemoveAsync(string key, CancellationToken cancellationToken = default)
     {
+        if (IsRedisUnavailable()) return;
+
         try
         {
             await _redis.GetDatabase().KeyDeleteAsync(key);

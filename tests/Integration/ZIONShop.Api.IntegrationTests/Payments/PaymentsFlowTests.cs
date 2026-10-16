@@ -113,11 +113,12 @@ public class PaymentsFlowTests
         await WaitForPaymentStatusAsync(customer, intent.IntentId, "Succeeded");
         var itemAfterFirst = await WaitForInventoryAsync(admin, sku, i => i.OnHand == 9 && i.Reserved == 0);
 
+        // FakeWebhookProcessor.ProcessAsync runs fully inside the request (no outbox/bus hop for the
+        // idempotent-replay short-circuit), so by the time this call returns, replay handling -- or the
+        // lack of it -- has already happened. No delay needed before asserting nothing changed.
         var replayed = await PostFakeWebhookRawAsync(anonymous, eventId, intent.IntentId, "succeeded");
         replayed.StatusCode.Should().Be(HttpStatusCode.OK);
 
-        // Give any erroneous re-processing a moment to happen, then assert nothing changed further.
-        await Task.Delay(1000);
         var itemAfterReplay = await GetInventoryItemBySkuAsync(admin, sku);
         itemAfterReplay.OnHand.Should().Be(itemAfterFirst.OnHand);
         itemAfterReplay.Reserved.Should().Be(0);

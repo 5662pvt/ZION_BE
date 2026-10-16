@@ -31,7 +31,7 @@ public class OrderReservationReleaseRequestedIntegrationEventHandlerTests
 
         using var db = CreateDb(dbName);
         var handler = new OrderReservationReleaseRequestedIntegrationEventHandler(
-            new StockReservationRepository(db), new InventoryItemRepository(db), new StockMovementRepository(db), db,
+            new StockReservationRepository(db), new InMemoryInventoryItemRepository(db), new StockMovementRepository(db), db,
             new FakeTimeProvider(DateTimeOffset.UtcNow));
 
         await handler.HandleAsync(new OrderReservationReleaseRequestedIntegrationEvent(orderId, "Order already cancelled"), CancellationToken.None);
@@ -50,7 +50,7 @@ public class OrderReservationReleaseRequestedIntegrationEventHandlerTests
         var dbName = Guid.NewGuid().ToString("N");
         using var db = CreateDb(dbName);
         var handler = new OrderReservationReleaseRequestedIntegrationEventHandler(
-            new StockReservationRepository(db), new InventoryItemRepository(db), new StockMovementRepository(db), db,
+            new StockReservationRepository(db), new InMemoryInventoryItemRepository(db), new StockMovementRepository(db), db,
             new FakeTimeProvider(DateTimeOffset.UtcNow));
 
         await handler.HandleAsync(new OrderReservationReleaseRequestedIntegrationEvent(Guid.NewGuid(), "Order already cancelled"), CancellationToken.None);
@@ -78,7 +78,7 @@ public class OrderReservationReleaseRequestedIntegrationEventHandlerTests
         using (var db = CreateDb(dbName))
         {
             var handler = new OrderReservationReleaseRequestedIntegrationEventHandler(
-                new StockReservationRepository(db), new InventoryItemRepository(db), new StockMovementRepository(db), db,
+                new StockReservationRepository(db), new InMemoryInventoryItemRepository(db), new StockMovementRepository(db), db,
                 new FakeTimeProvider(DateTimeOffset.UtcNow));
             await handler.HandleAsync(@event, CancellationToken.None);
         }
@@ -86,7 +86,7 @@ public class OrderReservationReleaseRequestedIntegrationEventHandlerTests
         using (var db = CreateDb(dbName))
         {
             var handler = new OrderReservationReleaseRequestedIntegrationEventHandler(
-                new StockReservationRepository(db), new InventoryItemRepository(db), new StockMovementRepository(db), db,
+                new StockReservationRepository(db), new InMemoryInventoryItemRepository(db), new StockMovementRepository(db), db,
                 new FakeTimeProvider(DateTimeOffset.UtcNow));
             await handler.HandleAsync(@event, CancellationToken.None);
         }
@@ -95,5 +95,36 @@ public class OrderReservationReleaseRequestedIntegrationEventHandlerTests
         var item = verifyDb.InventoryItems.Single(i => i.ProductId == productId);
         item.OnHand.Should().Be(10);
         item.Reserved.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Should_ReleaseReservations_OrderedByProductId()
+    {
+        var productLow = Guid.Parse("00000000-0000-0000-0000-000000000001");
+        var productHigh = Guid.Parse("ffffffff-ffff-ffff-ffff-ffffffffffff");
+        var orderId = Guid.NewGuid();
+
+        var items = new FakeInventoryItemRepository();
+        items.Seed(
+            InventoryItem.Create(productHigh, "SKU-H", "Product High", 10),
+            InventoryItem.Create(productLow, "SKU-L", "Product Low", 10));
+        items.Get(productHigh)!.Reserve(2);
+        items.Get(productLow)!.Reserve(3);
+
+        var recorder = new RecordingInventoryItemRepository(items);
+        var reservations = new FakeStockReservationRepository();
+        // Submitted high-id-first -- the handler must still release low-id-first.
+        await reservations.AddAsync(StockReservation.Create(orderId, productHigh, 2, null, DateTime.UtcNow));
+        await reservations.AddAsync(StockReservation.Create(orderId, productLow, 3, null, DateTime.UtcNow));
+
+        var movements = new FakeStockMovementRepository();
+        var uow = new FakeInventoryUnitOfWork(items);
+        var handler = new OrderReservationReleaseRequestedIntegrationEventHandler(
+            reservations, recorder, movements, uow, new FakeTimeProvider(DateTimeOffset.UtcNow));
+
+        await handler.HandleAsync(new OrderReservationReleaseRequestedIntegrationEvent(orderId, "Order already cancelled"), CancellationToken.None);
+
+        recorder.Calls.Select(c => c.ProductId).Should().Equal(productLow, productHigh);
+        recorder.Calls.Select(c => c.Operation).Should().Equal("Release", "Release");
     }
 }

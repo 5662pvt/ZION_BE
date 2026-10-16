@@ -46,24 +46,33 @@ public class ReservationExpiryProcessor
         var expired = await _reservations.GetActiveExpiredAsync(now, cancellationToken: cancellationToken);
         if (expired.Count == 0) return 0;
 
-        foreach (var orderGroup in expired.GroupBy(r => r.OrderId))
-        {
-            foreach (var reservation in orderGroup)
-            {
-                var item = await _items.GetByProductIdAsync(reservation.ProductId, cancellationToken);
-                if (item is not null)
-                {
-                    item.Release(reservation.Quantity);
-                    await _movements.AddAsync(StockMovement.Create(reservation.ProductId, StockMovementType.Expire, reservation.Quantity, orderGroup.Key.ToString(), now), cancellationToken);
-                }
+        // Unlike the integration event handlers, this processor is invoked directly by the background
+        // service rather than through the inbox-idempotent dispatch, so no transaction is already open on
+        // this scope's DbContext -- open one explicitly so every atomic release below and the final
+        // SaveChangesAsync commit (or roll back) together.
+        await using var transaction = await _uow.BeginTransactionAsync(cancellationToken);
 
-                reservation.MarkExpired();
+        // Released across the WHOLE batch ordered by ProductId (not grouped/ordered per order) so a
+        // concurrent commit/reserve touching the same products always takes its row locks in the same
+        // order as this scan, avoiding a Postgres deadlock (40P01) between them.
+        foreach (var reservation in expired.OrderBy(r => r.ProductId))
+        {
+            if (await _items.TryReleaseAsync(reservation.ProductId, reservation.Quantity, cancellationToken))
+            {
+                await _movements.AddAsync(StockMovement.Create(reservation.ProductId, StockMovementType.Expire, reservation.Quantity, reservation.OrderId.ToString(), now), cancellationToken);
             }
 
-            _outbox.Add(new InventoryReservationExpiredIntegrationEvent(orderGroup.Key));
+            reservation.MarkExpired();
+        }
+
+        foreach (var orderId in expired.Select(r => r.OrderId).Distinct())
+        {
+            _outbox.Add(new InventoryReservationExpiredIntegrationEvent(orderId));
         }
 
         await _uow.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+
         _logger.LogInformation("Expired {Count} stock reservation(s) across {OrderCount} order(s)", expired.Count, expired.Select(r => r.OrderId).Distinct().Count());
         return expired.Count;
     }

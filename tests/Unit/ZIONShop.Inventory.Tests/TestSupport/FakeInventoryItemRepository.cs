@@ -18,6 +18,15 @@ internal sealed class FakeInventoryItemRepository : IInventoryItemRepository
     /// <summary>Product ids for which TryReserveAsync should fail even if stock would allow it.</summary>
     public HashSet<Guid> ForceReserveFailure { get; } = new();
 
+    /// <summary>Product ids for which TryReleaseAsync should fail even if the invariant would allow it.</summary>
+    public HashSet<Guid> ForceReleaseFailure { get; } = new();
+
+    /// <summary>Product ids for which TryCommitAsync should fail even if the invariant would allow it.</summary>
+    public HashSet<Guid> ForceCommitFailure { get; } = new();
+
+    /// <summary>Product ids for which TryReturnAsync should fail even if the invariant would allow it.</summary>
+    public HashSet<Guid> ForceReturnFailure { get; } = new();
+
     public void Seed(params InventoryItem[] items)
     {
         foreach (var item in items) _items[item.ProductId] = item;
@@ -46,6 +55,31 @@ internal sealed class FakeInventoryItemRepository : IInventoryItemRepository
 
         _appliedInTransaction.Add((productId, quantity));
         return Task.FromResult(true);
+    }
+
+    public Task<bool> TryReleaseAsync(Guid productId, int quantity, CancellationToken cancellationToken = default)
+    {
+        if (ForceReleaseFailure.Contains(productId)) return Task.FromResult(false);
+        if (!_items.TryGetValue(productId, out var item) || item.Reserved < quantity) return Task.FromResult(false);
+
+        item.Release(quantity);
+        return Task.FromResult(true);
+    }
+
+    public Task<bool> TryCommitAsync(Guid productId, int quantity, CancellationToken cancellationToken = default)
+    {
+        if (ForceCommitFailure.Contains(productId)) return Task.FromResult(false);
+        if (!_items.TryGetValue(productId, out var item)) return Task.FromResult(false);
+
+        return Task.FromResult(item.Commit(quantity).IsSuccess);
+    }
+
+    public Task<bool> TryReturnAsync(Guid productId, int quantity, CancellationToken cancellationToken = default)
+    {
+        if (ForceReturnFailure.Contains(productId)) return Task.FromResult(false);
+        if (!_items.TryGetValue(productId, out var item)) return Task.FromResult(false);
+
+        return Task.FromResult(item.Return(quantity).IsSuccess);
     }
 
     internal void CommitTransaction() => _appliedInTransaction.Clear();

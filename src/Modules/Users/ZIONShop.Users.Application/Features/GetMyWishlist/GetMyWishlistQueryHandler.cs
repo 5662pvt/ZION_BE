@@ -27,19 +27,26 @@ public class GetMyWishlistQueryHandler : IRequestHandler<GetMyWishlistQuery, Res
         var page = request.Page < 1 ? 1 : request.Page;
         var pageSize = request.PageSize is < 1 or > 100 ? 20 : request.PageSize;
 
-        var query = _wishlist.Query()
+        // Wishlist is capped at 200 items (AddToWishlistCommandHandler), so loading it all and filtering
+        // before paging is bounded -- otherwise unpublished products dropped after a DB-level Skip/Take
+        // would shrink a page below pageSize and make `total` count items the caller never sees.
+        var allItems = await _wishlist.Query()
             .Where(w => w.UserId == request.AuthUserId)
-            .OrderByDescending(w => w.CreatedAt);
+            .OrderByDescending(w => w.CreatedAt)
+            .ToListAsync(cancellationToken);
 
-        var total = await query.CountAsync(cancellationToken);
-        var pageItems = await query.Skip((page - 1) * pageSize).Take(pageSize).ToListAsync(cancellationToken);
-
-        var productIds = pageItems.Select(w => w.ProductId).Distinct().ToList();
+        var productIds = allItems.Select(w => w.ProductId).Distinct().ToList();
         var priceInfos = await _prices.GetManyAsync(productIds, cancellationToken);
         var available = await _stock.GetAvailableAsync(productIds, cancellationToken);
 
-        var dtos = pageItems
+        var visibleItems = allItems
             .Where(w => priceInfos.TryGetValue(w.ProductId, out var info) && info.IsAvailable)
+            .ToList();
+
+        var total = visibleItems.Count;
+        var dtos = visibleItems
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
             .Select(w =>
             {
                 var info = priceInfos[w.ProductId];

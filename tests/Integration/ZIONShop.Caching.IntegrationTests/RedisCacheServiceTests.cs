@@ -105,6 +105,47 @@ public class RedisCacheServiceTests
     }
 
     [Fact]
+    public async Task GetOrCreateAsync_Should_FailOpenFast_When_FirstCallHitsRedisOutage()
+    {
+        // Production-sized timeouts (post-fix defaults from CachingExtensions): ConnectTimeout 1000ms,
+        // SyncTimeout/AsyncTimeout 500ms. The first call after the outage may still pay up to one
+        // SyncTimeout while the multiplexer detects the broken connection; every call after that must
+        // short-circuit via IsRedisUnavailable() before touching Redis at all.
+        var options = _fixture.BuildOptions();
+        options.ConnectTimeout = 1000;
+        options.SyncTimeout = 500;
+        options.AsyncTimeout = 500;
+        using var multiplexer = ConnectionMultiplexer.Connect(options);
+        var cache = new RedisCacheService(multiplexer, NullLogger<RedisCacheService>.Instance);
+        var key = $"zion:test:firstlatency:{Guid.NewGuid()}";
+
+        await _fixture.Redis.StopAsync();
+        try
+        {
+            var first = Stopwatch.StartNew();
+            var firstValue = await cache.GetOrCreateAsync(key, _ => Task.FromResult<string?>("fallback"), TimeSpan.FromMinutes(5), CancellationToken.None);
+            first.Stop();
+
+            firstValue.Should().Be("fallback");
+            first.Elapsed.Should().BeLessThan(TimeSpan.FromSeconds(1));
+
+            for (var i = 0; i < 3; i++)
+            {
+                var subsequent = Stopwatch.StartNew();
+                var value = await cache.GetOrCreateAsync(key, _ => Task.FromResult<string?>("fallback"), TimeSpan.FromMinutes(5), CancellationToken.None);
+                subsequent.Stop();
+
+                value.Should().Be("fallback");
+                subsequent.Elapsed.Should().BeLessThan(TimeSpan.FromMilliseconds(100));
+            }
+        }
+        finally
+        {
+            await _fixture.Redis.StartAsync();
+        }
+    }
+
+    [Fact]
     public async Task GetOrCreateAsync_Should_RunFactoriesConcurrently_When_RedisIsDownUnderContention()
     {
         // Tighter timeouts than CreateCache()'s default (2000ms): docker-stopping the container drops the

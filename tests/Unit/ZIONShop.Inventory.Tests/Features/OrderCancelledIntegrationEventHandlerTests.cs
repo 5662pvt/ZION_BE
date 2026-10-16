@@ -31,7 +31,7 @@ public class OrderCancelledIntegrationEventHandlerTests
 
         using var db = CreateDb(dbName);
         var handler = new OrderCancelledIntegrationEventHandler(
-            new StockReservationRepository(db), new InventoryItemRepository(db), new StockMovementRepository(db), db,
+            new StockReservationRepository(db), new InMemoryInventoryItemRepository(db), new StockMovementRepository(db), db,
             new FakeTimeProvider(DateTimeOffset.UtcNow));
 
         await handler.HandleAsync(new OrderCancelledIntegrationEvent(orderId, Guid.NewGuid(), "Customer changed mind"), CancellationToken.None);
@@ -66,7 +66,7 @@ public class OrderCancelledIntegrationEventHandlerTests
 
         using var db = CreateDb(dbName);
         var handler = new OrderCancelledIntegrationEventHandler(
-            new StockReservationRepository(db), new InventoryItemRepository(db), new StockMovementRepository(db), db,
+            new StockReservationRepository(db), new InMemoryInventoryItemRepository(db), new StockMovementRepository(db), db,
             new FakeTimeProvider(DateTimeOffset.UtcNow));
 
         await handler.HandleAsync(new OrderCancelledIntegrationEvent(orderId, Guid.NewGuid(), "Customer cancelled"), CancellationToken.None);
@@ -103,7 +103,7 @@ public class OrderCancelledIntegrationEventHandlerTests
         using (var db = CreateDb(dbName))
         {
             var handler = new OrderCancelledIntegrationEventHandler(
-                new StockReservationRepository(db), new InventoryItemRepository(db), new StockMovementRepository(db), db,
+                new StockReservationRepository(db), new InMemoryInventoryItemRepository(db), new StockMovementRepository(db), db,
                 new FakeTimeProvider(DateTimeOffset.UtcNow));
             await handler.HandleAsync(@event, CancellationToken.None);
         }
@@ -111,7 +111,7 @@ public class OrderCancelledIntegrationEventHandlerTests
         using (var db = CreateDb(dbName))
         {
             var handler = new OrderCancelledIntegrationEventHandler(
-                new StockReservationRepository(db), new InventoryItemRepository(db), new StockMovementRepository(db), db,
+                new StockReservationRepository(db), new InMemoryInventoryItemRepository(db), new StockMovementRepository(db), db,
                 new FakeTimeProvider(DateTimeOffset.UtcNow));
             await handler.HandleAsync(@event, CancellationToken.None);
         }
@@ -120,5 +120,53 @@ public class OrderCancelledIntegrationEventHandlerTests
         var item = verifyDb.InventoryItems.Single(i => i.ProductId == productId);
         item.OnHand.Should().Be(10);
         item.Reserved.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Should_ProcessActiveAndCommittedReservations_OrderedByProductId()
+    {
+        // One order can carry both an Active and a Committed reservation at once (e.g. OrderConfirmed
+        // committed one product's reservation but failed/skipped another's). Both halves must be processed
+        // in ONE pass ordered by ProductId -- not release-all-active-then-return-all-committed -- otherwise
+        // two concurrent cancels could still take their row locks in opposite order and deadlock.
+        var productLow = Guid.Parse("00000000-0000-0000-0000-000000000001");
+        var productHigh = Guid.Parse("ffffffff-ffff-ffff-ffff-ffffffffffff");
+        var orderId = Guid.NewGuid();
+
+        var items = new FakeInventoryItemRepository();
+        items.Seed(
+            InventoryItem.Create(productHigh, "SKU-H", "Product High", 10),
+            InventoryItem.Create(productLow, "SKU-L", "Product Low", 10));
+        items.Get(productHigh)!.Reserve(3); // still Active
+        items.Get(productLow)!.Reserve(5);
+        items.Get(productLow)!.Commit(5); // already Committed
+
+        var recorder = new RecordingInventoryItemRepository(items);
+        var reservations = new FakeStockReservationRepository();
+        // Submitted high-id-first (Active) then low-id-first (Committed) -- the handler must still issue
+        // its Try*Async calls low-id-first regardless of this input order.
+        var activeReservation = StockReservation.Create(orderId, productHigh, 3, null, DateTime.UtcNow);
+        await reservations.AddAsync(activeReservation);
+        var committedReservation = StockReservation.Create(orderId, productLow, 5, null, DateTime.UtcNow);
+        committedReservation.MarkCommitted();
+        await reservations.AddAsync(committedReservation);
+
+        var movements = new FakeStockMovementRepository();
+        var uow = new FakeInventoryUnitOfWork(items);
+        var handler = new OrderCancelledIntegrationEventHandler(reservations, recorder, movements, uow, new FakeTimeProvider(DateTimeOffset.UtcNow));
+
+        await handler.HandleAsync(new OrderCancelledIntegrationEvent(orderId, Guid.NewGuid(), "Customer cancelled"), CancellationToken.None);
+
+        recorder.Calls.Select(c => c.ProductId).Should().Equal(productLow, productHigh);
+        recorder.Calls.Select(c => c.Operation).Should().Equal("Return", "Release");
+
+        items.Get(productHigh)!.Reserved.Should().Be(0);
+        items.Get(productHigh)!.OnHand.Should().Be(10);
+        items.Get(productLow)!.OnHand.Should().Be(10);
+        items.Get(productLow)!.Reserved.Should().Be(0);
+
+        reservations.Reservations.Should().OnlyContain(r => r.Status == ReservationStatus.Released);
+        movements.Movements.Single(m => m.ProductId == productHigh).Type.Should().Be(StockMovementType.Release);
+        movements.Movements.Single(m => m.ProductId == productLow).Type.Should().Be(StockMovementType.Return);
     }
 }

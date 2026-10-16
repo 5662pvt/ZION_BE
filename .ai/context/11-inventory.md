@@ -63,6 +63,45 @@ bypasses the lock by accident, and needs no extra infrastructure/TTL-expiry book
 useful for coordinating non-transactional, cross-service work — not for a single conditional row update
 that Postgres can already make atomic.
 
+### Release/commit path: atomic conditional UPDATE too (W16 cleanup)
+
+Through W11, release/commit/return (`OrderCancelledIntegrationEventHandler`, `ActiveReservationReleaser`,
+`OrderConfirmedIntegrationEventHandler`, `OrderReservationReleaseRequestedIntegrationEventHandler`,
+`ReservationExpiryProcessor`) still loaded a tracked `InventoryItem`, mutated it with the entity method
+(`Release`/`Commit`/`Return`), and let EF batch the actual `UPDATE` at `SaveChangesAsync` time — in EF's
+own (unordered) batching order, not necessarily the order the caller looped in. Two concurrent
+multi-product operations that touched the same products in opposite order (e.g. a cancel releasing A,B
+while another order reserved B,A, or the expiry job releasing many products while several orders committed)
+could deadlock (Postgres `40P01`) or throw `DbUpdateConcurrencyException` on the xmin token.
+
+Fixed the same way as `TryReserveAsync`: `IInventoryItemRepository.TryReleaseAsync` (`Reserved -= q WHERE
+Reserved >= q`), `TryCommitAsync` (`OnHand -= q, Reserved -= q WHERE Reserved >= q AND OnHand >= q`), and
+`TryReturnAsync` (`OnHand += q`) are immediate, single-row `ExecuteUpdateAsync` conditional UPDATEs — no
+tracked row, no deferred/reordered write. Every call site now processes its reservations **ordered by
+ProductId** before issuing them:
+
+- `OrderConfirmedIntegrationEventHandler` — active reservations, ordered, committed via `TryCommitAsync`.
+- `ActiveReservationReleaser` (used by `OrderReservationReleaseRequestedIntegrationEventHandler`) — active
+  reservations, ordered, released via `TryReleaseAsync`.
+- `ReservationExpiryProcessor` — the **whole** expired batch (not grouped/ordered per order) sorted by
+  ProductId, released via `TryReleaseAsync`, inside its own explicit transaction (`BeginTransactionAsync`
+  — unlike the integration event handlers below, nothing already opened one on this scope, since the
+  background service calls it directly rather than through the inbox-idempotent dispatch).
+- `OrderCancelledIntegrationEventHandler` — its order's Active *and* Committed reservations are merged into
+  **one** pass ordered by ProductId (release via `TryReleaseAsync`, return via `TryReturnAsync`), not two
+  separate ordered-but-sequential phases. Splitting by status first would still risk inversion: one order's
+  Active lines and another concurrent order's Committed lines for the same two products could land in
+  opposite phase order across the two phases even though each phase alone was sorted.
+
+Admin `Adjust` (`AdjustStockCommandHandler`) is unchanged — single-row, tracked entity + xmin, catching
+`DbUpdateConcurrencyException` into a 409 for the caller to retry. A single-row update can't invert lock
+order against itself, so it doesn't need the atomic-UPDATE treatment; it already returns a conflict to the
+admin UI instead of relying on bus redelivery, which is the right behavior for a human-triggered action.
+
+If a path still hits a transient DB error (serialization failure, deadlock despite the ordering), it must
+propagate, not be swallowed — the integration event handlers have no local catch around these calls, so an
+exception rolls back the inbox decorator's transaction and the message is redelivered.
+
 ## Integration events
 
 - Consumes: `OrderCreatedIntegrationEvent` (reserve), `OrderConfirmedIntegrationEvent` (commit), `OrderCancelledIntegrationEvent` (release active / return committed), `OrderReservationReleaseRequestedIntegrationEvent` (release active — W11 rework, see below)

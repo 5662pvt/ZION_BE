@@ -27,4 +27,33 @@ public class InventoryItemRepository : IInventoryItemRepository
 
         return rows == 1;
     }
+
+    public async Task<bool> TryReleaseAsync(Guid productId, int quantity, CancellationToken cancellationToken = default)
+    {
+        var rows = await _db.InventoryItems
+            .Where(i => i.ProductId == productId && i.Reserved >= quantity)
+            .ExecuteUpdateAsync(setters => setters.SetProperty(i => i.Reserved, i => i.Reserved - quantity), cancellationToken);
+
+        return rows == 1;
+    }
+
+    public async Task<bool> TryCommitAsync(Guid productId, int quantity, CancellationToken cancellationToken = default)
+    {
+        var rows = await _db.InventoryItems
+            .Where(i => i.ProductId == productId && i.Reserved >= quantity && i.OnHand >= quantity)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(i => i.OnHand, i => i.OnHand - quantity)
+                .SetProperty(i => i.Reserved, i => i.Reserved - quantity), cancellationToken);
+
+        return rows == 1;
+    }
+
+    public async Task<bool> TryReturnAsync(Guid productId, int quantity, CancellationToken cancellationToken = default)
+    {
+        var rows = await _db.InventoryItems
+            .Where(i => i.ProductId == productId)
+            .ExecuteUpdateAsync(setters => setters.SetProperty(i => i.OnHand, i => i.OnHand + quantity), cancellationToken);
+
+        return rows == 1;
+    }
 }

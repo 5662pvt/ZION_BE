@@ -37,23 +37,19 @@ public class OrderConfirmedIntegrationEventHandler : IIntegrationEventHandler<Or
     {
         var active = (await _reservations.GetByOrderIdAsync(@event.OrderId, cancellationToken))
             .Where(r => r.Status == ReservationStatus.Active)
+            // Ordered by ProductId so two concurrent multi-product operations (e.g. this commit and a
+            // concurrent release/reserve touching the same products) always take their row locks in the
+            // same order, avoiding a Postgres deadlock (40P01) between them -- same rule as TryReserveAsync.
+            .OrderBy(r => r.ProductId)
             .ToList();
         if (active.Count == 0) return; // idempotent: nothing active to commit
 
         var now = _timeProvider.GetUtcNow().UtcDateTime;
         foreach (var reservation in active)
         {
-            var item = await _items.GetByProductIdAsync(reservation.ProductId, cancellationToken);
-            if (item is null)
+            if (!await _items.TryCommitAsync(reservation.ProductId, reservation.Quantity, cancellationToken))
             {
-                _logger.LogWarning("Inventory item for product {ProductId} not found while confirming order {OrderId}", reservation.ProductId, @event.OrderId);
-                continue;
-            }
-
-            var result = item.Commit(reservation.Quantity);
-            if (result.IsFailure)
-            {
-                _logger.LogError("Failed to commit {Quantity} of product {ProductId} for order {OrderId}: {Error}", reservation.Quantity, reservation.ProductId, @event.OrderId, result.Error.Message);
+                _logger.LogError("Failed to commit {Quantity} of product {ProductId} for order {OrderId}: no matching inventory row (not found, or Reserved/OnHand below quantity)", reservation.Quantity, reservation.ProductId, @event.OrderId);
                 continue;
             }
 

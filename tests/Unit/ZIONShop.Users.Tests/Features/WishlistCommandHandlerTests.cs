@@ -153,6 +153,46 @@ public class WishlistCommandHandlerTests
     }
 
     [Fact]
+    public async Task GetMyWishlist_Should_FilterBeforePaging_When_MiddleItemIsUnpublished()
+    {
+        var (db, wishlist) = BuildScope();
+        var userId = Guid.NewGuid();
+
+        var oldest = new ProductPriceInfo(Guid.NewGuid(), "Oldest", 10000m, "VND", true, "oldest", null);
+        var middleUnpublished = new ProductPriceInfo(Guid.NewGuid(), "Middle", 20000m, "VND", false, "middle", null);
+        var newest = new ProductPriceInfo(Guid.NewGuid(), "Newest", 30000m, "VND", true, "newest", null);
+
+        foreach (var product in new[] { oldest, middleUnpublished, newest })
+        {
+            await db.WishlistItems.AddAsync(WishlistItem.Create(userId, product.ProductId));
+            await db.SaveChangesAsync();
+            await Task.Delay(10);
+        }
+
+        var priceMap = new Dictionary<Guid, ProductPriceInfo>
+        {
+            [oldest.ProductId] = oldest,
+            [middleUnpublished.ProductId] = middleUnpublished,
+            [newest.ProductId] = newest,
+        };
+        var pricesMock = new Mock<IProductPriceLookup>();
+        pricesMock.Setup(x => x.GetManyAsync(It.IsAny<IReadOnlyCollection<Guid>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyDictionary<Guid, ProductPriceInfo>)priceMap);
+
+        var stockMock = new Mock<IStockAvailabilityReader>();
+        stockMock.Setup(x => x.GetAvailableAsync(It.IsAny<IReadOnlyCollection<Guid>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Dictionary<Guid, int> { [oldest.ProductId] = 1, [newest.ProductId] = 1 });
+
+        var handler = new GetMyWishlistQueryHandler(wishlist, pricesMock.Object, stockMock.Object);
+        var result = await handler.Handle(new GetMyWishlistQuery(userId, 1, 2), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Items.Should().HaveCount(2);
+        result.Value.Items.Select(i => i.ProductId).Should().Equal(newest.ProductId, oldest.ProductId);
+        result.Value.TotalCount.Should().Be(2);
+    }
+
+    [Fact]
     public async Task GetMyWishlistIds_Should_ReturnOnlyCurrentUsersProductIds()
     {
         var (db, wishlist) = BuildScope();
