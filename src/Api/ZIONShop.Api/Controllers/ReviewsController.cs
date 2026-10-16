@@ -1,12 +1,14 @@
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using ZIONShop.Api.Filters;
 using ZIONShop.Auth.Authorization;
 using ZIONShop.Auth.CurrentUser;
 using ZIONShop.Common.Api;
 using ZIONShop.Reviews.Application.Features.AdminSearchReviews;
 using ZIONShop.Reviews.Application.Features.CreateReview;
 using ZIONShop.Reviews.Application.Features.DeleteReview;
+using ZIONShop.Reviews.Application.Features.GetMyReviews;
 using ZIONShop.Reviews.Application.Features.GetProductReviews;
 using ZIONShop.Reviews.Application.Features.GetReviewEligibility;
 using ZIONShop.Reviews.Application.Features.GetReviewSummaries;
@@ -63,6 +65,14 @@ public class ReviewsController : ControllerBase
     public async Task<IActionResult> GetEligibility(Guid productId, CancellationToken ct)
         => (await _mediator.Send(new GetReviewEligibilityQuery(_currentUser.UserId!.Value, productId), ct)).ToActionResult();
 
+    [HttpGet("reviews/mine")]
+    [Authorize]
+    public async Task<IActionResult> GetMine([FromQuery] GetMyReviewsRequest req, CancellationToken ct)
+    {
+        var query = new GetMyReviewsQuery(_currentUser.UserId!.Value, req.Page <= 0 ? 1 : req.Page, req.PageSize <= 0 ? 20 : req.PageSize);
+        return (await _mediator.Send(query, ct)).ToPagedActionResult();
+    }
+
     [HttpPost("products/{productId:guid}/reviews")]
     [Authorize]
     public async Task<IActionResult> Create(Guid productId, [FromBody] CreateReviewBody body, CancellationToken ct)
@@ -94,11 +104,13 @@ public class ReviewsController : ControllerBase
 
     [HttpPost("admin/reviews/{id:guid}/hide")]
     [Authorize(Policy = Policies.StaffOrAdmin)]
+    [AdminAudit("Review.Hide", "Review")]
     public async Task<IActionResult> Hide(Guid id, [FromBody] HideReviewBody? body, CancellationToken ct)
         => (await _mediator.Send(new HideReviewCommand(id, body?.Reason), ct)).ToActionResult("Review hidden");
 
     [HttpPost("admin/reviews/{id:guid}/show")]
     [Authorize(Policy = Policies.StaffOrAdmin)]
+    [AdminAudit("Review.Show", "Review")]
     public async Task<IActionResult> Show(Guid id, CancellationToken ct)
         => (await _mediator.Send(new ShowReviewCommand(id), ct)).ToActionResult("Review shown");
 }
@@ -108,3 +120,4 @@ public record CreateReviewBody(int Rating, string? Title, string Content);
 public record UpdateReviewBody(int Rating, string? Title, string Content);
 public record HideReviewBody(string? Reason);
 public record AdminSearchReviewsRequest(int Page = 1, int PageSize = 20, string? Status = null, int? Rating = null, string? Keyword = null);
+public record GetMyReviewsRequest(int Page = 1, int PageSize = 20);

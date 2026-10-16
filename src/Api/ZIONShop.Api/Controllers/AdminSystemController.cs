@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
+using ZIONShop.Api.Filters;
 using ZIONShop.Auth.Authorization;
 using ZIONShop.Auth.CurrentUser;
 using ZIONShop.HealthChecks;
@@ -128,6 +129,7 @@ public class AdminSystemController : ControllerBase
     }
 
     [HttpPost("outbox/{module}/{id:guid}/retry")]
+    [AdminAudit("System.OutboxRetry", "Outbox")]
     public async Task<IActionResult> RetryOutbox(string module, Guid id, CancellationToken ct)
     {
         var store = FindOutboxStore(module);
@@ -148,6 +150,7 @@ public class AdminSystemController : ControllerBase
     }
 
     [HttpPost("outbox/retry-failed")]
+    [AdminAudit("System.OutboxRetryFailed", "Outbox", ResourceIdFromResult = true)]
     public async Task<IActionResult> RetryFailedOutbox([FromQuery] string? module, CancellationToken ct)
     {
         IReadOnlyList<IOutboxAdminStore> stores;
@@ -223,6 +226,7 @@ public class AdminSystemController : ControllerBase
     }
 
     [HttpPost("dlq/requeue")]
+    [AdminAudit("System.DlqRequeue", "Dlq", ResourceIdFromResult = true)]
     public async Task<IActionResult> RequeueDlq([FromBody] DlqRequeueBody? body, CancellationToken ct)
     {
         try
@@ -238,6 +242,7 @@ public class AdminSystemController : ControllerBase
     }
 
     [HttpDelete("dlq/{messageId}")]
+    [AdminAudit("System.DlqDelete", "Dlq", RouteKey = "messageId")]
     public async Task<IActionResult> DeleteDlqMessage(string messageId, CancellationToken ct)
     {
         try

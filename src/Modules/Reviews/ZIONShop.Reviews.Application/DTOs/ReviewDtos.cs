@@ -30,3 +30,15 @@ public record ReviewSummaryDto(Guid ProductId, decimal Average, int Count, IRead
 public record ProductRatingDto(Guid ProductId, decimal Average, int Count);
 
 public record ReviewEligibilityDto(bool CanReview, string? Reason, ReviewDto? MyReview);
+
+public record MyReviewDto(
+    Guid Id,
+    Guid ProductId,
+    string ProductName,
+    string? ProductSlug,
+    int Rating,
+    string? Title,
+    string Content,
+    string Status,
+    string? HiddenReason,
+    DateTime CreatedAt);

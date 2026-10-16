@@ -2,6 +2,7 @@ using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using ZIONShop.Api.Filters;
 using ZIONShop.Auth.Authorization;
 using ZIONShop.Common.Api;
 using ZIONShop.Products.Application.Features.AddProductImage;
@@ -92,11 +93,13 @@ public class ProductsController : ControllerBase
 
     [HttpPost]
     [Authorize(Policy = Policies.AdminOnly)]
+    [AdminAudit("Product.Create", "Product", ResourceIdFromResult = true)]
     public async Task<IActionResult> Create([FromBody] CreateProductCommand command, CancellationToken ct)
         => (await _mediator.Send(command, ct)).ToActionResult("Product created");
 
     [HttpPut("{id:guid}")]
     [Authorize(Policy = Policies.AdminOnly)]
+    [AdminAudit("Product.Update", "Product")]
     public async Task<IActionResult> Update(Guid id, [FromBody] UpdateProductBody body, CancellationToken ct)
     {
         var cmd = new UpdateProductCommand(id, body.Name, body.Description, body.Price, body.Currency, body.CategoryId, body.Brand);
@@ -105,11 +108,13 @@ public class ProductsController : ControllerBase
 
     [HttpPost("{id:guid}/archive")]
     [Authorize(Policy = Policies.AdminOnly)]
+    [AdminAudit("Product.Archive", "Product")]
     public async Task<IActionResult> Archive(Guid id, CancellationToken ct)
         => (await _mediator.Send(new ArchiveProductCommand(id), ct)).ToActionResult("Product archived");
 
     [HttpPost("{id:guid}/publish")]
     [Authorize(Policy = Policies.AdminOnly)]
+    [AdminAudit("Product.Publish", "Product")]
     public async Task<IActionResult> Publish(Guid id, CancellationToken ct)
         => (await _mediator.Send(new PublishProductCommand(id), ct)).ToActionResult("Product published");
 
@@ -117,6 +122,7 @@ public class ProductsController : ControllerBase
     [Authorize(Policy = Policies.AdminOnly)]
     [Consumes("multipart/form-data")]
     [RequestSizeLimit(5_242_880 + 64_000)]
+    [AdminAudit("Product.ImageAdd", "Product")]
     public async Task<IActionResult> AddImage(Guid id, IFormFile file, [FromForm] string? alt, CancellationToken ct)
     {
         await using var stream = file.OpenReadStream();
@@ -126,11 +132,13 @@ public class ProductsController : ControllerBase
 
     [HttpDelete("{id:guid}/images/{imageId:guid}")]
     [Authorize(Policy = Policies.AdminOnly)]
+    [AdminAudit("Product.ImageRemove", "Product")]
     public async Task<IActionResult> RemoveImage(Guid id, Guid imageId, CancellationToken ct)
         => (await _mediator.Send(new RemoveProductImageCommand(id, imageId), ct)).ToActionResult("Image removed");
 
     [HttpPut("{id:guid}/images/order")]
     [Authorize(Policy = Policies.AdminOnly)]
+    [AdminAudit("Product.ImageReorder", "Product")]
     public async Task<IActionResult> ReorderImages(Guid id, [FromBody] ReorderProductImagesBody body, CancellationToken ct)
         => (await _mediator.Send(new ReorderProductImagesCommand(id, body.ImageIds), ct)).ToActionResult("Images reordered");
 }

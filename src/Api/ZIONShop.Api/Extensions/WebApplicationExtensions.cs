@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using ZIONShop.Admin.Infrastructure.Persistence;
 using ZIONShop.Auth.Infrastructure.Persistence;
 using ZIONShop.Cart.Infrastructure.Persistence;
 using ZIONShop.Contracts.Products;
@@ -46,6 +47,8 @@ public static class WebApplicationExtensions
             await sp.GetRequiredService<NotificationsDbContext>().Database.MigrateAsync();
 
             await sp.GetRequiredService<ReviewsDbContext>().Database.MigrateAsync();
+
+            await sp.GetRequiredService<AdminDbContext>().Database.MigrateAsync();
         }
         catch (Exception ex)
         {

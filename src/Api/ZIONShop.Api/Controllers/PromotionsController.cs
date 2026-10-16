@@ -1,6 +1,7 @@
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using ZIONShop.Api.Filters;
 using ZIONShop.Auth.Authorization;
 using ZIONShop.Common.Api;
 using ZIONShop.Promotions.Application.DTOs;
@@ -40,6 +41,7 @@ public class PromotionsController : ControllerBase
         => (await _mediator.Send(new GetPromotionByIdQuery(id), ct)).ToActionResult();
 
     [HttpPost]
+    [AdminAudit("Promotion.Create", "Promotion", ResourceIdFromResult = true)]
     public async Task<IActionResult> Create([FromBody] PromotionUpsertRequest body, CancellationToken ct)
     {
         var cmd = new CreatePromotionCommand(
@@ -50,6 +52,7 @@ public class PromotionsController : ControllerBase
     }
 
     [HttpPut("{id:guid}")]
+    [AdminAudit("Promotion.Update", "Promotion")]
     public async Task<IActionResult> Update(Guid id, [FromBody] PromotionUpsertRequest body, CancellationToken ct)
     {
         var cmd = new UpdatePromotionCommand(
@@ -60,22 +63,27 @@ public class PromotionsController : ControllerBase
     }
 
     [HttpPost("{id:guid}/activate")]
+    [AdminAudit("Promotion.Activate", "Promotion")]
     public async Task<IActionResult> Activate(Guid id, CancellationToken ct)
         => (await _mediator.Send(new ActivatePromotionCommand(id), ct)).ToActionResult("Promotion activated");
 
     [HttpPost("{id:guid}/deactivate")]
+    [AdminAudit("Promotion.Deactivate", "Promotion")]
     public async Task<IActionResult> Deactivate(Guid id, CancellationToken ct)
         => (await _mediator.Send(new DeactivatePromotionCommand(id), ct)).ToActionResult("Promotion deactivated");
 
     [HttpPost("{id:guid}/coupons")]
+    [AdminAudit("Coupon.Create", "Coupon", ResourceIdFromResult = true)]
     public async Task<IActionResult> CreateCoupon(Guid id, [FromBody] CreateCouponBody body, CancellationToken ct)
         => (await _mediator.Send(new CreateCouponCommand(id, body.Code), ct)).ToActionResult("Coupon created");
 
     [HttpPost("{id:guid}/coupons/generate")]
+    [AdminAudit("Coupon.Generate", "Coupon", ResourceIdFromResult = true)]
     public async Task<IActionResult> GenerateCoupons(Guid id, [FromBody] GenerateCouponsBody body, CancellationToken ct)
         => (await _mediator.Send(new GenerateCouponsCommand(id, body.Prefix, body.Count), ct)).ToActionResult("Coupons generated");
 
     [HttpPost("{id:guid}/coupons/{couponId:guid}/deactivate")]
+    [AdminAudit("Coupon.Deactivate", "Coupon", RouteKey = "couponId")]
     public async Task<IActionResult> DeactivateCoupon(Guid id, Guid couponId, CancellationToken ct)
         => (await _mediator.Send(new DeactivateCouponCommand(id, couponId), ct)).ToActionResult("Coupon deactivated");
 }

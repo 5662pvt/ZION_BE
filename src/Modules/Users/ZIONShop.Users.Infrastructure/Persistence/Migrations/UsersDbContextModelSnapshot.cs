@@ -143,6 +143,29 @@ namespace ZIONShop.Users.Infrastructure.Persistence.Migrations
                     b.ToTable("UserProfiles", "users");
                 });
 
+            modelBuilder.Entity("ZIONShop.Users.Domain.Entities.WishlistItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("ProductId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId", "ProductId")
+                        .IsUnique();
+
+                    b.ToTable("WishlistItems", "users");
+                });
+
             modelBuilder.Entity("ZIONShop.Users.Domain.Entities.Address", b =>
                 {
                     b.HasOne("ZIONShop.Users.Domain.Entities.UserProfile", null)

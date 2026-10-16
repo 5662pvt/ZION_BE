@@ -18,4 +18,13 @@ public static class NotificationLogMappingExtensions
         log.Error,
         log.CreatedAt,
         log.SentAt);
+
+    public static MyNotificationDto ToMyDto(this NotificationLog log) => new(
+        log.Id,
+        log.Type.ToString(),
+        log.Subject,
+        log.OrderId,
+        log.Status.ToString(),
+        log.CreatedAt,
+        log.SentAt);
 }

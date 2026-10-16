@@ -1,6 +1,7 @@
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using ZIONShop.Api.Filters;
 using ZIONShop.Auth.Authorization;
 using ZIONShop.Common.Api;
 using ZIONShop.Products.Application.Features.Categories;
@@ -22,11 +23,13 @@ public class CategoriesController : ControllerBase
 
     [HttpPost]
     [Authorize(Policy = Policies.AdminOnly)]
+    [AdminAudit("Category.Create", "Category", ResourceIdFromResult = true)]
     public async Task<IActionResult> Create([FromBody] CreateCategoryCommand command, CancellationToken ct)
         => (await _mediator.Send(command, ct)).ToActionResult("Category created");
 
     [HttpPut("{id:guid}")]
     [Authorize(Policy = Policies.AdminOnly)]
+    [AdminAudit("Category.Update", "Category")]
     public async Task<IActionResult> Update(Guid id, [FromBody] UpdateCategoryBody body, CancellationToken ct)
     {
         var cmd = new UpdateCategoryCommand(id, body.Name, body.Description, body.DisplayOrder);
@@ -35,6 +38,7 @@ public class CategoriesController : ControllerBase
 
     [HttpDelete("{id:guid}")]
     [Authorize(Policy = Policies.AdminOnly)]
+    [AdminAudit("Category.Delete", "Category")]
     public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
         => (await _mediator.Send(new DeleteCategoryCommand(id), ct)).ToActionResult("Category deleted");
 }

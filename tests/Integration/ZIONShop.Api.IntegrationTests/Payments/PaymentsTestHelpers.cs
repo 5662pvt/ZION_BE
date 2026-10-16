@@ -1,4 +1,3 @@
-using System.Net;
 using System.Net.Http.Json;
 using System.Security.Cryptography;
 using System.Text;
@@ -34,30 +33,10 @@ public static class PaymentsTestHelpers
 
     public static async Task<PaymentIntentData> CreatePaymentIntentAsync(HttpClient client, Guid orderId, string idempotencyKey, string? channel = null)
     {
-        // Orders flips the order's own status to AwaitingPayment and Payments builds its PayableOrder
-        // projection from the same InventoryReserved event, but via two independent outbox/inbox
-        // consumers -- under load one can lag the other, so a caller that just observed AwaitingPayment
-        // can still hit a transient "Payments.OrderNotPayable" 409 here. Retry only that specific,
-        // known-transient error; any other failure (including a genuine, permanent OrderNotPayable for
-        // an order that was never placed) still surfaces immediately via EnsureSuccessStatusCode.
-        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(10);
-        while (true)
-        {
-            var response = await CreatePaymentIntentRawAsync(client, orderId, idempotencyKey, channel);
-            if (response.StatusCode == HttpStatusCode.Conflict && DateTime.UtcNow < deadline)
-            {
-                var errorEnvelope = await response.Content.ReadFromJsonAsync<ApiEnvelope<PaymentIntentData>>(ApiEnvelopeJson.Options);
-                if (errorEnvelope?.Errors?.Any(e => e.Code == "Payments.OrderNotPayable") == true)
-                {
-                    await Task.Delay(250);
-                    continue;
-                }
-            }
-
-            response.EnsureSuccessStatusCode();
-            var envelope = await response.Content.ReadFromJsonAsync<ApiEnvelope<PaymentIntentData>>(ApiEnvelopeJson.Options);
-            return envelope!.Data!;
-        }
+        var response = await CreatePaymentIntentRawAsync(client, orderId, idempotencyKey, channel);
+        response.EnsureSuccessStatusCode();
+        var envelope = await response.Content.ReadFromJsonAsync<ApiEnvelope<PaymentIntentData>>(ApiEnvelopeJson.Options);
+        return envelope!.Data!;
     }
 
     public static async Task<HttpResponseMessage> GetPaymentIntentRawAsync(HttpClient client, string intentId)

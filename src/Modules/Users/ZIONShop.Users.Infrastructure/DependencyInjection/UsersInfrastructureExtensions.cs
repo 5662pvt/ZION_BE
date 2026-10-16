@@ -23,8 +23,10 @@ public static class UsersInfrastructureExtensions
                 npgsql => npgsql.MigrationsHistoryTable("__EFMigrationsHistory", UsersDbContext.Schema)));
 
         services.AddScoped<IUserProfileRepository, UserProfileRepository>();
+        services.AddScoped<IWishlistRepository, WishlistRepository>();
         services.AddScoped<IUsersUnitOfWork>(sp => sp.GetRequiredService<UsersDbContext>());
         services.AddScoped<IUserAddressReader, UserAddressReader>();
+        services.AddScoped<IUserProfileReader, UserProfileReader>();
 
         services.AddInboxAdmin<UsersDbContext>();
 

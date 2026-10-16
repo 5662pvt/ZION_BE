@@ -2,6 +2,7 @@ using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using ZIONShop.Auth.Application.Features.ChangePassword;
 using ZIONShop.Auth.Application.Features.Login;
 using ZIONShop.Auth.Application.Features.Me;
 using ZIONShop.Auth.Application.Features.RefreshToken;
@@ -82,4 +83,16 @@ public class AuthController : ControllerBase
         if (_currentUser.UserId is null) return Unauthorized(ApiResponse.Fail("Unauthorized"));
         return (await _mediator.Send(new GetCurrentUserQuery(_currentUser.UserId.Value), ct)).ToActionResult();
     }
+
+    [HttpPost("change-password")]
+    [EnableRateLimiting("auth")]
+    [Authorize]
+    public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordBody body, CancellationToken ct)
+    {
+        if (_currentUser.UserId is null) return Unauthorized(ApiResponse.Fail("Unauthorized"));
+        var cmd = new ChangePasswordCommand(_currentUser.UserId.Value, body.CurrentPassword, body.NewPassword);
+        return (await _mediator.Send(cmd, ct)).ToActionResult("Đổi mật khẩu thành công");
+    }
 }
+
+public record ChangePasswordBody(string CurrentPassword, string NewPassword);

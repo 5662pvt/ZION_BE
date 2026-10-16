@@ -13,6 +13,7 @@ public class UsersDbContext : DbContext, IUsersUnitOfWork
 
     public DbSet<UserProfile> UserProfiles => Set<UserProfile>();
     public DbSet<Address> Addresses => Set<Address>();
+    public DbSet<WishlistItem> WishlistItems => Set<WishlistItem>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

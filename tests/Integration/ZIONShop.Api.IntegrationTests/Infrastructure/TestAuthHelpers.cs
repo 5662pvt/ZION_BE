@@ -1,4 +1,5 @@
 using System.Net.Http.Json;
+using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using ZIONShop.Auth.Infrastructure.Persistence;
@@ -35,7 +36,7 @@ public static class TestAuthHelpers
     /// through IEmailSender (logged, not persisted in plaintext), so there is no clean way to drive
     /// the real /verify-email flow from an HTTP-only test client.
     /// </summary>
-    public static async Task RegisterAndConfirmAsync(this HttpClient client, ApiFactory factory, string email, string password, string displayName)
+    public static async Task RegisterAndConfirmAsync(this HttpClient client, WebApplicationFactory<Program> factory, string email, string password, string displayName)
     {
         var response = await client.PostAsJsonAsync("/api/v1/auth/register", new { email, password, displayName });
         response.EnsureSuccessStatusCode();

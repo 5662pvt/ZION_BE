@@ -1,4 +1,5 @@
 using System.Net.Http.Json;
+using Microsoft.AspNetCore.Mvc.Testing;
 using ZIONShop.Api.IntegrationTests.Infrastructure;
 
 namespace ZIONShop.Api.IntegrationTests.Checkout;
@@ -67,7 +68,7 @@ public static class CheckoutTestHelpers
         return envelope!.Data!.Single(i => i.Sku == sku);
     }
 
-    public static async Task<(HttpClient Client, Guid AddressId, Guid UserId)> CreateCustomerWithAddressAsync(ApiFactory factory)
+    public static async Task<(HttpClient Client, Guid AddressId, Guid UserId)> CreateCustomerWithAddressAsync(WebApplicationFactory<Program> factory)
     {
         var client = factory.CreateClient();
         var email = $"customer-{Guid.NewGuid():N}@zionshop.local";

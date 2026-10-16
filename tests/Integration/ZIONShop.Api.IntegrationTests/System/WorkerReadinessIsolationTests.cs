@@ -20,7 +20,15 @@ namespace ZIONShop.Api.IntegrationTests.SystemOps;
 /// suite) with BackgroundProcessing disabled on this host too and no Worker started anywhere, so the
 /// main queue genuinely has zero consumers -- the same shape as a real deployment where the API has
 /// handed consumers to a Worker that was never started.
+///
+/// Tagged into <see cref="ApiTestCollection"/> (same as <c>BackgroundProcessingTests</c>) purely to
+/// serialize against it: this still builds its own independent host, but it overwrites the process-wide
+/// ConnectionStrings__DefaultConnection/EventBus__* environment variables for the duration of the test,
+/// which would otherwise race any other collection's test reading those same variables (e.g.
+/// NpgsqlExportFilterTests asserting on ApiFactory's own connection string) since xUnit runs separate
+/// collections in parallel by default.
 /// </summary>
+[Collection(ApiTestCollection.Name)]
 public sealed class WorkerReadinessIsolationTests : IAsyncLifetime
 {
     private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder()
@@ -39,6 +47,7 @@ public sealed class WorkerReadinessIsolationTests : IAsyncLifetime
     private readonly string _uploadsRoot = Path.Combine(Path.GetTempPath(), "zion-uploads-" + Guid.NewGuid().ToString("N"));
 
     private WebApplicationFactory<Program>? _factory;
+    private EnvironmentVariableScope? _envScope;
 
     private record HealthCheckDto(string Name, string Status, double DurationMs, string? Description);
     private record HealthReportDto(string Status, double TotalDurationMs, List<HealthCheckDto> Checks);
@@ -47,6 +56,14 @@ public sealed class WorkerReadinessIsolationTests : IAsyncLifetime
     {
         await Task.WhenAll(_postgres.StartAsync(), _rabbitMq.StartAsync());
         Directory.CreateDirectory(_uploadsRoot);
+
+        // Restored to the shared ApiFactory fixture's own values on Dispose (not null) -- ApiFactory
+        // sets these exact variables once, lazily, the first time its host is built; nulling them out
+        // here instead would permanently break any later test in the same process (e.g.
+        // NpgsqlExportFilterTests) that reads them directly. The EventBus__* variables below have no
+        // ApiFactory-set value to restore, so clearing them back to null (their original state) is correct.
+        _envScope = new EnvironmentVariableScope(
+            "ConnectionStrings__DefaultConnection", "EventBus__Provider", "ImageStorage__PublicBaseUrl", "ImageStorage__LocalRootPath");
 
         Environment.SetEnvironmentVariable("ConnectionStrings__DefaultConnection", _postgres.GetConnectionString());
         Environment.SetEnvironmentVariable("EventBus__Provider", "RabbitMq");
@@ -128,8 +145,7 @@ public sealed class WorkerReadinessIsolationTests : IAsyncLifetime
     public async Task DisposeAsync()
     {
         _factory?.Dispose();
-        Environment.SetEnvironmentVariable("ConnectionStrings__DefaultConnection", null);
-        Environment.SetEnvironmentVariable("EventBus__Provider", null);
+        _envScope?.Dispose();
         Environment.SetEnvironmentVariable("EventBus__Host", null);
         Environment.SetEnvironmentVariable("EventBus__Port", null);
         Environment.SetEnvironmentVariable("EventBus__VirtualHost", null);
@@ -138,8 +154,6 @@ public sealed class WorkerReadinessIsolationTests : IAsyncLifetime
         Environment.SetEnvironmentVariable("EventBus__Exchange", null);
         Environment.SetEnvironmentVariable("EventBus__QueueName", null);
         Environment.SetEnvironmentVariable("BackgroundProcessing__Enabled", null);
-        Environment.SetEnvironmentVariable("ImageStorage__PublicBaseUrl", null);
-        Environment.SetEnvironmentVariable("ImageStorage__LocalRootPath", null);
         if (Directory.Exists(_uploadsRoot))
             Directory.Delete(_uploadsRoot, recursive: true);
         await Task.WhenAll(_postgres.DisposeAsync().AsTask(), _rabbitMq.DisposeAsync().AsTask());

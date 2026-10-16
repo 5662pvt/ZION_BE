@@ -9,6 +9,7 @@ public interface IUserRepository
     Task<User?> GetByEmailForUpdateAsync(string email, CancellationToken cancellationToken = default);
     Task<User?> GetByRefreshTokenHashAsync(string tokenHash, CancellationToken cancellationToken = default);
     Task<bool> EmailExistsAsync(string email, CancellationToken cancellationToken = default);
+    IQueryable<User> Query();
     Task AddAsync(User user, CancellationToken cancellationToken = default);
     Task AddRefreshTokenAsync(RefreshToken token, CancellationToken cancellationToken = default);
     Task SetLastLoginAsync(Guid userId, DateTime at, CancellationToken cancellationToken = default);

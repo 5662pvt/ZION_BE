@@ -13,3 +13,12 @@ public record NotificationLogDto(
     string? Error,
     DateTime CreatedAt,
     DateTime? SentAt);
+
+public record MyNotificationDto(
+    Guid Id,
+    string Type,
+    string Subject,
+    Guid OrderId,
+    string Status,
+    DateTime CreatedAt,
+    DateTime? SentAt);

@@ -16,4 +16,8 @@ public static class AuthErrors
     public static readonly Error InvalidResetCode = Error.Validation("Auth.InvalidResetCode", "Reset code is invalid. Use the latest code from your email.");
     public static readonly Error ResetCodeExpired = Error.Validation("Auth.ResetCodeExpired", "Reset code has expired. Request a new code.");
     public static readonly Error EmailDeliveryFailed = Error.Failure("Auth.EmailDeliveryFailed", "Could not send the email. Please check email settings and try again.");
+    public static readonly Error InvalidCurrentPassword = Error.Validation("Auth.InvalidCurrentPassword", "Mật khẩu hiện tại không đúng");
+    public static readonly Error PasswordUnchanged = Error.Validation("Auth.PasswordUnchanged", "Mật khẩu mới phải khác mật khẩu hiện tại");
+    public static readonly Error CustomerNotFound = Error.NotFound("Admin.CustomerNotFound", "Không tìm thấy khách hàng");
+    public static readonly Error CannotLockSelf = Error.Validation("Admin.CannotLockSelf", "Không thể tự khóa tài khoản của chính mình");
 }

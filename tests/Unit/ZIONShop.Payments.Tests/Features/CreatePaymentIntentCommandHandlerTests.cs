@@ -1,5 +1,8 @@
+using ZIONShop.Contracts.Inventory;
 using ZIONShop.Payments.Application.Features.CreatePaymentIntent;
+using ZIONShop.Payments.Application.IntegrationEvents;
 using ZIONShop.Payments.Domain.Entities;
+using ZIONShop.Payments.Domain.Enums;
 using ZIONShop.Payments.Tests.TestSupport;
 
 namespace ZIONShop.Payments.Tests.Features;
@@ -20,7 +23,7 @@ public class CreatePaymentIntentCommandHandlerTests
         await payableOrders.AddAsync(projection);
         await db.SaveChangesAsync();
 
-        var handler = new CreatePaymentIntentCommandHandler(payments, payableOrders, uow, gateway, TimeProvider.System);
+        var handler = new CreatePaymentIntentCommandHandler(payments, payableOrders, uow, gateway, new FakeOrderDetailsReader(), TimeProvider.System);
         var result = await handler.Handle(new CreatePaymentIntentCommand(orderId, userId, "idem-key-1"), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
@@ -45,7 +48,7 @@ public class CreatePaymentIntentCommandHandlerTests
         await payableOrders.AddAsync(projection);
         await db.SaveChangesAsync();
 
-        var handler = new CreatePaymentIntentCommandHandler(payments, payableOrders, uow, gateway, TimeProvider.System);
+        var handler = new CreatePaymentIntentCommandHandler(payments, payableOrders, uow, gateway, new FakeOrderDetailsReader(), TimeProvider.System);
         var first = await handler.Handle(new CreatePaymentIntentCommand(orderId, userId, "idem-key-1"), CancellationToken.None);
         var second = await handler.Handle(new CreatePaymentIntentCommand(orderId, userId, "idem-key-1"), CancellationToken.None);
 
@@ -68,7 +71,7 @@ public class CreatePaymentIntentCommandHandlerTests
         await payableOrders.AddAsync(projection);
         await db.SaveChangesAsync();
 
-        var handler = new CreatePaymentIntentCommandHandler(payments, payableOrders, uow, gateway, TimeProvider.System);
+        var handler = new CreatePaymentIntentCommandHandler(payments, payableOrders, uow, gateway, new FakeOrderDetailsReader(), TimeProvider.System);
         var first = await handler.Handle(new CreatePaymentIntentCommand(orderId, userId, "idem-key-1"), CancellationToken.None);
         var second = await handler.Handle(new CreatePaymentIntentCommand(orderId, userId, "idem-key-2"), CancellationToken.None);
 
@@ -88,7 +91,7 @@ public class CreatePaymentIntentCommandHandlerTests
         await payableOrders.AddAsync(PayableOrder.Create(orderId, userId, 250000m, "VND", DateTime.UtcNow));
         await db.SaveChangesAsync();
 
-        var handler = new CreatePaymentIntentCommandHandler(payments, payableOrders, uow, gateway, TimeProvider.System);
+        var handler = new CreatePaymentIntentCommandHandler(payments, payableOrders, uow, gateway, new FakeOrderDetailsReader(), TimeProvider.System);
         var result = await handler.Handle(new CreatePaymentIntentCommand(orderId, userId, "idem-key-1"), CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
@@ -109,7 +112,7 @@ public class CreatePaymentIntentCommandHandlerTests
         await payableOrders.AddAsync(projection);
         await db.SaveChangesAsync();
 
-        var handler = new CreatePaymentIntentCommandHandler(payments, payableOrders, uow, gateway, TimeProvider.System);
+        var handler = new CreatePaymentIntentCommandHandler(payments, payableOrders, uow, gateway, new FakeOrderDetailsReader(), TimeProvider.System);
         var result = await handler.Handle(new CreatePaymentIntentCommand(orderId, userId, "idem-key-1"), CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
@@ -131,7 +134,7 @@ public class CreatePaymentIntentCommandHandlerTests
         await payableOrders.AddAsync(projection);
         await db.SaveChangesAsync();
 
-        var handler = new CreatePaymentIntentCommandHandler(payments, payableOrders, uow, gateway, TimeProvider.System);
+        var handler = new CreatePaymentIntentCommandHandler(payments, payableOrders, uow, gateway, new FakeOrderDetailsReader(), TimeProvider.System);
         var result = await handler.Handle(new CreatePaymentIntentCommand(orderId, userId, "idem-key-1"), CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
@@ -151,7 +154,7 @@ public class CreatePaymentIntentCommandHandlerTests
         await payableOrders.AddAsync(projection);
         await db.SaveChangesAsync();
 
-        var handler = new CreatePaymentIntentCommandHandler(payments, payableOrders, uow, gateway, TimeProvider.System);
+        var handler = new CreatePaymentIntentCommandHandler(payments, payableOrders, uow, gateway, new FakeOrderDetailsReader(), TimeProvider.System);
         var result = await handler.Handle(new CreatePaymentIntentCommand(orderId, Guid.NewGuid(), "idem-key-1"), CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
@@ -165,7 +168,7 @@ public class CreatePaymentIntentCommandHandlerTests
         var uow = new FakePaymentsUnitOfWork(db);
         var gateway = PaymentsTestFactory.BuildGateway();
 
-        var handler = new CreatePaymentIntentCommandHandler(payments, payableOrders, uow, gateway, TimeProvider.System);
+        var handler = new CreatePaymentIntentCommandHandler(payments, payableOrders, uow, gateway, new FakeOrderDetailsReader(), TimeProvider.System);
         var result = await handler.Handle(new CreatePaymentIntentCommand(Guid.NewGuid(), Guid.NewGuid(), "idem-key-1"), CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
@@ -186,7 +189,7 @@ public class CreatePaymentIntentCommandHandlerTests
         await payableOrders.AddAsync(projection);
         await db.SaveChangesAsync();
 
-        var handler = new CreatePaymentIntentCommandHandler(payments, payableOrders, uow, gateway, TimeProvider.System);
+        var handler = new CreatePaymentIntentCommandHandler(payments, payableOrders, uow, gateway, new FakeOrderDetailsReader(), TimeProvider.System);
         var result = await handler.Handle(new CreatePaymentIntentCommand(orderId, userId, "idem-key-1"), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
@@ -207,7 +210,7 @@ public class CreatePaymentIntentCommandHandlerTests
         await payableOrders.AddAsync(projection);
         await db.SaveChangesAsync();
 
-        var handler = new CreatePaymentIntentCommandHandler(payments, payableOrders, uow, gateway, TimeProvider.System);
+        var handler = new CreatePaymentIntentCommandHandler(payments, payableOrders, uow, gateway, new FakeOrderDetailsReader(), TimeProvider.System);
         var result = await handler.Handle(new CreatePaymentIntentCommand(orderId, userId, "idem-key-1", "ewallet"), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
@@ -228,7 +231,7 @@ public class CreatePaymentIntentCommandHandlerTests
         await payableOrders.AddAsync(projection);
         await db.SaveChangesAsync();
 
-        var handler = new CreatePaymentIntentCommandHandler(payments, payableOrders, uow, gateway, TimeProvider.System);
+        var handler = new CreatePaymentIntentCommandHandler(payments, payableOrders, uow, gateway, new FakeOrderDetailsReader(), TimeProvider.System);
         var result = await handler.Handle(new CreatePaymentIntentCommand(orderId, userId, "idem-key-1", "PayPal"), CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
@@ -249,11 +252,73 @@ public class CreatePaymentIntentCommandHandlerTests
         await payableOrders.AddAsync(projection);
         await db.SaveChangesAsync();
 
-        var handler = new CreatePaymentIntentCommandHandler(payments, payableOrders, uow, gateway, TimeProvider.System);
+        var handler = new CreatePaymentIntentCommandHandler(payments, payableOrders, uow, gateway, new FakeOrderDetailsReader(), TimeProvider.System);
         var first = await handler.Handle(new CreatePaymentIntentCommand(orderId, userId, "idem-key-1", "BankTransfer"), CancellationToken.None);
         var second = await handler.Handle(new CreatePaymentIntentCommand(orderId, userId, "idem-key-1"), CancellationToken.None);
 
         second.IsSuccess.Should().BeTrue();
         second.Value.Channel.Should().Be(first.Value.Channel).And.Be("BankTransfer");
+    }
+
+    [Fact]
+    public async Task Handle_Should_CreateIntent_When_ProjectionMissingButOrderIsAwaitingPayment()
+    {
+        var (db, payments, payableOrders, _) = PaymentsTestFactory.BuildScope();
+        var uow = new FakePaymentsUnitOfWork(db);
+        var gateway = PaymentsTestFactory.BuildGateway();
+        var orderId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+
+        var orderReader = new FakeOrderDetailsReader().With(FakeOrderDetailsReader.AwaitingPayment(orderId, userId, 250000m));
+
+        var handler = new CreatePaymentIntentCommandHandler(payments, payableOrders, uow, gateway, orderReader, TimeProvider.System);
+        var result = await handler.Handle(new CreatePaymentIntentCommand(orderId, userId, "idem-key-1"), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value.OrderId.Should().Be(orderId);
+        (await payableOrders.GetByOrderIdAsync(orderId))!.State.Should().Be(PayableOrderState.Payable);
+    }
+
+    [Fact]
+    public async Task Handle_Should_CreateIntent_When_ProjectionAwaitingStockButOrderIsAwaitingPayment_AndLaterInventoryReservedEventIsNoOp()
+    {
+        var (db, payments, payableOrders, _) = PaymentsTestFactory.BuildScope();
+        var uow = new FakePaymentsUnitOfWork(db);
+        var gateway = PaymentsTestFactory.BuildGateway();
+        var orderId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+
+        await payableOrders.AddAsync(PayableOrder.Create(orderId, userId, 250000m, "VND", DateTime.UtcNow));
+        await db.SaveChangesAsync();
+
+        var orderReader = new FakeOrderDetailsReader().With(FakeOrderDetailsReader.AwaitingPayment(orderId, userId, 250000m));
+
+        var handler = new CreatePaymentIntentCommandHandler(payments, payableOrders, uow, gateway, orderReader, TimeProvider.System);
+        var result = await handler.Handle(new CreatePaymentIntentCommand(orderId, userId, "idem-key-1"), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+
+        var inventoryReservedHandler = new InventoryReservedIntegrationEventHandler(payableOrders, uow, TimeProvider.System);
+        await inventoryReservedHandler.HandleAsync(new InventoryReservedIntegrationEvent(orderId, Array.Empty<ReservedItem>(), DateTime.UtcNow.AddMinutes(15)));
+
+        (await payableOrders.GetByOrderIdAsync(orderId))!.State.Should().Be(PayableOrderState.Payable);
+    }
+
+    [Fact]
+    public async Task Handle_Should_ReturnConflict_When_OrderIsStillPendingStock()
+    {
+        var (db, payments, payableOrders, _) = PaymentsTestFactory.BuildScope();
+        var uow = new FakePaymentsUnitOfWork(db);
+        var gateway = PaymentsTestFactory.BuildGateway();
+        var orderId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+
+        var orderReader = new FakeOrderDetailsReader().With(FakeOrderDetailsReader.PendingStock(orderId, userId, 250000m));
+
+        var handler = new CreatePaymentIntentCommandHandler(payments, payableOrders, uow, gateway, orderReader, TimeProvider.System);
+        var result = await handler.Handle(new CreatePaymentIntentCommand(orderId, userId, "idem-key-1"), CancellationToken.None);
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Code.Should().Be("Payments.OrderNotPayable");
     }
 }

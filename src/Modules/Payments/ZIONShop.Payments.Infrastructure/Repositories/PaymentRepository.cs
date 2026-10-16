@@ -26,4 +26,6 @@ public class PaymentRepository : IPaymentRepository
 
     public async Task AddAsync(Payment payment, CancellationToken cancellationToken = default) =>
         await _db.Payments.AddAsync(payment, cancellationToken);
+
+    public IQueryable<Payment> Query() => _db.Payments.AsQueryable();
 }

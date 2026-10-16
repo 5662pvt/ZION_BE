@@ -2,6 +2,7 @@ using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using ZIONShop.Api.Filters;
 using ZIONShop.Auth.Authorization;
 using ZIONShop.Auth.CurrentUser;
 using ZIONShop.Common.Api;
@@ -60,6 +61,7 @@ public class OrdersController : ControllerBase
         => (await _mediator.Send(new GetOrderQuery(id, _currentUser.UserId!.Value, IsStaffOrAdmin), ct)).ToActionResult();
 
     [HttpPost("{id:guid}/cancel")]
+    [AdminAudit("Order.Cancel", "Order", RequireStaffOrAdmin = true)]
     public async Task<IActionResult> Cancel(Guid id, [FromBody] CancelOrderBody? body, CancellationToken ct)
         => (await _mediator.Send(new CancelOrderCommand(id, _currentUser.UserId!.Value, IsStaffOrAdmin, body?.Reason), ct)).ToActionResult("Order cancelled");
 
@@ -73,11 +75,13 @@ public class OrdersController : ControllerBase
 
     [HttpPost("{id:guid}/ship")]
     [Authorize(Policy = Policies.StaffOrAdmin)]
+    [AdminAudit("Order.Ship", "Order")]
     public async Task<IActionResult> Ship(Guid id, CancellationToken ct)
         => (await _mediator.Send(new ShipOrderCommand(id), ct)).ToActionResult("Order shipped");
 
     [HttpPost("{id:guid}/complete")]
     [Authorize(Policy = Policies.StaffOrAdmin)]
+    [AdminAudit("Order.Complete", "Order")]
     public async Task<IActionResult> Complete(Guid id, CancellationToken ct)
         => (await _mediator.Send(new CompleteOrderCommand(id), ct)).ToActionResult("Order completed");
 }

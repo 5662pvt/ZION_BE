@@ -6,4 +6,6 @@ public static class UsersErrors
 {
     public static readonly Error ProfileNotFound = Error.NotFound("Users.ProfileNotFound", "User profile not found");
     public static readonly Error AddressNotFound = Error.NotFound("Users.AddressNotFound", "Address not found");
+    public static readonly Error ProductNotFound = Error.NotFound("Users.ProductNotFound", "Sản phẩm không tồn tại hoặc chưa được công bố");
+    public static readonly Error WishlistFull = Error.Validation("Users.WishlistFull", "Danh sách yêu thích đã đạt tối đa 200 sản phẩm");
 }

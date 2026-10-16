@@ -49,6 +49,18 @@ public static class ReviewMappingExtensions
         return new ReviewSummaryDto(productId, summary.Average, summary.Count, distribution);
     }
 
+    public static MyReviewDto ToMyDto(this Review review, string? productSlug) => new(
+        review.Id,
+        review.ProductId,
+        review.ProductName,
+        productSlug,
+        review.Rating,
+        review.Title,
+        review.Content,
+        review.Status.ToString(),
+        review.HiddenReason,
+        review.CreatedDate);
+
     public static ProductRatingDto ToRatingDto(this ProductRatingSummary? summary, Guid productId) =>
         summary is null ? new ProductRatingDto(productId, 0m, 0) : new ProductRatingDto(productId, summary.Average, summary.Count);
 

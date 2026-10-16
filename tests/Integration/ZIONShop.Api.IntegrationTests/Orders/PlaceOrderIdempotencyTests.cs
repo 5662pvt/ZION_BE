@@ -1,13 +1,20 @@
 using System.Net;
 using System.Net.Http.Json;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Testcontainers.PostgreSql;
 using ZIONShop.Api.IntegrationTests.Checkout;
 using ZIONShop.Api.IntegrationTests.Infrastructure;
 using ZIONShop.Contracts.Inventory;
 using ZIONShop.Contracts.Orders;
 using ZIONShop.EventBus.Abstractions;
 using ZIONShop.EventBus.Outbox;
+using ZIONShop.EventBus.RabbitMq;
+using ZIONShop.Inventory.Infrastructure.Persistence;
 using ZIONShop.Orders.Infrastructure.Persistence;
 using static ZIONShop.Api.IntegrationTests.Checkout.CheckoutTestHelpers;
 using static ZIONShop.Api.IntegrationTests.Notifications.NotificationsTestHelpers;
@@ -28,6 +35,52 @@ public class PlaceOrderIdempotencyTests
         var login = await admin.LoginAsAdminAsync();
         admin.WithBearerToken(login.AccessToken);
         return admin;
+    }
+
+    private static async Task<HttpClient> AdminClientAsync(WebApplicationFactory<Program> factory)
+    {
+        var admin = factory.CreateClient();
+        var login = await admin.LoginAsAdminAsync();
+        admin.WithBearerToken(login.AccessToken);
+        return admin;
+    }
+
+    /// <summary>
+    /// Flushes one batch of a module's outbox synchronously, standing in for the background
+    /// <see cref="OutboxPublisherService{TDbContext}"/> that a BackgroundProcessing-disabled host never
+    /// starts -- lets a test control exactly when a pending event is delivered instead of racing an
+    /// automatic polling timer. <see cref="OutboxPublisherService{TDbContext}"/> itself is only
+    /// registered in DI when background processing is enabled, so it is constructed directly here from
+    /// its otherwise-ungated dependencies.
+    /// </summary>
+    private static async Task PumpOutboxOnceAsync<TDbContext>(WebApplicationFactory<Program> factory) where TDbContext : DbContext
+    {
+        using var scope = factory.Services.CreateScope();
+        var publisher = new OutboxPublisherService<TDbContext>(
+            scope.ServiceProvider.GetRequiredService<IServiceScopeFactory>(),
+            scope.ServiceProvider.GetRequiredService<IOptions<RabbitMqOptions>>(),
+            scope.ServiceProvider.GetRequiredService<ILogger<OutboxPublisherService<TDbContext>>>());
+        await publisher.PublishBatchAsync(CancellationToken.None);
+    }
+
+    /// <summary>
+    /// Removes the one still-pending outbox row for <typeparamref name="TEvent"/>/<paramref name="orderId"/>
+    /// so it can be stood in for separately (a hand-built "late" event, or simply skipped) without
+    /// <see cref="PumpOutboxOnceAsync{TDbContext}"/> picking it up and dispatching it bundled together with
+    /// whatever else is pending in the same module's outbox at that moment -- <c>PublishBatchAsync</c>
+    /// flushes up to 50 eligible rows per call, not just one, so two events that both happen to be pending
+    /// (e.g. OrderCreated and OrderCancelled) would otherwise be delivered in the same batch.
+    /// </summary>
+    private static async Task DiscardPendingOutboxMessageAsync<TEvent>(WebApplicationFactory<Program> factory, Guid orderId) where TEvent : IntegrationEvent
+    {
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<OrdersDbContext>();
+        var pending = await db.Set<OutboxMessage>()
+            .Where(m => m.ProcessedOn == null && m.Type.Contains(typeof(TEvent).Name))
+            .ToListAsync();
+        var match = pending.Single(m => m.Content.Contains(orderId.ToString()));
+        db.Set<OutboxMessage>().Remove(match);
+        await db.SaveChangesAsync();
     }
 
     private static async Task<HttpResponseMessage> PlaceOrderWithKeyAsync(
@@ -222,10 +275,13 @@ public class PlaceOrderIdempotencyTests
     [Fact]
     public async Task AsyncReservationFailure_Should_CancelOrder_And_NotifyCustomer()
     {
-        var admin = await AdminClientAsync();
+        await using var host = await IsolatedBackgroundDisabledHost.CreateAsync();
+        var factory = host.Factory;
+
+        var admin = await AdminClientAsync(factory);
         var (productId, _) = await CreatePublishedProductAsync(admin);
         await AdjustStockAsync(admin, productId, 5);
-        var (customer, addressId, _) = await CreateCustomerWithAddressAsync(_factory);
+        var (customer, addressId, _) = await CreateCustomerWithAddressAsync(factory);
         await AddToCartAsync(customer, productId, 1);
 
         var placed = await PlaceOrderAsync(customer, addressId, "COD"); // passes the sync pre-check (5 available >= 1)
@@ -233,17 +289,25 @@ public class PlaceOrderIdempotencyTests
         // Simulates the async Inventory reservation failing outright (e.g. a concurrent order depleted stock
         // between the sync pre-check and the real atomic reservation) by publishing the same event Inventory
         // would publish in that case, through the real integration-event pipeline (not by touching Inventory).
-        // The real OrderCreated outbox row for this order is discarded first so the still-available stock can
-        // never legitimately get reserved and confirm the order in the background, racing this synthetic
-        // failure and making the test flaky.
-        await DiscardPendingOutboxMessageAsync<OrderCreatedIntegrationEvent>(placed.Id);
+        // The real OrderCreated outbox row for this order is discarded first so it can never legitimately
+        // reserve/confirm the order and race this synthetic failure -- this host's own
+        // OutboxPublisherService<OrdersDbContext> never runs anyway (BackgroundProcessing disabled) and no
+        // other host shares this isolated database, so the discard itself races nothing.
+        await DiscardPendingOutboxMessageAsync<OrderCreatedIntegrationEvent>(factory, placed.Id);
 
-        using var scope = _factory.Services.CreateScope();
-        var eventBus = scope.ServiceProvider.GetRequiredService<IEventBus>();
-        await eventBus.PublishAsync(new InventoryReservationFailedIntegrationEvent(placed.Id, "Hết hàng", new[] { productId }));
+        using (var scope = factory.Services.CreateScope())
+        {
+            var eventBus = scope.ServiceProvider.GetRequiredService<IEventBus>();
+            await eventBus.PublishAsync(new InventoryReservationFailedIntegrationEvent(placed.Id, "Hết hàng", new[] { productId }));
+        }
 
         var cancelled = await WaitForOrderStatusAsync(customer, placed.Id, "Cancelled");
         cancelled.CancelReason.Should().Be("Hết hàng");
+
+        // The cancellation above queued OrderCancelledIntegrationEvent as the only pending row left on
+        // Orders' own outbox (OrderCreated was discarded) -- flush it ourselves so Notifications picks it
+        // up, since no background publisher is running.
+        await PumpOutboxOnceAsync<OrdersDbContext>(factory);
 
         var log = await WaitForNotificationLogAsync(admin, placed.Id, "OrderCancelled");
         log.Status.Should().Be("Sent");
@@ -252,34 +316,49 @@ public class PlaceOrderIdempotencyTests
     [Fact]
     public async Task LateReservation_Should_BeReleased_When_ItArrivesAfterOrderWasAlreadyCancelled()
     {
-        var admin = await AdminClientAsync();
+        await using var host = await IsolatedBackgroundDisabledHost.CreateAsync();
+        var factory = host.Factory;
+
+        var admin = await AdminClientAsync(factory);
         var (productId, sku) = await CreatePublishedProductAsync(admin);
         await AdjustStockAsync(admin, productId, 5);
-        var (customer, addressId, userId) = await CreateCustomerWithAddressAsync(_factory);
+        var (customer, addressId, userId) = await CreateCustomerWithAddressAsync(factory);
         await AddToCartAsync(customer, productId, 1);
 
         var placed = await PlaceOrderAsync(customer, addressId, "COD");
 
         // Reproduces the F3 leak directly: discard the real OrderCreated outbox row (standing in for it
-        // being stuck in a delayed retry queue) and cancel the order while Inventory has not reserved
-        // anything for it yet.
-        await DiscardPendingOutboxMessageAsync<OrderCreatedIntegrationEvent>(placed.Id);
+        // being stuck in a delayed retry queue) so the order gets cancelled while Inventory has reserved
+        // nothing for it yet, and so that flushing Orders' outbox next delivers only OrderCancelled -- if
+        // OrderCreated were still pending alongside it, PublishBatchAsync would deliver both in the same
+        // batch, and Inventory's own (unrelated) OrderCancelledIntegrationEventHandler would release the
+        // reservation immediately, short-circuiting the actual leak this test targets. This host's own
+        // OutboxPublisherService<OrdersDbContext> never runs (BackgroundProcessing disabled) and no other
+        // host shares this isolated database, so the discard races nothing.
+        await DiscardPendingOutboxMessageAsync<OrderCreatedIntegrationEvent>(factory, placed.Id);
         var cancelResponse = await CancelOrderRawAsync(customer, placed.Id);
         cancelResponse.StatusCode.Should().Be(HttpStatusCode.OK);
         await WaitForOrderStatusAsync(customer, placed.Id, "Cancelled");
+
+        // Only OrderCancelled is pending now -- flush it alone so Inventory's OrderCancelledIntegrationEventHandler
+        // runs its (idempotent, no-op) release check before any reservation exists, exactly like production.
+        await PumpOutboxOnceAsync<OrdersDbContext>(factory);
 
         var beforeLateReservation = await GetInventoryItemBySkuAsync(admin, sku);
         beforeLateReservation.Reserved.Should().Be(0);
 
         // The delayed retry finally lands: Inventory has no idea the order was cancelled and reserves stock
         // for it anyway (COD -> no expiry), publishing the real InventoryReservedIntegrationEvent through its
-        // own outbox exactly as it would in production.
-        using var scope = _factory.Services.CreateScope();
-        var eventBus = scope.ServiceProvider.GetRequiredService<IEventBus>();
-        await eventBus.PublishAsync(new OrderCreatedIntegrationEvent(
-            placed.Id, userId, placed.Total,
-            placed.Lines.Select(l => new OrderLine(l.ProductId, l.Quantity, l.UnitPrice, l.IsGift)).ToList(),
-            placed.PaymentMethod, placed.Currency));
+        // own outbox exactly as it would in production. Published directly (not via Orders' outbox) since
+        // the real row was discarded above -- this is the "late" delivery itself, not a race workaround.
+        using (var scope = factory.Services.CreateScope())
+        {
+            var eventBus = scope.ServiceProvider.GetRequiredService<IEventBus>();
+            await eventBus.PublishAsync(new OrderCreatedIntegrationEvent(
+                placed.Id, userId, placed.Total,
+                placed.Lines.Select(l => new OrderLine(l.ProductId, l.Quantity, l.UnitPrice, l.IsGift)).ToList(),
+                placed.PaymentMethod, placed.Currency));
+        }
 
         // Confirms the reservation really happened (i.e. this test exercises the leak, not a trivial no-op).
         var reservedSnapshot = await WaitForInventoryAsync(admin, sku, i => i.Reserved > 0, TimeSpan.FromSeconds(10));
@@ -287,22 +366,82 @@ public class PlaceOrderIdempotencyTests
 
         // Without the release-on-cancel fix this would stay reserved forever: InventoryReservedIntegrationEventHandler
         // would see the order is Cancelled and silently no-op. With the fix it requests a release, which Inventory's
-        // outbox round-trip (InventoryReserved -> Orders -> OrderReservationReleaseRequested -> Inventory) applies
-        // asynchronously, so Reserved must return to its starting value.
-        var released = await WaitForInventoryAsync(admin, sku, i => i.Reserved == 0, TimeSpan.FromSeconds(30));
+        // outbox round-trip (InventoryReserved -> Orders -> OrderReservationReleaseRequested -> Inventory) applies --
+        // driven explicitly here via PumpOutboxOnceAsync instead of a background timer, since Inventory's and
+        // Orders' outboxes each hold exactly one pending row at their respective hop.
+        await PumpOutboxOnceAsync<InventoryDbContext>(factory);
+        await PumpOutboxOnceAsync<OrdersDbContext>(factory);
+
+        var released = await WaitForInventoryAsync(admin, sku, i => i.Reserved == 0, TimeSpan.FromSeconds(10));
         released.OnHand.Should().Be(5);
         released.Available.Should().Be(5);
     }
 
-    private async Task DiscardPendingOutboxMessageAsync<TEvent>(Guid orderId) where TEvent : IntegrationEvent
+    /// <summary>
+    /// A dedicated Postgres container (not the shared ApiTestCollection fixture's) with
+    /// BackgroundProcessing disabled. The shared fixture's own OutboxPublisherService&lt;TDbContext&gt;
+    /// instances, once started, keep polling for the lifetime of the whole suite -- disabling
+    /// registration on a second <c>WithWebHostBuilder</c> host pointed at that same database does not
+    /// stop them, so a test that needs a real pending outbox row to stay put must not share that
+    /// database at all. Same shape as <c>WorkerReadinessIsolationTests.cs</c>, minus RabbitMq since this
+    /// scenario only needs EventBus:Provider=InMemory.
+    /// </summary>
+    private sealed class IsolatedBackgroundDisabledHost : IAsyncDisposable
     {
-        using var scope = _factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<OrdersDbContext>();
-        var pending = await db.Set<OutboxMessage>()
-            .Where(m => m.ProcessedOn == null && m.Type.Contains(typeof(TEvent).Name))
-            .ToListAsync();
-        var match = pending.Single(m => m.Content.Contains(orderId.ToString()));
-        db.Set<OutboxMessage>().Remove(match);
-        await db.SaveChangesAsync();
+        private readonly PostgreSqlContainer _postgres;
+        private readonly string _uploadsRoot;
+        private readonly EnvironmentVariableScope _envScope;
+
+        public WebApplicationFactory<Program> Factory { get; }
+
+        private IsolatedBackgroundDisabledHost(
+            PostgreSqlContainer postgres, string uploadsRoot, EnvironmentVariableScope envScope, WebApplicationFactory<Program> factory)
+        {
+            _postgres = postgres;
+            _uploadsRoot = uploadsRoot;
+            _envScope = envScope;
+            Factory = factory;
+        }
+
+        public static async Task<IsolatedBackgroundDisabledHost> CreateAsync()
+        {
+            var postgres = new PostgreSqlBuilder()
+                .WithImage("postgres:16-alpine")
+                .WithDatabase("zionshop_outbox_isolation_test")
+                .WithUsername("postgres")
+                .WithPassword("postgres")
+                .Build();
+            await postgres.StartAsync();
+
+            var uploadsRoot = Path.Combine(Path.GetTempPath(), "zion-uploads-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(uploadsRoot);
+
+            // Restored to the shared ApiFactory fixture's own values on Dispose (not null) -- ApiFactory
+            // sets these exact variables once, lazily, the first time its host is built; nulling them
+            // out here instead would permanently break any later test in the same process (e.g.
+            // NpgsqlExportFilterTests) that reads them directly.
+            var envScope = new EnvironmentVariableScope(
+                "ConnectionStrings__DefaultConnection", "EventBus__Provider", "BackgroundProcessing__Enabled",
+                "ImageStorage__PublicBaseUrl", "ImageStorage__LocalRootPath");
+
+            Environment.SetEnvironmentVariable("ConnectionStrings__DefaultConnection", postgres.GetConnectionString());
+            Environment.SetEnvironmentVariable("EventBus__Provider", "InMemory");
+            Environment.SetEnvironmentVariable("BackgroundProcessing__Enabled", "false");
+            Environment.SetEnvironmentVariable("ImageStorage__PublicBaseUrl", "http://test.local");
+            Environment.SetEnvironmentVariable("ImageStorage__LocalRootPath", uploadsRoot);
+
+            var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder => builder.UseEnvironment("Development"));
+
+            return new IsolatedBackgroundDisabledHost(postgres, uploadsRoot, envScope, factory);
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            Factory.Dispose();
+            _envScope.Dispose();
+            if (Directory.Exists(_uploadsRoot))
+                Directory.Delete(_uploadsRoot, recursive: true);
+            await _postgres.DisposeAsync();
+        }
     }
 }

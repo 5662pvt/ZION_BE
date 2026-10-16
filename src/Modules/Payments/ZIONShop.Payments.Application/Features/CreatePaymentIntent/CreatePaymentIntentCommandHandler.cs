@@ -1,4 +1,5 @@
 using MediatR;
+using ZIONShop.Contracts.Orders;
 using ZIONShop.Payments.Application.DTOs;
 using ZIONShop.Payments.Application.Interfaces;
 using ZIONShop.Payments.Application.Mappings;
@@ -16,6 +17,7 @@ public class CreatePaymentIntentCommandHandler : IRequestHandler<CreatePaymentIn
     private readonly IPayableOrderRepository _payableOrders;
     private readonly IPaymentsUnitOfWork _uow;
     private readonly IPaymentGateway _gateway;
+    private readonly IOrderDetailsReader _orderDetailsReader;
     private readonly TimeProvider _timeProvider;
 
     public CreatePaymentIntentCommandHandler(
@@ -23,12 +25,14 @@ public class CreatePaymentIntentCommandHandler : IRequestHandler<CreatePaymentIn
         IPayableOrderRepository payableOrders,
         IPaymentsUnitOfWork uow,
         IPaymentGateway gateway,
+        IOrderDetailsReader orderDetailsReader,
         TimeProvider timeProvider)
     {
         _payments = payments;
         _payableOrders = payableOrders;
         _uow = uow;
         _gateway = gateway;
+        _orderDetailsReader = orderDetailsReader;
         _timeProvider = timeProvider;
     }
 
@@ -51,7 +55,35 @@ public class CreatePaymentIntentCommandHandler : IRequestHandler<CreatePaymentIn
         var existingByKey = await _payments.GetByIdempotencyKeyAsync(request.UserId, request.IdempotencyKey, cancellationToken);
         if (existingByKey is not null) return Result.Success(existingByKey.ToDto(_gateway));
 
+        var now = _timeProvider.GetUtcNow().UtcDateTime;
         var payableOrder = await _payableOrders.GetByOrderIdAsync(request.OrderId, cancellationToken);
+
+        // Race: Orders flips the order to AwaitingPayment and Payments flips this projection to Payable
+        // from the SAME InventoryReserved event, but via two independent outbox/inbox consumers. If the
+        // customer calls this right away the Orders side can have already caught up while the Payments
+        // side hasn't. Fall back to the Orders read model so that doesn't surface as a 409. The later
+        // InventoryReserved consumer becomes a no-op once the projection is no longer AwaitingStock.
+        if (payableOrder is null || payableOrder.State == PayableOrderState.AwaitingStock)
+        {
+            var orderDetails = await _orderDetailsReader.GetAsync(request.OrderId, cancellationToken);
+            if (orderDetails is not null
+                && orderDetails.UserId == request.UserId
+                && string.Equals(orderDetails.PaymentMethod, "Online", StringComparison.OrdinalIgnoreCase)
+                && string.Equals(orderDetails.Status, "AwaitingPayment", StringComparison.OrdinalIgnoreCase))
+            {
+                if (payableOrder is null)
+                {
+                    payableOrder = PayableOrder.Create(request.OrderId, request.UserId, orderDetails.Total, orderDetails.Currency, now);
+                    payableOrder.MarkPayable(now);
+                    await _payableOrders.AddAsync(payableOrder, cancellationToken);
+                }
+                else
+                {
+                    payableOrder.MarkPayable(now);
+                }
+            }
+        }
+
         if (payableOrder is null)
             return Result.Failure<PaymentIntentDto>(PaymentsErrors.OrderNotPayable);
         if (payableOrder.UserId != request.UserId)
@@ -69,7 +101,6 @@ public class CreatePaymentIntentCommandHandler : IRequestHandler<CreatePaymentIn
         var existingPending = await _payments.GetPendingByOrderIdAsync(request.OrderId, cancellationToken);
         if (existingPending is not null) return Result.Success(existingPending.ToDto(_gateway));
 
-        var now = _timeProvider.GetUtcNow().UtcDateTime;
         var payment = Payment.Create(request.OrderId, request.UserId, payableOrder.Amount, payableOrder.Currency, "Fake", request.IdempotencyKey, now, channel);
         var (intentId, _) = await _gateway.CreateIntentAsync(payment, cancellationToken);
         payment.AssignIntent(intentId);

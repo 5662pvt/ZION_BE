@@ -1,6 +1,7 @@
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using ZIONShop.Api.Filters;
 using ZIONShop.Auth.Authorization;
 using ZIONShop.Auth.CurrentUser;
 using ZIONShop.Common.Api;
@@ -76,6 +77,7 @@ public class InventoryController : ControllerBase
 
     [HttpPost("products/{productId:guid}/adjust")]
     [Authorize(Policy = Policies.AdminOnly)]
+    [AdminAudit("Inventory.Adjust", "Inventory", RouteKey = "productId")]
     public async Task<IActionResult> AdjustStock(Guid productId, [FromBody] AdjustStockBody body, CancellationToken ct)
     {
         var createdBy = _currentUser.Email ?? _currentUser.UserId?.ToString();
