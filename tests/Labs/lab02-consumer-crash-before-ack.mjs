@@ -8,7 +8,7 @@ import {
   Evidence, sleep, readLogFile,
   startApi, startWorker, adminLogin, login, createPublishedProduct, adjustStock, getOrCreateAddress,
   clearCart, addToCart, placeOrder, waitForOrderStatus, rabbitQueue, countInboxMessages,
-  waitForInventory, countStockReservations,
+  waitForInventory, countStockReservations, parsePgTimestamp,
 } from './lib.mjs';
 
 const CRASH_EVENT_TYPE = 'OrderCreatedIntegrationEvent';
@@ -103,13 +103,13 @@ async function main() {
       ev.observe('inboxMessageCheck', inboxCheck);
       ev.assert('exactly one inbox row exists for the redelivered message id (no double-apply)', inboxCheck.count === 1, 1, inboxCheck.count);
       if (inboxCheck.minProcessedOn && crashAt) {
-        const processedAt = new Date(inboxCheck.minProcessedOn.replace(' ', 'T'));
+        const processedAt = parsePgTimestamp(inboxCheck.minProcessedOn);
         const processedBeforeCrash = processedAt <= crashAt;
+        // Observation only, not an assertion: both orderings are valid at-least-once outcomes
+        // (the handler's commit and the FailFast race each other -- either can land first).
         ev.observe('processedBeforeCrash', processedBeforeCrash);
-        // Expected true: the handler's DB transaction (stock reservation + inbox row) committed
-        // before the crash -- the crash happens right after that commit, before BasicAck. On
-        // redelivery the inbox dedupe check (AnyAsync on (MessageId, Consumer)) finds this row and
-        // skips the handler entirely, which is exactly the protection this lab demonstrates.
+        ev.observe('processedOnIso', processedAt.toISOString());
+        ev.observe('crashAtIso', crashAt.toISOString());
       }
     } else {
       ev.assert('could extract a message id from the fault-injection log line to check inbox dedupe', false, 'a message id', 'none (log line not matched)');

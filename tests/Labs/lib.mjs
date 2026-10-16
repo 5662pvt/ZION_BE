@@ -29,6 +29,25 @@ export function nowIso() {
   return new Date().toISOString();
 }
 
+/**
+ * Parses a psql `-At` timestamptz text value (e.g. "2026-10-16 08:17:43.637768+00" or
+ * "...+07:00") into a Date. JS `Date` cannot parse psql's bare `+HH`/`-HH` offset (no colon,
+ * no minutes) -- it silently produces an Invalid Date instead of throwing, so without this a
+ * downstream comparison just evaluates to false with no error. This normalizes the offset to
+ * `+HH:MM`/`-HH:MM`, trims fractional seconds to milliseconds (JS Date only supports 3 digits),
+ * and throws if the result is still not parseable.
+ */
+export function parsePgTimestamp(text) {
+  let iso = text.trim().replace(' ', 'T');
+  iso = iso.replace(/\.(\d+)/, (_, frac) => `.${frac.slice(0, 3)}`);
+  iso = iso.replace(/([+-]\d{2})(?::?(\d{2}))?$/, (_, hh, mm) => `${hh}:${mm ?? '00'}`);
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) {
+    throw new Error(`parsePgTimestamp: could not parse "${text}" (normalized to "${iso}")`);
+  }
+  return date;
+}
+
 // ---------------------------------------------------------------------------
 // Evidence collector
 // ---------------------------------------------------------------------------

@@ -1,6 +1,6 @@
 {
-  "startedAt": "2026-10-16T08:17:19.329Z",
-  "finishedAt": "2026-10-16T08:18:20.772Z",
+  "startedAt": "2026-10-16T11:13:02.689Z",
+  "finishedAt": "2026-10-16T11:13:51.987Z",
   "environment": {
     "api": {
       "ASPNETCORE_ENVIRONMENT": "Development",
@@ -21,218 +21,220 @@
   },
   "steps": [
     {
-      "at": "2026-10-16T08:17:19.329Z",
+      "at": "2026-10-16T11:13:02.689Z",
       "title": "starting API (BackgroundProcessing__Enabled=false -- no consumer/outbox publisher on this host)"
     },
     {
-      "at": "2026-10-16T08:17:23.681Z",
+      "at": "2026-10-16T11:13:07.062Z",
       "title": "starting Worker with FaultInjection__CrashBeforeAckEventType=OrderCreatedIntegrationEvent"
     },
     {
-      "at": "2026-10-16T08:17:40.065Z",
+      "at": "2026-10-16T11:13:10.180Z",
       "title": "logging in as admin + customer, seeding a published product with stock"
     },
     {
-      "at": "2026-10-16T08:17:42.404Z",
+      "at": "2026-10-16T11:13:12.665Z",
       "title": "placing an order so Inventory reserves stock via OrderCreatedIntegrationEvent"
     },
     {
-      "at": "2026-10-16T08:17:43.127Z",
+      "at": "2026-10-16T11:13:13.507Z",
       "title": "waiting for the Worker to crash (Environment.FailFast after the handler succeeds, before ack)"
     },
     {
-      "at": "2026-10-16T08:17:44.108Z",
+      "at": "2026-10-16T11:13:16.128Z",
       "title": "recording queue depth/unacked for the main queue while no consumer is attached (message redelivered)"
     },
     {
-      "at": "2026-10-16T08:18:14.681Z",
+      "at": "2026-10-16T11:13:46.736Z",
       "title": "starting the Worker again WITHOUT the fault-injection flag"
     },
     {
-      "at": "2026-10-16T08:18:17.788Z",
+      "at": "2026-10-16T11:13:48.822Z",
       "title": "waiting for the redelivered message to be handled and the order to settle"
     },
     {
-      "at": "2026-10-16T08:18:17.869Z",
+      "at": "2026-10-16T11:13:48.872Z",
       "title": "checking the Inbox deduped the redelivery (exactly one row for this message id) via psql -- the admin API (GET /admin/system/inbox) paginates and filters client-side, and can miss the row once the module inbox has thousands of rows"
     },
     {
-      "at": "2026-10-16T08:18:18.047Z",
+      "at": "2026-10-16T11:13:49.034Z",
       "title": "checking Reserved/OnHand reflect exactly one reservation+commit (no double reservation from redelivery) -- polling since the Inventory commit lands via a later async event (OrderConfirmed), after the order already shows Confirmed, and worker2 must stay up to process it"
     },
     {
-      "at": "2026-10-16T08:18:19.220Z",
+      "at": "2026-10-16T11:13:50.749Z",
       "title": "checking exactly one StockReservation row exists for the crashed order (the redelivery did not double-reserve)"
     },
     {
-      "at": "2026-10-16T08:18:19.366Z",
+      "at": "2026-10-16T11:13:50.890Z",
       "title": "finally: stopping the second (healthy) Worker"
     },
     {
-      "at": "2026-10-16T08:18:19.762Z",
+      "at": "2026-10-16T11:13:51.277Z",
       "title": "finally: stopping the crashed Worker process (likely already dead)"
     },
     {
-      "at": "2026-10-16T08:18:20.219Z",
+      "at": "2026-10-16T11:13:51.608Z",
       "title": "finally: stopping API"
     }
   ],
   "observations": {
-    "apiLogPath": "C:\\Code\\Zion\\ZION_BE\\tests\\Labs\\.logs\\lab02-consumer-crash-before-ack-api-2026-10-16T08-17-19-328Z-1.log",
-    "workerLogPath": "C:\\Code\\Zion\\ZION_BE\\tests\\Labs\\.logs\\lab02-consumer-crash-before-ack-worker-2026-10-16T08-17-19-328Z-1.log",
-    "orderId": "3ddf35bc-8b60-43da-9495-c27261849f4b",
+    "apiLogPath": "C:\\Code\\Zion\\ZION_BE\\tests\\Labs\\.logs\\lab02-consumer-crash-before-ack-api-2026-10-16T11-13-02-688Z-1.log",
+    "workerLogPath": "C:\\Code\\Zion\\ZION_BE\\tests\\Labs\\.logs\\lab02-consumer-crash-before-ack-worker-2026-10-16T11-13-02-688Z-1.log",
+    "orderId": "227bfa72-b016-42ca-a63b-fd367bf8844f",
     "workerExit": {
       "code": 2148734499,
       "signal": null
     },
-    "crashAt": "2026-10-16T08:17:44.105Z",
+    "crashAt": "2026-10-16T11:13:16.126Z",
     "crashLinesInWorkerLog": [
-      "FAULT INJECTION: crashing before ACK for OrderCreatedIntegrationEvent b3079712-2e45-448f-868a-14a05c957bdf"
+      "FAULT INJECTION: crashing before ACK for OrderCreatedIntegrationEvent 8779ec4a-6a05-4880-afb0-33f796c21cde"
     ],
     "queueDepthSamples": [
       {
-        "at": "2026-10-16T08:17:44.135Z",
+        "at": "2026-10-16T11:13:16.143Z",
         "messages": 0,
         "messages_ready": 0,
         "messages_unacknowledged": 0
       },
       {
-        "at": "2026-10-16T08:17:45.664Z",
+        "at": "2026-10-16T11:13:17.666Z",
         "messages": 0,
         "messages_ready": 0,
         "messages_unacknowledged": 0
       },
       {
-        "at": "2026-10-16T08:17:47.191Z",
+        "at": "2026-10-16T11:13:19.204Z",
         "messages": 0,
         "messages_ready": 0,
         "messages_unacknowledged": 0
       },
       {
-        "at": "2026-10-16T08:17:48.726Z",
+        "at": "2026-10-16T11:13:20.718Z",
         "messages": 0,
         "messages_ready": 0,
         "messages_unacknowledged": 0
       },
       {
-        "at": "2026-10-16T08:17:50.242Z",
-        "messages": 0,
-        "messages_ready": 0,
-        "messages_unacknowledged": 0
-      },
-      {
-        "at": "2026-10-16T08:17:51.773Z",
-        "messages": 0,
-        "messages_ready": 0,
-        "messages_unacknowledged": 0
-      },
-      {
-        "at": "2026-10-16T08:17:53.297Z",
+        "at": "2026-10-16T11:13:22.254Z",
         "messages": 1,
         "messages_ready": 1,
         "messages_unacknowledged": 0
       },
       {
-        "at": "2026-10-16T08:17:54.825Z",
+        "at": "2026-10-16T11:13:23.786Z",
         "messages": 1,
         "messages_ready": 1,
         "messages_unacknowledged": 0
       },
       {
-        "at": "2026-10-16T08:17:56.364Z",
+        "at": "2026-10-16T11:13:25.311Z",
         "messages": 1,
         "messages_ready": 1,
         "messages_unacknowledged": 0
       },
       {
-        "at": "2026-10-16T08:17:57.891Z",
+        "at": "2026-10-16T11:13:26.837Z",
         "messages": 1,
         "messages_ready": 1,
         "messages_unacknowledged": 0
       },
       {
-        "at": "2026-10-16T08:17:59.414Z",
+        "at": "2026-10-16T11:13:28.370Z",
         "messages": 1,
         "messages_ready": 1,
         "messages_unacknowledged": 0
       },
       {
-        "at": "2026-10-16T08:18:00.948Z",
+        "at": "2026-10-16T11:13:29.889Z",
         "messages": 1,
         "messages_ready": 1,
         "messages_unacknowledged": 0
       },
       {
-        "at": "2026-10-16T08:18:02.482Z",
+        "at": "2026-10-16T11:13:31.418Z",
         "messages": 1,
         "messages_ready": 1,
         "messages_unacknowledged": 0
       },
       {
-        "at": "2026-10-16T08:18:03.991Z",
+        "at": "2026-10-16T11:13:32.953Z",
         "messages": 1,
         "messages_ready": 1,
         "messages_unacknowledged": 0
       },
       {
-        "at": "2026-10-16T08:18:05.506Z",
+        "at": "2026-10-16T11:13:34.489Z",
         "messages": 1,
         "messages_ready": 1,
         "messages_unacknowledged": 0
       },
       {
-        "at": "2026-10-16T08:18:07.041Z",
+        "at": "2026-10-16T11:13:36.020Z",
         "messages": 1,
         "messages_ready": 1,
         "messages_unacknowledged": 0
       },
       {
-        "at": "2026-10-16T08:18:08.570Z",
+        "at": "2026-10-16T11:13:37.558Z",
         "messages": 1,
         "messages_ready": 1,
         "messages_unacknowledged": 0
       },
       {
-        "at": "2026-10-16T08:18:10.105Z",
+        "at": "2026-10-16T11:13:39.092Z",
         "messages": 1,
         "messages_ready": 1,
         "messages_unacknowledged": 0
       },
       {
-        "at": "2026-10-16T08:18:11.636Z",
+        "at": "2026-10-16T11:13:40.626Z",
         "messages": 1,
         "messages_ready": 1,
         "messages_unacknowledged": 0
       },
       {
-        "at": "2026-10-16T08:18:13.167Z",
+        "at": "2026-10-16T11:13:42.159Z",
+        "messages": 1,
+        "messages_ready": 1,
+        "messages_unacknowledged": 0
+      },
+      {
+        "at": "2026-10-16T11:13:43.693Z",
+        "messages": 1,
+        "messages_ready": 1,
+        "messages_unacknowledged": 0
+      },
+      {
+        "at": "2026-10-16T11:13:45.222Z",
         "messages": 1,
         "messages_ready": 1,
         "messages_unacknowledged": 0
       }
     ],
     "messageBecameReadyAgain": {
-      "at": "2026-10-16T08:17:53.297Z",
-      "delayFromCrashMs": 9192
+      "at": "2026-10-16T11:13:22.254Z",
+      "delayFromCrashMs": 6128
     },
-    "worker2LogPath": "C:\\Code\\Zion\\ZION_BE\\tests\\Labs\\.logs\\lab02-consumer-crash-before-ack-worker-2026-10-16T08-17-19-328Z-2.log",
+    "worker2LogPath": "C:\\Code\\Zion\\ZION_BE\\tests\\Labs\\.logs\\lab02-consumer-crash-before-ack-worker-2026-10-16T11-13-02-688Z-2.log",
     "finalOrderStatus": "Confirmed",
     "inboxMessageCheck": {
       "count": 1,
-      "minProcessedOn": "2026-10-16 08:17:43.637768+00"
+      "minProcessedOn": "2026-10-16 11:13:15.561435+00"
     },
-    "processedBeforeCrash": false,
+    "processedBeforeCrash": true,
+    "processedOnIso": "2026-10-16T11:13:15.561Z",
+    "crashAtIso": "2026-10-16T11:13:16.126Z",
     "inventoryAfter": {
-      "productId": "611e08e9-9579-4b69-b5cc-64afac66412f",
-      "sku": "LAB-TNZ4D26Q",
-      "productName": "Lab Product tnz4d26q",
+      "productId": "c3e89b2f-bd55-40bf-ac98-e0f01f7287dd",
+      "sku": "LAB-HVJGP9RS",
+      "productName": "Lab Product hvjgp9rs",
       "onHand": 9,
       "reserved": 0,
       "available": 9,
       "lowStockThreshold": 5,
       "isLowStock": false
     },
-    "inventorySettleMs": 1172,
+    "inventorySettleMs": 1715,
     "reservationCount": 1
   },
   "assertions": [

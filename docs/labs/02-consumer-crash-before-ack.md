@@ -145,7 +145,7 @@ inbox có bao nhiêu row.
 | Queue trong lúc Worker chết | Có mẫu với `messages_ready >= 1` hoặc `messages_unacknowledged >= 1` — message không mất |
 | Sau cửa sổ quan sát | `messages_unacknowledged = 0` — message đã về lại `ready`, sẵn sàng redeliver |
 | Sau khi Worker khởi động lại | Đơn đạt `Confirmed` |
-| Inbox module Inventory (qua `psql`) | Đúng 1 row cho `messageId` bị crash; `ProcessedOn` ≤ `crashAt` (`processedBeforeCrash = true`) |
+| Inbox module Inventory (qua `psql`) | Đúng 1 row cho `messageId` bị crash (`processedBeforeCrash` chỉ là quan sát, không assert — xem mục bên dưới) |
 | Inventory cuối (polled, ≤30s, Worker thứ hai vẫn sống) | `onHand` giảm đúng 1 đơn vị, `reserved=0` |
 | StockReservations cho (orderId, productId) bị crash | đúng 1 dòng |
 
@@ -153,7 +153,7 @@ inbox có bao nhiêu row.
 
 Nguồn: [`docs/labs/evidence/lab02-consumer-crash-before-ack.json`](evidence/lab02-consumer-crash-before-ack.json).
 
-- **Thời điểm chạy**: 2026-10-16, `08:17:19.329Z` → `08:18:20.772Z` (≈ 61.4s).
+- **Thời điểm chạy**: 2026-10-16, `11:13:02.689Z` → `11:13:51.987Z` (≈ 49.3s).
 - **Verdict**: `PASS`.
 
 | Assertion | Kỳ vọng | Thực tế | Kết quả |
@@ -172,28 +172,12 @@ Nguồn: [`docs/labs/evidence/lab02-consumer-crash-before-ack.json`](evidence/la
 Quan sát số liệu đáng chú ý:
 
 - `workerExit.code = 2148734499` (`0x80131623` = `COR_E_FAILFAST`) — exit code CLR chuẩn cho `Environment.FailFast` trên Windows, không phải `70` (xem "Lưu ý cho người chạy" ở dưới).
-- Dòng log crash: `FAULT INJECTION: crashing before ACK for OrderCreatedIntegrationEvent b3079712-2e45-448f-868a-14a05c957bdf`, tại `crashAt = 2026-10-16T08:17:44.105Z`.
-- `messageBecameReadyAgain`: RabbitMQ phát hiện Worker mất kết nối và chuyển message về `ready` tại `08:17:53.297Z`, trễ `delayFromCrashMs = 9192` (~9.2s) so với `crashAt` — đúng với cơ chế TCP-timeout-detection, không phải mất message.
-- Inbox check (qua `psql`, module Inventory): `count = 1`, `minProcessedOn = "2026-10-16 08:17:43.637768+00"` — đúng 1 row cho message bị crash, không double-apply.
-- `reservationCount = 1`, `inventoryAfter = { onHand: 9, reserved: 0 }` (10 seed − 1 đơn) — không double-reserve từ redelivery.
-
-### Hạn chế đã biết (không sửa script)
-
-Trường quan sát `processedBeforeCrash = false` trong evidence là **lỗi parse ngày giờ trong script
-lab, không phải hành vi sai của hệ thống**. Script tạo `Date` từ chuỗi Postgres bằng
-`new Date("2026-10-16 08:17:43.637768+00".replace(' ', 'T'))` → chuỗi kết quả là
-`"2026-10-16T08:17:43.637768+00"`. JavaScript's `Date` constructor không parse được offset dạng
-`+00` (thiếu phần phút, cần `+00:00`) → trả về `Invalid Date` → so sánh với `crashAt` luôn `false`.
-
-Số liệu thật từ evidence cho thấy thứ tự ngược lại với `processedBeforeCrash: false`: Inbox
-`ProcessedOn = 2026-10-16T08:17:43.637768Z` **sớm hơn** `crashAt = 2026-10-16T08:17:44.105Z` khoảng
-~467ms — nghĩa là transaction của handler (giữ hàng + ghi Inbox row) đã **commit trước khi crash
-xảy ra**, và lần redeliver ~9.2s sau đó (`messageBecameReadyAgain.delayFromCrashMs = 9192`) bị Inbox
-dedupe chặn đúng như kỳ vọng — không có double-apply.
-
-Gợi ý fix 1 dòng cho script (không áp dụng ở đây, chỉ ghi lại để người chạy sau sửa nếu cần): chuẩn
-hoá offset `+00` → `+00:00` trước khi gọi `new Date(...)` (ví dụ
-`.replace(/([+-]\d{2})$/, '$1:00')` sau khi đã `replace(' ', 'T')`).
+- Dòng log crash: `FAULT INJECTION: crashing before ACK for OrderCreatedIntegrationEvent 8779ec4a-6a05-4880-afb0-33f796c21cde`, tại `crashAt = 2026-10-16T11:13:16.126Z`.
+- `messageBecameReadyAgain`: RabbitMQ phát hiện Worker mất kết nối và chuyển message về `ready` tại `11:13:22.254Z`, trễ `delayFromCrashMs = 6128` (~6.1s) so với `crashAt` — đúng với cơ chế TCP-timeout-detection, không phải mất message.
+- Inbox check (qua `psql`, module Inventory): `count = 1`, `minProcessedOn = "2026-10-16 11:13:15.561435+00"` — đúng 1 row cho message bị crash, không double-apply.
+- `processedBeforeCrash = true` (`processedOnIso = 2026-10-16T11:13:15.561Z` < `crashAtIso = 2026-10-16T11:13:16.126Z`, sau khi sửa `parsePgTimestamp` trong `tests/Labs/lib.mjs` — xem "Lưu ý cho người chạy" ở dưới): handler đã commit transaction (giữ hàng + ghi Inbox row) **trước** khi `Environment.FailFast` xảy ra, nghĩa là lần redeliver bị Inbox dedupe chặn ngay từ check `AnyAsync`, không gọi lại handler thật. Đây vẫn chỉ là quan sát bổ sung, không phải assertion — cả `true`/`false` đều là kết quả hợp lệ của at-least-once delivery; thứ assertion riêng đã chứng minh là Inbox vẫn chỉ có đúng 1 row sau redelivery bất kể thứ tự này.
+- `reservationCount = 1`, `inventoryAfter = { onHand: 9, reserved: 0 }` (10 seed − 1 đơn, sku `LAB-HVJGP9RS`) — không double-reserve từ redelivery.
+- `inventorySettleMs = 1715` (~1.7s) — thời gian `waitForInventory` phải poll sau khi đơn đạt `Confirmed` để Inventory thực sự commit (`onHand`/`reserved` ổn định), đúng với cơ chế eventual consistency mô tả ở mục "Eventual consistency" trên.
 
 ## Kết luận
 
@@ -202,10 +186,10 @@ khi consumer mất kết nối trước ack, `RabbitMqConsumerService.cs:308-317
 theo `(MessageId, Consumer)` (`IdempotentIntegrationEventHandler.cs`) đủ để đảm bảo một message
 được redeliver không áp dụng hiệu ứng nghiệp vụ hai lần: dù `Environment.FailFast` xảy ra ngay sau
 khi handler xử lý xong (giữ hàng) nhưng trước `BasicAck`, Inbox vẫn chỉ có đúng 1 row và Inventory
-chỉ bị trừ đúng 1 lần (`onHand=9, reserved=0`). Giá trị `processedBeforeCrash=false` trong JSON evidence
-là false negative do lỗi parse ngày trong script (xem "Hạn chế đã biết" trên) — số liệu gốc
-(`ProcessedOn` < `crashAt`) xác nhận transaction đã commit trước crash, không phải sai lệch của hệ
-thống thật.
+chỉ bị trừ đúng 1 lần (`onHand=9, reserved=0`). Sau khi sửa lỗi parse timestamp Postgres trong
+`tests/Labs/lib.mjs` (`parsePgTimestamp`), `processedBeforeCrash = true` ở lần chạy này xác nhận
+trực tiếp — không còn là false negative — rằng transaction đã commit (`processedOnIso =
+2026-10-16T11:13:15.561Z`) trước khi Worker crash (`crashAtIso = 2026-10-16T11:13:16.126Z`).
 
 ## Lưu ý cho người chạy (orchestrator)
 
