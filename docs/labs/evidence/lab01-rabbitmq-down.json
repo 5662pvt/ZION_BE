@@ -1,0 +1,181 @@
+{
+  "startedAt": "2026-10-16T07:27:07.573Z",
+  "finishedAt": "2026-10-16T07:27:35.483Z",
+  "environment": {
+    "ASPNETCORE_ENVIRONMENT": "Development",
+    "ASPNETCORE_URLS": "http://localhost:8080",
+    "EventBus__Provider": "RabbitMq",
+    "EventBus__Host": "localhost",
+    "Redis__Configuration": "localhost:6379",
+    "BackgroundProcessing__Enabled": "true",
+    "RateLimiting__CheckoutPermitLimit": "1000"
+  },
+  "steps": [
+    {
+      "at": "2026-10-16T07:27:07.573Z",
+      "title": "starting API with consumers on (BackgroundProcessing__Enabled=true)"
+    },
+    {
+      "at": "2026-10-16T07:27:12.891Z",
+      "title": "logging in as admin + customer, seeding a published product with stock"
+    },
+    {
+      "at": "2026-10-16T07:27:14.696Z",
+      "title": "baseline: placing an order while RabbitMQ is healthy"
+    },
+    {
+      "at": "2026-10-16T07:27:16.806Z",
+      "title": "stopping zionshop-rabbitmq"
+    },
+    {
+      "at": "2026-10-16T07:27:21.348Z",
+      "title": "checking admin health reports RabbitMQ unhealthy"
+    },
+    {
+      "at": "2026-10-16T07:27:21.405Z",
+      "title": "placing an order while the broker is down"
+    },
+    {
+      "at": "2026-10-16T07:27:21.470Z",
+      "title": "checking the Orders outbox row for this order stays unprocessed (Pending, 0 attempts)"
+    },
+    {
+      "at": "2026-10-16T07:27:21.595Z",
+      "title": "starting zionshop-rabbitmq back up"
+    },
+    {
+      "at": "2026-10-16T07:27:22.014Z",
+      "title": "waiting for the outbox to drain and the order to reach a settled state"
+    },
+    {
+      "at": "2026-10-16T07:27:33.084Z",
+      "title": "confirming no duplicate reservation (OnHand/Reserved consistent for 2 orders of qty 1 each) -- polling since the Inventory commit lands via a later async event, after the order already shows Confirmed"
+    },
+    {
+      "at": "2026-10-16T07:27:34.737Z",
+      "title": "checking exactly one StockReservation row exists for the outage order (no double reservation from the outbox retry path)"
+    },
+    {
+      "at": "2026-10-16T07:27:34.880Z",
+      "title": "finally: stopping API"
+    }
+  ],
+  "observations": {
+    "baselineFinalStatus": "Confirmed",
+    "healthDuringOutage": {
+      "status": "Unhealthy",
+      "totalDurationMs": 17.423,
+      "checkedAt": "2026-10-16T07:27:21.3993668Z",
+      "checks": [
+        {
+          "name": "postgres",
+          "status": "Healthy",
+          "durationMs": 12.5285,
+          "description": null
+        },
+        {
+          "name": "redis",
+          "status": "Healthy",
+          "durationMs": 7.9049,
+          "description": null
+        },
+        {
+          "name": "rabbitmq",
+          "status": "Unhealthy",
+          "durationMs": 0.2417,
+          "description": "RabbitMQ not connected"
+        },
+        {
+          "name": "worker",
+          "status": "Unhealthy",
+          "durationMs": 1.2658,
+          "description": "RabbitMQ not connected"
+        }
+      ]
+    },
+    "outageOrderResponseStatus": 200,
+    "outageOrderInitialStatus": "PendingStock",
+    "pendingOutboxMessage": {
+      "id": "68166640-27a4-4d43-883d-17ccc09851af",
+      "module": "Orders",
+      "eventType": "OrderCreatedIntegrationEvent",
+      "occurredOn": "2026-10-16T07:27:21.463044Z",
+      "processedOn": null,
+      "attempts": 0,
+      "status": "Pending",
+      "lastError": null,
+      "traceParent": "00-7fbe104377da294f31b49902a8c6a521-ac9a9a0dfa275bc1-01",
+      "payload": "{\r\n  \"OrderId\": \"44caaac8-f83b-4743-b425-c346c3f220bc\",\r\n  \"UserId\": \"43a1a26f-aa55-4245-8f73-2d89138b0ff3\",\r\n  \"TotalAmount\": 130000.00,\r\n  \"Lines\": [\r\n    {\r\n      \"ProductId\": \"7400f8f5-4720-43d9-bc2a-38ec18ab1ecc\",\r\n      \"Quantity\": 1,\r\n      \"UnitPrice\": 100000.00,\r\n      \"IsGift\": false\r\n    }\r\n  ],\r\n  \"PaymentMethod\": \"COD\",\r\n  \"Currency\": \"VND\",\r\n  \"EventId\": \"68166640-27a4-4d43-883d-17ccc09851af\",\r\n  \"OccurredOn\": \"2026-10-16T07:27:21.4630442Z\"\r\n}"
+    },
+    "timeToRecoverMs": 11069,
+    "inventoryAfter": {
+      "productId": "7400f8f5-4720-43d9-bc2a-38ec18ab1ecc",
+      "sku": "LAB-G1702V4S",
+      "productName": "Lab Product g1702v4s",
+      "onHand": 18,
+      "reserved": 0,
+      "available": 18,
+      "lowStockThreshold": 5,
+      "isLowStock": false
+    },
+    "inventorySettleMs": 1653,
+    "outageReservationCount": 1
+  },
+  "assertions": [
+    {
+      "name": "baseline order accepted (2xx)",
+      "expected": "2xx",
+      "actual": 200,
+      "pass": true
+    },
+    {
+      "name": "baseline order confirmed end-to-end while broker healthy",
+      "expected": "Confirmed",
+      "actual": "Confirmed",
+      "pass": true
+    },
+    {
+      "name": "admin health shows rabbitmq unhealthy while broker is down",
+      "expected": "Unhealthy",
+      "actual": "Unhealthy",
+      "pass": true
+    },
+    {
+      "name": "order placement still accepted (2xx) while broker is down",
+      "expected": "2xx",
+      "actual": 200,
+      "pass": true
+    },
+    {
+      "name": "outbox row for the outage order exists and is Pending",
+      "expected": "Pending",
+      "actual": "Pending",
+      "pass": true
+    },
+    {
+      "name": "outbox row was not penalized with Attempts while the broker is down (OutboxPublisherService breaks the batch on BrokerUnavailableException before incrementing Attempts)",
+      "expected": 0,
+      "actual": 0,
+      "pass": true
+    },
+    {
+      "name": "order recovered to Confirmed after the broker came back (no message lost)",
+      "expected": "Confirmed",
+      "actual": "Confirmed",
+      "pass": true
+    },
+    {
+      "name": "inventory is consistent after recovery (onHand=18, reserved=0 -- 20 seeded minus 2 orders of 1, both committed)",
+      "expected": "onHand=18, reserved=0",
+      "actual": "onHand=18, reserved=0",
+      "pass": true
+    },
+    {
+      "name": "exactly one StockReservation row for (outageOrderId, productId)",
+      "expected": 1,
+      "actual": 1,
+      "pass": true
+    }
+  ],
+  "verdict": "PASS"
+}

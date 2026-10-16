@@ -1,5 +1,7 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using StackExchange.Redis;
 
 namespace ZIONShop.Caching.DependencyInjection;
@@ -8,6 +10,14 @@ public static class CachingExtensions
 {
     public static IServiceCollection AddZionCaching(this IServiceCollection services, IConfiguration configuration)
     {
+        var cachingEnabled = configuration.GetValue<bool?>("Caching:Enabled") ?? true;
+        if (!cachingEnabled)
+        {
+            services.AddSingleton<IDistributedCacheService, NullDistributedCacheService>();
+            services.AddHostedService<CachingDisabledStartupLogger>();
+            return services;
+        }
+
         var redisSection = configuration.GetSection("Redis");
         var connection = redisSection["Configuration"] ?? "localhost:6379";
         var connectTimeoutMs = redisSection.GetValue<int?>("ConnectTimeoutMs") ?? 1000;
@@ -24,5 +34,20 @@ public static class CachingExtensions
         });
         services.AddSingleton<IDistributedCacheService, RedisCacheService>();
         return services;
+    }
+
+    private sealed class CachingDisabledStartupLogger : IHostedService
+    {
+        private readonly ILogger<CachingDisabledStartupLogger> _logger;
+
+        public CachingDisabledStartupLogger(ILogger<CachingDisabledStartupLogger> logger) => _logger = logger;
+
+        public Task StartAsync(CancellationToken cancellationToken)
+        {
+            _logger.LogInformation("Distributed cache disabled (Caching:Enabled=false)");
+            return Task.CompletedTask;
+        }
+
+        public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
     }
 }

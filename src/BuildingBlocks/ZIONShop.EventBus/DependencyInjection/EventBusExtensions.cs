@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using ZIONShop.EventBus.Abstractions;
+using ZIONShop.EventBus.FaultInjection;
 using ZIONShop.EventBus.InMemory;
 using ZIONShop.EventBus.RabbitMq;
 
@@ -24,6 +25,11 @@ public static class EventBusExtensions
             services.AddSingleton<IEventBus, RabbitMqEventBus>();
             services.AddSingleton<IDeadLetterAdmin, RabbitMqDeadLetterAdmin>();
             services.AddZionBackgroundService<RabbitMqConsumerService>(configuration);
+
+            services.Configure<FaultInjectionOptions>(configuration.GetSection(FaultInjectionOptions.SectionName));
+            services.AddSingleton<IProcessTerminator, EnvironmentProcessTerminator>();
+            services.AddSingleton<IFaultInjector, CrashBeforeAckFaultInjector>();
+            services.AddHostedService<FaultInjectionStartupLogger>();
         }
         else
         {

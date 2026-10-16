@@ -26,7 +26,8 @@ public static class WebApplicationExtensions
         try
         {
             await sp.GetRequiredService<AuthDbContext>().Database.MigrateAsync();
-            await AuthDbSeeder.SeedAsync(sp.GetRequiredService<AuthDbContext>());
+            var loadTestCustomers = app.Configuration.GetValue<int>("Seed:LoadTestCustomers");
+            await AuthDbSeeder.SeedAsync(sp.GetRequiredService<AuthDbContext>(), loadTestCustomers);
 
             await sp.GetRequiredService<UsersDbContext>().Database.MigrateAsync();
 

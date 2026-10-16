@@ -1,0 +1,301 @@
+{
+  "startedAt": "2026-10-16T08:17:19.329Z",
+  "finishedAt": "2026-10-16T08:18:20.772Z",
+  "environment": {
+    "api": {
+      "ASPNETCORE_ENVIRONMENT": "Development",
+      "ASPNETCORE_URLS": "http://localhost:8080",
+      "EventBus__Provider": "RabbitMq",
+      "EventBus__Host": "localhost",
+      "Redis__Configuration": "localhost:6379",
+      "BackgroundProcessing__Enabled": "false"
+    },
+    "worker": {
+      "ASPNETCORE_ENVIRONMENT": "Development",
+      "ASPNETCORE_URLS": "http://localhost:8090",
+      "EventBus__Provider": "RabbitMq",
+      "EventBus__Host": "localhost",
+      "Redis__Configuration": "localhost:6379",
+      "FaultInjection__CrashBeforeAckEventType": "OrderCreatedIntegrationEvent"
+    }
+  },
+  "steps": [
+    {
+      "at": "2026-10-16T08:17:19.329Z",
+      "title": "starting API (BackgroundProcessing__Enabled=false -- no consumer/outbox publisher on this host)"
+    },
+    {
+      "at": "2026-10-16T08:17:23.681Z",
+      "title": "starting Worker with FaultInjection__CrashBeforeAckEventType=OrderCreatedIntegrationEvent"
+    },
+    {
+      "at": "2026-10-16T08:17:40.065Z",
+      "title": "logging in as admin + customer, seeding a published product with stock"
+    },
+    {
+      "at": "2026-10-16T08:17:42.404Z",
+      "title": "placing an order so Inventory reserves stock via OrderCreatedIntegrationEvent"
+    },
+    {
+      "at": "2026-10-16T08:17:43.127Z",
+      "title": "waiting for the Worker to crash (Environment.FailFast after the handler succeeds, before ack)"
+    },
+    {
+      "at": "2026-10-16T08:17:44.108Z",
+      "title": "recording queue depth/unacked for the main queue while no consumer is attached (message redelivered)"
+    },
+    {
+      "at": "2026-10-16T08:18:14.681Z",
+      "title": "starting the Worker again WITHOUT the fault-injection flag"
+    },
+    {
+      "at": "2026-10-16T08:18:17.788Z",
+      "title": "waiting for the redelivered message to be handled and the order to settle"
+    },
+    {
+      "at": "2026-10-16T08:18:17.869Z",
+      "title": "checking the Inbox deduped the redelivery (exactly one row for this message id) via psql -- the admin API (GET /admin/system/inbox) paginates and filters client-side, and can miss the row once the module inbox has thousands of rows"
+    },
+    {
+      "at": "2026-10-16T08:18:18.047Z",
+      "title": "checking Reserved/OnHand reflect exactly one reservation+commit (no double reservation from redelivery) -- polling since the Inventory commit lands via a later async event (OrderConfirmed), after the order already shows Confirmed, and worker2 must stay up to process it"
+    },
+    {
+      "at": "2026-10-16T08:18:19.220Z",
+      "title": "checking exactly one StockReservation row exists for the crashed order (the redelivery did not double-reserve)"
+    },
+    {
+      "at": "2026-10-16T08:18:19.366Z",
+      "title": "finally: stopping the second (healthy) Worker"
+    },
+    {
+      "at": "2026-10-16T08:18:19.762Z",
+      "title": "finally: stopping the crashed Worker process (likely already dead)"
+    },
+    {
+      "at": "2026-10-16T08:18:20.219Z",
+      "title": "finally: stopping API"
+    }
+  ],
+  "observations": {
+    "apiLogPath": "C:\\Code\\Zion\\ZION_BE\\tests\\Labs\\.logs\\lab02-consumer-crash-before-ack-api-2026-10-16T08-17-19-328Z-1.log",
+    "workerLogPath": "C:\\Code\\Zion\\ZION_BE\\tests\\Labs\\.logs\\lab02-consumer-crash-before-ack-worker-2026-10-16T08-17-19-328Z-1.log",
+    "orderId": "3ddf35bc-8b60-43da-9495-c27261849f4b",
+    "workerExit": {
+      "code": 2148734499,
+      "signal": null
+    },
+    "crashAt": "2026-10-16T08:17:44.105Z",
+    "crashLinesInWorkerLog": [
+      "FAULT INJECTION: crashing before ACK for OrderCreatedIntegrationEvent b3079712-2e45-448f-868a-14a05c957bdf"
+    ],
+    "queueDepthSamples": [
+      {
+        "at": "2026-10-16T08:17:44.135Z",
+        "messages": 0,
+        "messages_ready": 0,
+        "messages_unacknowledged": 0
+      },
+      {
+        "at": "2026-10-16T08:17:45.664Z",
+        "messages": 0,
+        "messages_ready": 0,
+        "messages_unacknowledged": 0
+      },
+      {
+        "at": "2026-10-16T08:17:47.191Z",
+        "messages": 0,
+        "messages_ready": 0,
+        "messages_unacknowledged": 0
+      },
+      {
+        "at": "2026-10-16T08:17:48.726Z",
+        "messages": 0,
+        "messages_ready": 0,
+        "messages_unacknowledged": 0
+      },
+      {
+        "at": "2026-10-16T08:17:50.242Z",
+        "messages": 0,
+        "messages_ready": 0,
+        "messages_unacknowledged": 0
+      },
+      {
+        "at": "2026-10-16T08:17:51.773Z",
+        "messages": 0,
+        "messages_ready": 0,
+        "messages_unacknowledged": 0
+      },
+      {
+        "at": "2026-10-16T08:17:53.297Z",
+        "messages": 1,
+        "messages_ready": 1,
+        "messages_unacknowledged": 0
+      },
+      {
+        "at": "2026-10-16T08:17:54.825Z",
+        "messages": 1,
+        "messages_ready": 1,
+        "messages_unacknowledged": 0
+      },
+      {
+        "at": "2026-10-16T08:17:56.364Z",
+        "messages": 1,
+        "messages_ready": 1,
+        "messages_unacknowledged": 0
+      },
+      {
+        "at": "2026-10-16T08:17:57.891Z",
+        "messages": 1,
+        "messages_ready": 1,
+        "messages_unacknowledged": 0
+      },
+      {
+        "at": "2026-10-16T08:17:59.414Z",
+        "messages": 1,
+        "messages_ready": 1,
+        "messages_unacknowledged": 0
+      },
+      {
+        "at": "2026-10-16T08:18:00.948Z",
+        "messages": 1,
+        "messages_ready": 1,
+        "messages_unacknowledged": 0
+      },
+      {
+        "at": "2026-10-16T08:18:02.482Z",
+        "messages": 1,
+        "messages_ready": 1,
+        "messages_unacknowledged": 0
+      },
+      {
+        "at": "2026-10-16T08:18:03.991Z",
+        "messages": 1,
+        "messages_ready": 1,
+        "messages_unacknowledged": 0
+      },
+      {
+        "at": "2026-10-16T08:18:05.506Z",
+        "messages": 1,
+        "messages_ready": 1,
+        "messages_unacknowledged": 0
+      },
+      {
+        "at": "2026-10-16T08:18:07.041Z",
+        "messages": 1,
+        "messages_ready": 1,
+        "messages_unacknowledged": 0
+      },
+      {
+        "at": "2026-10-16T08:18:08.570Z",
+        "messages": 1,
+        "messages_ready": 1,
+        "messages_unacknowledged": 0
+      },
+      {
+        "at": "2026-10-16T08:18:10.105Z",
+        "messages": 1,
+        "messages_ready": 1,
+        "messages_unacknowledged": 0
+      },
+      {
+        "at": "2026-10-16T08:18:11.636Z",
+        "messages": 1,
+        "messages_ready": 1,
+        "messages_unacknowledged": 0
+      },
+      {
+        "at": "2026-10-16T08:18:13.167Z",
+        "messages": 1,
+        "messages_ready": 1,
+        "messages_unacknowledged": 0
+      }
+    ],
+    "messageBecameReadyAgain": {
+      "at": "2026-10-16T08:17:53.297Z",
+      "delayFromCrashMs": 9192
+    },
+    "worker2LogPath": "C:\\Code\\Zion\\ZION_BE\\tests\\Labs\\.logs\\lab02-consumer-crash-before-ack-worker-2026-10-16T08-17-19-328Z-2.log",
+    "finalOrderStatus": "Confirmed",
+    "inboxMessageCheck": {
+      "count": 1,
+      "minProcessedOn": "2026-10-16 08:17:43.637768+00"
+    },
+    "processedBeforeCrash": false,
+    "inventoryAfter": {
+      "productId": "611e08e9-9579-4b69-b5cc-64afac66412f",
+      "sku": "LAB-TNZ4D26Q",
+      "productName": "Lab Product tnz4d26q",
+      "onHand": 9,
+      "reserved": 0,
+      "available": 9,
+      "lowStockThreshold": 5,
+      "isLowStock": false
+    },
+    "inventorySettleMs": 1172,
+    "reservationCount": 1
+  },
+  "assertions": [
+    {
+      "name": "order placement accepted (2xx)",
+      "expected": "2xx",
+      "actual": 200,
+      "pass": true
+    },
+    {
+      "name": "exactly one fault-injection crash line found in this run's first Worker log",
+      "expected": 1,
+      "actual": 1,
+      "pass": true
+    },
+    {
+      "name": "worker process logged the fault-injection crash line for the right event type",
+      "expected": "OrderCreatedIntegrationEvent",
+      "actual": "OrderCreatedIntegrationEvent",
+      "pass": true
+    },
+    {
+      "name": "worker process actually exited (crashed, not a graceful stop)",
+      "expected": "process exited",
+      "actual": "code=2148734499 signal=null",
+      "pass": true
+    },
+    {
+      "name": "the message was never lost -- the main queue showed >=1 ready or unacked message at some point after the crash",
+      "expected": true,
+      "actual": true,
+      "pass": true
+    },
+    {
+      "name": "by the end of the observation window the message is back to ready (unacked == 0, no consumer attached)",
+      "expected": 0,
+      "actual": 0,
+      "pass": true
+    },
+    {
+      "name": "order reached Confirmed after redelivery was handled",
+      "expected": "Confirmed",
+      "actual": "Confirmed",
+      "pass": true
+    },
+    {
+      "name": "exactly one inbox row exists for the redelivered message id (no double-apply)",
+      "expected": 1,
+      "actual": 1,
+      "pass": true
+    },
+    {
+      "name": "inventory reflects exactly one commit of 1 unit (onHand=9, reserved=0)",
+      "expected": "onHand=9, reserved=0",
+      "actual": "onHand=9, reserved=0",
+      "pass": true
+    },
+    {
+      "name": "exactly one StockReservation row for (orderId, productId)",
+      "expected": 1,
+      "actual": 1,
+      "pass": true
+    }
+  ],
+  "verdict": "PASS"
+}

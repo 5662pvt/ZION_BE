@@ -9,6 +9,7 @@ using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
 using ZIONShop.EventBus.Abstractions;
 using ZIONShop.EventBus.Diagnostics;
+using ZIONShop.EventBus.FaultInjection;
 using ZIONShop.EventBus.Registry;
 
 namespace ZIONShop.EventBus.RabbitMq;
@@ -24,23 +25,30 @@ public class RabbitMqConsumerService : BackgroundService
     private readonly IntegrationEventTypeRegistry _registry;
     private readonly RabbitMqPublisher _publisher;
     private readonly IServiceScopeFactory _scopeFactory;
+    private readonly IFaultInjector _faultInjector;
     private readonly ILogger<RabbitMqConsumerService> _logger;
     private IModel? _channel;
     private CancellationToken _stoppingToken;
 
+    // IFaultInjector is optional: hosts that compose this service without going through
+    // AddZionEventBus' RabbitMq branch (e.g. a test host building its own ServiceCollection) never
+    // register it. MS DI falls back to this default when the service isn't registered, so the
+    // consumer still activates there -- it just never crashes on purpose.
     public RabbitMqConsumerService(
         RabbitMqConnection connection,
         IOptions<RabbitMqOptions> options,
         IntegrationEventTypeRegistry registry,
         RabbitMqPublisher publisher,
         IServiceScopeFactory scopeFactory,
-        ILogger<RabbitMqConsumerService> logger)
+        ILogger<RabbitMqConsumerService> logger,
+        IFaultInjector? faultInjector = null)
     {
         _connection = connection;
         _options = options.Value;
         _registry = registry;
         _publisher = publisher;
         _scopeFactory = scopeFactory;
+        _faultInjector = faultInjector ?? NoOpFaultInjector.Instance;
         _logger = logger;
     }
 
@@ -298,6 +306,14 @@ public class RabbitMqConsumerService : BackgroundService
         {
             MessagingDiagnostics.RecordException(activity, failure);
             await HandleFailureAsync(args, resolvedTypeName, failure);
+            return;
+        }
+
+        if (_faultInjector.ShouldCrashBeforeAck(resolvedTypeName))
+        {
+            // Crash() terminates the process (Environment.FailFast) and never returns in practice;
+            // the return below only matters for unit tests driving this with a fake IProcessTerminator.
+            _faultInjector.Crash(resolvedTypeName, args.BasicProperties?.MessageId);
             return;
         }
 

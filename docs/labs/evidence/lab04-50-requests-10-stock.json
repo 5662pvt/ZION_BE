@@ -1,0 +1,167 @@
+{
+  "startedAt": "2026-10-16T07:28:41.803Z",
+  "finishedAt": "2026-10-16T07:29:26.320Z",
+  "environment": {
+    "ASPNETCORE_ENVIRONMENT": "Development",
+    "ASPNETCORE_URLS": "http://localhost:8080",
+    "EventBus__Provider": "RabbitMq",
+    "EventBus__Host": "localhost",
+    "Redis__Configuration": "localhost:6379",
+    "BackgroundProcessing__Enabled": "true",
+    "Seed__LoadTestCustomers": "50",
+    "RateLimiting__AuthPermitLimit": "500",
+    "RateLimiting__CheckoutPermitLimit": "500"
+  },
+  "steps": [
+    {
+      "at": "2026-10-16T07:28:41.803Z",
+      "title": "starting API with Seed__LoadTestCustomers=50 and raised auth/checkout rate limits"
+    },
+    {
+      "at": "2026-10-16T07:28:44.966Z",
+      "title": "logging in as admin, creating a published product with stock=10"
+    },
+    {
+      "at": "2026-10-16T07:28:45.677Z",
+      "title": "logging in 50 load-test customers sequentially and preparing their cart (1 unit) + address"
+    },
+    {
+      "at": "2026-10-16T07:28:55.358Z",
+      "title": "firing 50 place-order requests concurrently (shared start barrier via Promise.all)"
+    },
+    {
+      "at": "2026-10-16T07:28:56.102Z",
+      "title": "waiting for every accepted order to settle (async Inventory reservation via the outbox/RabbitMQ)"
+    },
+    {
+      "at": "2026-10-16T07:29:25.833Z",
+      "title": "checking final inventory is consistent (never oversold) -- polling since the Inventory commit lands via a later async event, after each order already shows Confirmed"
+    },
+    {
+      "at": "2026-10-16T07:29:25.894Z",
+      "title": "finally: stopping API"
+    }
+  ],
+  "observations": {
+    "preparedUsers": 50,
+    "statusHistogram": {
+      "200": 50
+    },
+    "latenciesMs": [
+      728,
+      740,
+      737,
+      726,
+      729,
+      740,
+      736,
+      735,
+      728,
+      731,
+      732,
+      738,
+      729,
+      732,
+      733,
+      722,
+      738,
+      727,
+      729,
+      719,
+      721,
+      724,
+      726,
+      730,
+      714,
+      727,
+      730,
+      724,
+      722,
+      729,
+      728,
+      728,
+      728,
+      732,
+      720,
+      730,
+      720,
+      734,
+      725,
+      714,
+      718,
+      722,
+      717,
+      718,
+      715,
+      732,
+      712,
+      731,
+      728,
+      721
+    ],
+    "wallClockMs": 743,
+    "acceptedCount": 50,
+    "syncRejectedCount": 0,
+    "finalStatusCounts": {
+      "confirmed": 10,
+      "cancelled": 40,
+      "stillPending": 0
+    },
+    "inventoryAfter": {
+      "productId": "e0fdaaf1-8a1b-45fe-b9db-24aec76905a3",
+      "sku": "LAB-9X5IER5U",
+      "productName": "Lab Product 9x5ier5u",
+      "onHand": 0,
+      "reserved": 0,
+      "available": 0,
+      "lowStockThreshold": 5,
+      "isLowStock": true
+    },
+    "inventorySettleMs": 60
+  },
+  "assertions": [
+    {
+      "name": "no 5xx responses under the concurrent burst",
+      "expected": true,
+      "actual": true,
+      "pass": true
+    },
+    {
+      "name": "every request settled either 2xx (order created) or 409 (sync stock pre-check rejected)",
+      "expected": 50,
+      "actual": 50,
+      "pass": true
+    },
+    {
+      "name": "every accepted order reached a terminal state within 45s",
+      "expected": 0,
+      "actual": 0,
+      "pass": true
+    },
+    {
+      "name": "exactly 10 orders ended up Confirmed (reserved the available stock)",
+      "expected": 10,
+      "actual": 10,
+      "pass": true
+    },
+    {
+      "name": "the rest of the accepted orders ended up Cancelled (out of stock)",
+      "expected": 40,
+      "actual": 40,
+      "pass": true
+    },
+    {
+      "name": "onHand reached 0 (10 seeded, 10 committed) and reserved returned to 0",
+      "expected": "onHand=0, reserved=0",
+      "actual": "onHand=0, reserved=0",
+      "pass": true
+    },
+    {
+      "name": "stock was never oversold (onHand never negative)",
+      "expected": ">=0",
+      "actual": 0,
+      "pass": true
+    }
+  ],
+  "verdict": "PASS"
+}

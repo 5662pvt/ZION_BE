@@ -141,3 +141,20 @@ mặt DB là atomic — nhưng gửi email là một side effect không thể ro
 chạy lại, và **email có thể bị gửi lại lần nữa**. Đây là caveat cố hữu của tích hợp email qua at-least-once
 delivery — ngoài phạm vi sửa của inbox pattern (inbox chỉ đảm bảo DB-side effect, không đảm bảo side effect
 ngoài DB).
+
+## Fault injection: crash trước ACK (Development only)
+
+Để một lab có thể tận mắt kiểm chứng tính at-least-once ở trên (chứ không chỉ đọc code), `RabbitMqConsumerService`
+có một hook dev-only: cấu hình `FaultInjection:CrashBeforeAckEventType` = tên ngắn của event type (ví dụ
+`OrderCreatedIntegrationEvent`, so khớp không phân biệt hoa/thường — đây luôn là dạng tên được dùng làm
+routing key, xem `RabbitMqEventBus.PublishAsync`). Khi tên này khớp với event đang xử lý **và**
+`IHostEnvironment.IsDevelopment()` là true, ngay sau khi mọi handler của message đó chạy xong (effect
+nghiệp vụ + dòng inbox đã `SaveChangesAsync` thành công) nhưng **trước** `BasicAck`, tiến trình gọi
+`Environment.FailFast` và chết ngay — không `BasicAck`, không chạy `finally`/`ProcessExit`/graceful shutdown
+nào cả (xem `CrashBeforeAckFaultInjector`/`IProcessTerminator`). Vì message chưa được ack, broker sẽ giao
+lại nó khi Worker khởi động lại mà không còn cấu hình này — đúng kịch bản "giao lại" ở mục đầu bài, và dòng
+inbox đã ghi từ lần chạy trước sẽ khiến lần giao lại đó bị handler bỏ qua (dedupe), chứng minh inbox hoạt
+động đúng dù process chết giữa lúc effect đã xảy ra và lúc ack.
+
+Ở môi trường khác Development, giá trị này bị bỏ qua hoàn toàn (chỉ log Warning một lần lúc khởi động nếu
+có set) — không có đường nào để kích hoạt ngoài Development.

@@ -1,0 +1,180 @@
+{
+  "startedAt": "2026-10-16T07:11:21.552Z",
+  "finishedAt": "2026-10-16T07:11:35.061Z",
+  "environment": {
+    "ASPNETCORE_ENVIRONMENT": "Development",
+    "ASPNETCORE_URLS": "http://localhost:8080",
+    "EventBus__Provider": "RabbitMq",
+    "EventBus__Host": "localhost",
+    "Redis__Configuration": "localhost:6379",
+    "BackgroundProcessing__Enabled": "false"
+  },
+  "steps": [
+    {
+      "at": "2026-10-16T07:11:21.553Z",
+      "title": "starting API (Caching:Enabled=true, the appsettings.json default)"
+    },
+    {
+      "at": "2026-10-16T07:11:24.720Z",
+      "title": "logging in as admin, seeding a published product"
+    },
+    {
+      "at": "2026-10-16T07:11:25.505Z",
+      "title": "warming the product-by-slug cache (first call = DB miss, second = Redis hit)"
+    },
+    {
+      "at": "2026-10-16T07:11:25.590Z",
+      "title": "stopping zionshop-redis"
+    },
+    {
+      "at": "2026-10-16T07:11:27.995Z",
+      "title": "first request right after Redis went down"
+    },
+    {
+      "at": "2026-10-16T07:11:28.037Z",
+      "title": "firing 20 more requests while Redis stays down"
+    },
+    {
+      "at": "2026-10-16T07:11:28.300Z",
+      "title": "checking admin health reports Redis degraded (not unhealthy -- Redis is optional, app fails open)"
+    },
+    {
+      "at": "2026-10-16T07:11:29.393Z",
+      "title": "checking idempotency-key placement still works (PostgresIdempotencyLock, not Redis-backed) and rate limiting still works (in-memory FixedWindowRateLimiter, not Redis-backed)"
+    },
+    {
+      "at": "2026-10-16T07:11:31.159Z",
+      "title": "starting zionshop-redis back up"
+    },
+    {
+      "at": "2026-10-16T07:11:34.527Z",
+      "title": "confirming the cache works again after Redis reconnects"
+    },
+    {
+      "at": "2026-10-16T07:11:34.547Z",
+      "title": "finally: stopping API"
+    }
+  ],
+  "observations": {
+    "warmupLatenciesMs": {
+      "miss": 63,
+      "hit": 20
+    },
+    "firstRequestAfterOutage": {
+      "status": 200,
+      "durationMs": 39
+    },
+    "subsequentLatenciesMs": [
+      12,
+      11,
+      17,
+      10,
+      19,
+      9,
+      24,
+      9,
+      9,
+      9,
+      19,
+      9,
+      8,
+      12,
+      22,
+      10,
+      9,
+      17,
+      15,
+      6
+    ],
+    "healthDuringOutage": {
+      "status": "Unhealthy",
+      "totalDurationMs": 1060.5083,
+      "checkedAt": "2026-10-16T07:11:29.3854064Z",
+      "checks": [
+        {
+          "name": "postgres",
+          "status": "Healthy",
+          "durationMs": 7.3232,
+          "description": null
+        },
+        {
+          "name": "redis",
+          "status": "Degraded",
+          "durationMs": 1056.7344,
+          "description": "Redis unreachable"
+        },
+        {
+          "name": "rabbitmq",
+          "status": "Healthy",
+          "durationMs": 118.2742,
+          "description": null
+        },
+        {
+          "name": "worker",
+          "status": "Unhealthy",
+          "durationMs": 136.2872,
+          "description": "no consumer: start the worker"
+        }
+      ]
+    },
+    "orderPlacedWhileRedisDown": {
+      "status": 200,
+      "orderId": "e8a329d7-ee47-41b9-8370-b1c30797cf27"
+    },
+    "afterReconnect": {
+      "status": 200,
+      "durationMs": 20
+    }
+  },
+  "assertions": [
+    {
+      "name": "warm-up calls both succeeded (200)",
+      "expected": 200,
+      "actual": "200, 200",
+      "pass": true
+    },
+    {
+      "name": "first request after outage still returns 200",
+      "expected": 200,
+      "actual": 200,
+      "pass": true
+    },
+    {
+      "name": "first request after outage completes in < 1000ms (fails open, no long timeout)",
+      "expected": "<1000ms",
+      "actual": "39ms",
+      "pass": true
+    },
+    {
+      "name": "all 20 subsequent requests returned 200",
+      "expected": true,
+      "actual": true,
+      "pass": true
+    },
+    {
+      "name": "all 20 subsequent requests completed in < 200ms each",
+      "expected": true,
+      "actual": true,
+      "pass": true
+    },
+    {
+      "name": "admin health shows redis Degraded while Redis is down",
+      "expected": "Degraded",
+      "actual": "Degraded",
+      "pass": true
+    },
+    {
+      "name": "placing an order with an Idempotency-Key still succeeds while Redis is down (idempotency lock is PostgresIdempotencyLock, independent of Redis)",
+      "expected": "2xx",
+      "actual": 200,
+      "pass": true
+    },
+    {
+      "name": "product-by-slug works again after Redis reconnects",
+      "expected": 200,
+      "actual": 200,
+      "pass": true
+    }
+  ],
+  "verdict": "PASS"
+}

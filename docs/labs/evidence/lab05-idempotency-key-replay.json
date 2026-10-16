@@ -1,0 +1,170 @@
+{
+  "startedAt": "2026-10-16T07:10:49.530Z",
+  "finishedAt": "2026-10-16T07:11:04.323Z",
+  "environment": {
+    "ASPNETCORE_ENVIRONMENT": "Development",
+    "ASPNETCORE_URLS": "http://localhost:8080",
+    "EventBus__Provider": "RabbitMq",
+    "EventBus__Host": "localhost",
+    "Redis__Configuration": "localhost:6379",
+    "BackgroundProcessing__Enabled": "true",
+    "RateLimiting__CheckoutPermitLimit": "200"
+  },
+  "steps": [
+    {
+      "at": "2026-10-16T07:10:49.531Z",
+      "title": "starting API with consumers on and a raised checkout rate limit (10 concurrent requests, same user)"
+    },
+    {
+      "at": "2026-10-16T07:10:59.904Z",
+      "title": "logging in as admin + customer, seeding a published product with ample stock"
+    },
+    {
+      "at": "2026-10-16T07:11:01.970Z",
+      "title": "(a) same Idempotency-Key, called sequentially twice"
+    },
+    {
+      "at": "2026-10-16T07:11:02.723Z",
+      "title": "(b) 10 concurrent requests with the same brand-new Idempotency-Key"
+    },
+    {
+      "at": "2026-10-16T07:11:03.722Z",
+      "title": "(c) same Idempotency-Key, different request body (different note)"
+    },
+    {
+      "at": "2026-10-16T07:11:03.819Z",
+      "title": "(d) checking the total order count increased by exactly the expected amount"
+    },
+    {
+      "at": "2026-10-16T07:11:03.844Z",
+      "title": "finally: stopping API"
+    }
+  ],
+  "observations": {
+    "baselineOrderCount": 0,
+    "a1": {
+      "status": 200,
+      "orderId": "ec300eb8-0d31-4d06-b0f0-bcaec63cd45c",
+      "replayed": false
+    },
+    "a2": {
+      "status": 200,
+      "orderId": "ec300eb8-0d31-4d06-b0f0-bcaec63cd45c",
+      "replayed": true
+    },
+    "countAfterA": 1,
+    "bStatuses": [
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      200
+    ],
+    "bDistinctOrderIds": [
+      "3e469b4b-7f14-433e-bf73-9024f142dd64"
+    ],
+    "bReplayedCount": 9,
+    "countAfterB": 2,
+    "c1": {
+      "status": 200,
+      "orderId": "33fe759e-ca29-4720-a7c1-1edabb24c5c9"
+    },
+    "c2": {
+      "status": 409,
+      "errors": [
+        {
+          "field": "Orders",
+          "code": "Orders.IdempotencyKeyReused",
+          "message": "Idempotency-Key đã được dùng cho một yêu cầu đặt hàng khác."
+        }
+      ]
+    },
+    "countAfterC": 3
+  },
+  "assertions": [
+    {
+      "name": "(a) both calls succeeded (2xx)",
+      "expected": "2xx, 2xx",
+      "actual": "200, 200",
+      "pass": true
+    },
+    {
+      "name": "(a) both calls returned the same order id",
+      "expected": "ec300eb8-0d31-4d06-b0f0-bcaec63cd45c",
+      "actual": "ec300eb8-0d31-4d06-b0f0-bcaec63cd45c",
+      "pass": true
+    },
+    {
+      "name": "(a) the first call was not a replay",
+      "expected": false,
+      "actual": false,
+      "pass": true
+    },
+    {
+      "name": "(a) the second call was a replay (Idempotent-Replayed: true)",
+      "expected": true,
+      "actual": true,
+      "pass": true
+    },
+    {
+      "name": "(a) exactly one order was created for this key",
+      "expected": 1,
+      "actual": 1,
+      "pass": true
+    },
+    {
+      "name": "(b) every concurrent request settled 2xx",
+      "expected": true,
+      "actual": true,
+      "pass": true
+    },
+    {
+      "name": "(b) exactly one distinct order id was created across all 10 concurrent requests",
+      "expected": 1,
+      "actual": 1,
+      "pass": true
+    },
+    {
+      "name": "(b) exactly 9 of the 10 responses were replays of the winner",
+      "expected": 9,
+      "actual": 9,
+      "pass": true
+    },
+    {
+      "name": "(b) exactly one order was created for this key",
+      "expected": 2,
+      "actual": 2,
+      "pass": true
+    },
+    {
+      "name": "(c) the first call succeeded (2xx)",
+      "expected": "2xx",
+      "actual": 200,
+      "pass": true
+    },
+    {
+      "name": "(c) the second call (different body, same key) returned 409 Conflict",
+      "expected": 409,
+      "actual": 409,
+      "pass": true
+    },
+    {
+      "name": "(c) the 409 error code is Orders.IdempotencyKeyReused",
+      "expected": "Orders.IdempotencyKeyReused",
+      "actual": "Orders.IdempotencyKeyReused",
+      "pass": true
+    },
+    {
+      "name": "(d) order count increased by exactly 3 across (a)+(b)+(c) (1 order each, despite 2+10+2=14 HTTP calls)",
+      "expected": 3,
+      "actual": 3,
+      "pass": true
+    }
+  ],
+  "verdict": "PASS"
+}
