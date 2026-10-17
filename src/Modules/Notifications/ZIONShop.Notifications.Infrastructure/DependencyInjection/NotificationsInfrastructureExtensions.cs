@@ -34,6 +34,8 @@ public static class NotificationsInfrastructureExtensions
         services.AddIntegrationEventHandler<OrderShippedIntegrationEvent, OrderShippedIntegrationEventHandler, NotificationsDbContext>();
         services.AddIntegrationEventHandler<OrderCancelledIntegrationEvent, OrderCancelledIntegrationEventHandler, NotificationsDbContext>();
         services.AddIntegrationEventHandler<OrderCreatedIntegrationEvent, OrderCreatedNotificationHandler, NotificationsDbContext>();
+        services.AddIntegrationEventHandler<OrderCreatedIntegrationEvent, OrderCreatedAdminNotificationHandler, NotificationsDbContext>();
+        services.AddIntegrationEventHandler<OrderCompletedIntegrationEvent, OrderCompletedNotificationHandler, NotificationsDbContext>();
         services.AddIntegrationEventHandler<PaymentCompletedIntegrationEvent, PaymentCompletedNotificationHandler, NotificationsDbContext>();
         services.AddIntegrationEventHandler<PaymentFailedIntegrationEvent, PaymentFailedNotificationHandler, NotificationsDbContext>();
 

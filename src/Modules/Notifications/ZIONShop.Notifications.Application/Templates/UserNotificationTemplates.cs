@@ -20,4 +20,10 @@ public static class UserNotificationTemplates
 
     public static (string Title, string Message) PaymentFailed(string orderCode) =>
         ("Thanh toán không thành công", $"Thanh toán cho đơn hàng #{orderCode} không thành công.");
+
+    public static (string Title, string Message) OrderCreatedForReview(string orderCode) =>
+        ("Đơn hàng mới cần xử lý", $"Đơn hàng #{orderCode} vừa được đặt, cần kiểm tra và xử lý.");
+
+    public static (string Title, string Message) OrderCompleted(string orderCode) =>
+        ("Đơn hàng đã hoàn tất", $"Đơn hàng #{orderCode} đã được hoàn tất.");
 }

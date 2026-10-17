@@ -133,4 +133,43 @@ public class NotificationsFeedTests
         var anonymous = _factory.CreateClient();
         ((int)(await anonymous.GetAsync("/api/v1/notifications/feed")).StatusCode).Should().Be(401);
     }
+
+    [Fact]
+    public async Task GetFeed_Should_ShowOrderCreatedForReview_When_CustomerPlacesOrder()
+    {
+        var admin = await AdminClientAsync();
+        var (productId, _) = await CreatePublishedProductAsync(admin);
+        await AdjustStockAsync(admin, productId, 5);
+
+        var (customer, addressId, _) = await CreateCustomerWithAddressAsync(_factory);
+        await AddToCartAsync(customer, productId, 1);
+        var placed = await PlaceOrderAsync(customer, addressId, "COD");
+
+        var entry = await WaitForFeedEntryAsync(admin, placed.Id, "OrderCreatedForReview");
+        entry.IsRead.Should().BeFalse();
+        entry.Title.Should().NotBeNullOrWhiteSpace();
+    }
+
+    [Fact]
+    public async Task GetFeed_Should_ShowShippedThenCompleted_When_AdminShipsThenCompletesOrder()
+    {
+        var admin = await AdminClientAsync();
+        var (productId, _) = await CreatePublishedProductAsync(admin);
+        await AdjustStockAsync(admin, productId, 5);
+
+        var (customer, addressId, _) = await CreateCustomerWithAddressAsync(_factory);
+        await AddToCartAsync(customer, productId, 1);
+        var placed = await PlaceOrderAsync(customer, addressId, "COD");
+
+        await WaitForFeedEntryAsync(admin, placed.Id, "OrderCreatedForReview");
+        await WaitForOrderStatusAsync(customer, placed.Id, "Confirmed");
+
+        var shipResponse = await admin.PostAsync($"/api/v1/orders/{placed.Id}/ship", null);
+        shipResponse.EnsureSuccessStatusCode();
+        await WaitForFeedEntryAsync(customer, placed.Id, "OrderShipped");
+
+        var completeResponse = await admin.PostAsync($"/api/v1/orders/{placed.Id}/complete", null);
+        completeResponse.EnsureSuccessStatusCode();
+        await WaitForFeedEntryAsync(customer, placed.Id, "OrderCompleted");
+    }
 }

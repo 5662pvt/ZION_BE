@@ -1,4 +1,5 @@
 using MediatR;
+using ZIONShop.Contracts.Orders;
 using ZIONShop.Orders.Application.DTOs;
 using ZIONShop.Orders.Application.Interfaces;
 using ZIONShop.Orders.Application.Mappings;
@@ -26,6 +27,8 @@ public class CompleteOrderCommandHandler : IRequestHandler<CompleteOrderCommand,
 
         var result = order.Complete();
         if (result.IsFailure) return Result.Failure<OrderDto>(result.Error);
+
+        _uow.AddOutboxEvent(new OrderCompletedIntegrationEvent(order.Id, order.UserId));
 
         _orders.Update(order);
         await _uow.SaveChangesAsync(cancellationToken);

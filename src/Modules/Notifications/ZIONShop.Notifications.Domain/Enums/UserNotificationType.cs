@@ -7,5 +7,7 @@ public enum UserNotificationType
     OrderShipped,
     OrderCancelled,
     PaymentCompleted,
-    PaymentFailed
+    PaymentFailed,
+    OrderCreatedForReview,
+    OrderCompleted
 }
