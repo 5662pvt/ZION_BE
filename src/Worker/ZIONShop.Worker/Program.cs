@@ -28,6 +28,7 @@ using ZIONShop.Products.Application.DependencyInjection;
 using ZIONShop.Products.Infrastructure.DependencyInjection;
 using ZIONShop.Promotions.Application.DependencyInjection;
 using ZIONShop.Promotions.Infrastructure.DependencyInjection;
+using ZIONShop.Realtime.DependencyInjection;
 using ZIONShop.Reviews.Application.DependencyInjection;
 using ZIONShop.Reviews.Infrastructure.DependencyInjection;
 using ZIONShop.Users.Application.DependencyInjection;
@@ -58,6 +59,12 @@ if (!builder.Environment.IsEnvironment("Testing"))
     try { builder.Services.AddZionCaching(builder.Configuration); }
     catch { /* Redis optional, same fail-open as the API */ }
 }
+// Publish side for real-time notifications must exist here too -- this is the process where the
+// Notifications integration-event handlers actually run once BackgroundProcessing:Enabled=false on
+// the Api hands them over (see docker-compose). Delivery to the browser still only happens from the
+// Api host's NotificationRelayHostedService/SignalR hub.
+try { builder.Services.AddZionRealtime(builder.Configuration); }
+catch { /* Redis optional, same fail-open as the API */ }
 
 // MediatR pipeline behaviors -- same three as the API (Program.cs), registered against the same
 // shared assemblies, since every module's integration-event handlers run through MediatR here too.

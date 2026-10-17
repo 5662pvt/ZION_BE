@@ -1,5 +1,5 @@
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using ZIONShop.Common.Email;
 using ZIONShop.Contracts.Auth;
 using ZIONShop.Contracts.Orders;
 using ZIONShop.EventBus.Abstractions;
@@ -9,32 +9,43 @@ using ZIONShop.Notifications.Application.Templates;
 using ZIONShop.Notifications.Domain.Entities;
 using ZIONShop.Notifications.Domain.Enums;
 using ZIONShop.Notifications.Domain.Repositories;
+using ZIONShop.Common.Email;
+using ZIONShop.Realtime;
 
 namespace ZIONShop.Notifications.Application.IntegrationEvents;
 
 public class OrderShippedIntegrationEventHandler : IIntegrationEventHandler<OrderShippedIntegrationEvent>
 {
     private readonly INotificationLogRepository _logs;
+    private readonly IUserNotificationRepository _userNotifications;
     private readonly INotificationsUnitOfWork _uow;
     private readonly IUserContactReader _contacts;
     private readonly IOrderDetailsReader _orderDetails;
     private readonly IEmailSender _email;
+    private readonly INotificationPush _push;
     private readonly NotificationsOptions _options;
+    private readonly ILogger<OrderShippedIntegrationEventHandler> _logger;
 
     public OrderShippedIntegrationEventHandler(
         INotificationLogRepository logs,
+        IUserNotificationRepository userNotifications,
         INotificationsUnitOfWork uow,
         IUserContactReader contacts,
         IOrderDetailsReader orderDetails,
         IEmailSender email,
-        IOptions<NotificationsOptions> options)
+        INotificationPush push,
+        IOptions<NotificationsOptions> options,
+        ILogger<OrderShippedIntegrationEventHandler> logger)
     {
         _logs = logs;
+        _userNotifications = userNotifications;
         _uow = uow;
         _contacts = contacts;
         _orderDetails = orderDetails;
         _email = email;
+        _push = push;
         _options = options.Value;
+        _logger = logger;
     }
 
     public async Task HandleAsync(OrderShippedIntegrationEvent @event, CancellationToken cancellationToken = default)
@@ -48,7 +59,14 @@ public class OrderShippedIntegrationEventHandler : IIntegrationEventHandler<Orde
         {
             var reason = order is null ? "Order not found" : "Missing contact email";
             await _logs.AddAsync(NotificationLog.Skipped(@event.EventId, NotificationType.OrderShipped, @event.UserId, @event.OrderId, reason, DateTime.UtcNow), cancellationToken);
+
+            var userNotification = order is not null
+                ? await AddUserNotificationAsync(@event.UserId, order.Code, @event.OrderId, cancellationToken)
+                : null;
+
             await _uow.SaveChangesAsync(cancellationToken);
+
+            if (userNotification is not null) await PushAsync(@event.UserId, userNotification, cancellationToken);
             return;
         }
 
@@ -67,6 +85,29 @@ public class OrderShippedIntegrationEventHandler : IIntegrationEventHandler<Orde
         }
 
         await _logs.AddAsync(log, cancellationToken);
+        var created = await AddUserNotificationAsync(@event.UserId, order.Code, @event.OrderId, cancellationToken);
         await _uow.SaveChangesAsync(cancellationToken);
+        await PushAsync(@event.UserId, created, cancellationToken);
+    }
+
+    private async Task<UserNotification> AddUserNotificationAsync(Guid userId, string orderCode, Guid orderId, CancellationToken cancellationToken)
+    {
+        var (title, message) = UserNotificationTemplates.OrderShipped(orderCode);
+        var notification = UserNotification.Create(userId, UserNotificationType.OrderShipped, title, message, orderId);
+        await _userNotifications.AddAsync(notification, cancellationToken);
+        return notification;
+    }
+
+    private async Task PushAsync(Guid userId, UserNotification notification, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var dto = new UserNotificationPushDto(notification.Id, notification.Type.ToString(), notification.Title, notification.Message, notification.OrderId, notification.CreatedAt);
+            await _push.PublishAsync(userId, dto, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Notification push failed for user {UserId}, notification {NotificationId}; continuing", userId, notification.Id);
+        }
     }
 }

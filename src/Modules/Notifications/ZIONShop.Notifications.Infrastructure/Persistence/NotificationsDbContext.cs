@@ -12,6 +12,7 @@ public class NotificationsDbContext : DbContext, INotificationsUnitOfWork
     public NotificationsDbContext(DbContextOptions<NotificationsDbContext> options) : base(options) { }
 
     public DbSet<NotificationLog> NotificationLogs => Set<NotificationLog>();
+    public DbSet<UserNotification> UserNotifications => Set<UserNotification>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

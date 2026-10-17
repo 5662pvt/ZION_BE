@@ -19,6 +19,7 @@
     <ProjectReference Include="..\..\BuildingBlocks\ZIONShop.Auth\ZIONShop.Auth.csproj" />
     <ProjectReference Include="..\..\BuildingBlocks\ZIONShop.EventBus\ZIONShop.EventBus.csproj" />
     <ProjectReference Include="..\..\BuildingBlocks\ZIONShop.Caching\ZIONShop.Caching.csproj" />
+    <ProjectReference Include="..\..\BuildingBlocks\ZIONShop.Realtime\ZIONShop.Realtime.csproj" />
     <ProjectReference Include="..\..\BuildingBlocks\ZIONShop.Logging\ZIONShop.Logging.csproj" />
     <ProjectReference Include="..\..\BuildingBlocks\ZIONShop.Observability\ZIONShop.Observability.csproj" />
     <ProjectReference Include="..\..\BuildingBlocks\ZIONShop.HealthChecks\ZIONShop.HealthChecks.csproj" />

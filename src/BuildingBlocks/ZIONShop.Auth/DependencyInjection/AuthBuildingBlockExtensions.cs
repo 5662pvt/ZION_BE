@@ -39,6 +39,23 @@ public static class AuthBuildingBlockExtensions
                         IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(signingKey)),
                         ClockSkew = TimeSpan.FromSeconds(30)
                     };
+
+                    // Browser WebSocket/SignalR clients cannot set an Authorization header on the
+                    // initial handshake -- bridge the token through a query string param instead, but
+                    // only for the SignalR hub path, so the normal "Authorization: Bearer ..." header
+                    // path for REST endpoints is unaffected.
+                    options.Events = new JwtBearerEvents
+                    {
+                        OnMessageReceived = ctx =>
+                        {
+                            var token = ctx.Request.Query["access_token"];
+                            if (!string.IsNullOrEmpty(token) && ctx.HttpContext.Request.Path.StartsWithSegments("/hubs"))
+                            {
+                                ctx.Token = token;
+                            }
+                            return Task.CompletedTask;
+                        }
+                    };
                 });
         }
 

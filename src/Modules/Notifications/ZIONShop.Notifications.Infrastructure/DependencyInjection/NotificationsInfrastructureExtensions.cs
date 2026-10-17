@@ -2,6 +2,7 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using ZIONShop.Contracts.Orders;
+using ZIONShop.Contracts.Payments;
 using ZIONShop.EventBus.DependencyInjection;
 using ZIONShop.EventBus.Inbox;
 using ZIONShop.Notifications.Application.IntegrationEvents;
@@ -24,6 +25,7 @@ public static class NotificationsInfrastructureExtensions
         services.Configure<NotificationsOptions>(configuration.GetSection(NotificationsOptions.SectionName));
 
         services.AddScoped<INotificationLogRepository, NotificationLogRepository>();
+        services.AddScoped<IUserNotificationRepository, UserNotificationRepository>();
         services.AddScoped<INotificationsUnitOfWork>(sp => sp.GetRequiredService<NotificationsDbContext>());
 
         services.AddInboxAdmin<NotificationsDbContext>();
@@ -31,6 +33,9 @@ public static class NotificationsInfrastructureExtensions
         services.AddIntegrationEventHandler<OrderConfirmedIntegrationEvent, OrderConfirmedIntegrationEventHandler, NotificationsDbContext>();
         services.AddIntegrationEventHandler<OrderShippedIntegrationEvent, OrderShippedIntegrationEventHandler, NotificationsDbContext>();
         services.AddIntegrationEventHandler<OrderCancelledIntegrationEvent, OrderCancelledIntegrationEventHandler, NotificationsDbContext>();
+        services.AddIntegrationEventHandler<OrderCreatedIntegrationEvent, OrderCreatedNotificationHandler, NotificationsDbContext>();
+        services.AddIntegrationEventHandler<PaymentCompletedIntegrationEvent, PaymentCompletedNotificationHandler, NotificationsDbContext>();
+        services.AddIntegrationEventHandler<PaymentFailedIntegrationEvent, PaymentFailedNotificationHandler, NotificationsDbContext>();
 
         return services;
     }

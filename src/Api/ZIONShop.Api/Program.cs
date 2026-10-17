@@ -12,9 +12,12 @@ using System.Text.Json;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Options;
+using Microsoft.AspNetCore.SignalR;
 using ZIONShop.Api.Extensions;
+using ZIONShop.Api.Hubs;
 using ZIONShop.Api.Middleware;
 using ZIONShop.Api.Options;
+using ZIONShop.Api.Realtime;
 using ZIONShop.Auth.Application.DependencyInjection;
 using ZIONShop.Auth.DependencyInjection;
 using ZIONShop.Auth.Infrastructure.DependencyInjection;
@@ -48,6 +51,7 @@ using ZIONShop.Payments.Application.DependencyInjection;
 using ZIONShop.Payments.Infrastructure.DependencyInjection;
 using ZIONShop.Promotions.Application.DependencyInjection;
 using ZIONShop.Promotions.Infrastructure.DependencyInjection;
+using ZIONShop.Realtime.DependencyInjection;
 using ZIONShop.Notifications.Application.DependencyInjection;
 using ZIONShop.Notifications.Infrastructure.DependencyInjection;
 using ZIONShop.Reviews.Application.DependencyInjection;
@@ -133,6 +137,16 @@ if (!builder.Environment.IsEnvironment("Testing"))
     try { builder.Services.AddZionCaching(builder.Configuration); }
     catch { /* Redis optional in local dev */ }
 }
+// Independent Redis connection from Caching (see ZIONShop.Realtime) -- publish side must exist
+// wherever the Notifications integration-event handlers run (here, and in the Worker's Program.cs).
+try { builder.Services.AddZionRealtime(builder.Configuration); }
+catch { /* Redis optional in local dev; relay/publish fail open */ }
+
+// SignalR: server -> client push for real-time order/payment notifications. Only the Api host ever
+// holds these connections (see NotificationRelayHostedService doc comment for why).
+builder.Services.AddSignalR();
+builder.Services.AddSingleton<IUserIdProvider, ClaimsUserIdProvider>();
+builder.Services.AddHostedService<NotificationRelayHostedService>();
 
 // MediatR pipeline behaviors (registered against shared assemblies)
 builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>));
@@ -275,6 +289,7 @@ app.UseAuthorization();
 app.UseRateLimiter();
 
 app.MapControllers();
+app.MapHub<NotificationsHub>("/hubs/notifications");
 
 app.MapHealthChecks("/health/live", new HealthCheckOptions
 {
