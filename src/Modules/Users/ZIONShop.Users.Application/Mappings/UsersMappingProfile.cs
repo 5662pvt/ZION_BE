@@ -11,5 +11,7 @@ public class UsersMappingProfile : Profile
         CreateMap<Address, AddressDto>();
         CreateMap<UserProfile, UserProfileDto>()
             .ForCtorParam(nameof(UserProfileDto.Addresses), opt => opt.MapFrom(src => src.Addresses));
+        CreateMap<Province, ProvinceDto>();
+        CreateMap<Ward, WardDto>();
     }
 }

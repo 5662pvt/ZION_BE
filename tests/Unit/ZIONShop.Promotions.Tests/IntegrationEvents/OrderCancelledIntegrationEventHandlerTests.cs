@@ -7,16 +7,18 @@ namespace ZIONShop.Promotions.Tests.IntegrationEvents;
 public class OrderCancelledIntegrationEventHandlerTests
 {
     [Fact]
-    public async Task HandleAsync_Should_ReleaseCouponAndGifts_When_OrderCancelled()
+    public async Task HandleAsync_Should_ReleaseCouponAndGiftsAndFlashSale_When_OrderCancelled()
     {
         var orderId = Guid.NewGuid();
         var coupons = new FakePromotionEvaluator();
         var gifts = new FakeGiftPromotionEvaluator();
-        var handler = new OrderCancelledIntegrationEventHandler(coupons, gifts);
+        var flashSales = new FakeFlashSaleEvaluator();
+        var handler = new OrderCancelledIntegrationEventHandler(coupons, gifts, flashSales);
 
         await handler.HandleAsync(new OrderCancelledIntegrationEvent(orderId, Guid.NewGuid(), "Customer request"), CancellationToken.None);
 
         coupons.ReleasedOrderIds.Should().ContainSingle(id => id == orderId);
         gifts.ReleasedGiftsOrderIds.Should().ContainSingle(id => id == orderId);
+        flashSales.ReleasedOrderIds.Should().ContainSingle(id => id == orderId);
     }
 }

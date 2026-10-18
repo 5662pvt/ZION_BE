@@ -450,8 +450,8 @@ export async function getOrCreateAddress(token) {
     body: {
       recipientName: 'Lab Tester',
       phoneNumber: '0900000000',
-      province: 'TP.HCM',
-      ward: 'Phuong Ben Nghe',
+      province: 'Thành phố Hà Nội',
+      ward: 'Phường Ba Đình',
       streetAddress: '1 Lab St',
       isDefault: true,
     },

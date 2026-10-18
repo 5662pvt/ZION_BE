@@ -15,23 +15,29 @@ public class StaleReservationReleaseProcessor
 
     private readonly ICouponRedemptionRepository _redemptions;
     private readonly IGiftRedemptionRepository _giftRedemptions;
+    private readonly IFlashSaleRedemptionRepository _flashSaleRedemptions;
     private readonly IPromotionEvaluator _evaluator;
     private readonly IGiftPromotionEvaluator _giftEvaluator;
+    private readonly IFlashSaleEvaluator _flashSaleEvaluator;
     private readonly TimeProvider _timeProvider;
     private readonly ILogger<StaleReservationReleaseProcessor> _logger;
 
     public StaleReservationReleaseProcessor(
         ICouponRedemptionRepository redemptions,
         IGiftRedemptionRepository giftRedemptions,
+        IFlashSaleRedemptionRepository flashSaleRedemptions,
         IPromotionEvaluator evaluator,
         IGiftPromotionEvaluator giftEvaluator,
+        IFlashSaleEvaluator flashSaleEvaluator,
         TimeProvider timeProvider,
         ILogger<StaleReservationReleaseProcessor> logger)
     {
         _redemptions = redemptions;
         _giftRedemptions = giftRedemptions;
+        _flashSaleRedemptions = flashSaleRedemptions;
         _evaluator = evaluator;
         _giftEvaluator = giftEvaluator;
+        _flashSaleEvaluator = flashSaleEvaluator;
         _timeProvider = timeProvider;
         _logger = logger;
     }
@@ -49,9 +55,15 @@ public class StaleReservationReleaseProcessor
         foreach (var orderId in staleGifts.Select(g => g.OrderId).Distinct())
             await _giftEvaluator.ReleaseGiftsAsync(orderId, cancellationToken);
 
-        var total = staleCoupons.Count + staleGifts.Count;
+        var staleFlashSales = await _flashSaleRedemptions.GetStaleReservedAsync(cutoff, cancellationToken);
+        foreach (var orderId in staleFlashSales.Select(f => f.OrderId).Distinct())
+            await _flashSaleEvaluator.ReleaseAsync(orderId, cancellationToken);
+
+        var total = staleCoupons.Count + staleGifts.Count + staleFlashSales.Count;
         if (total > 0)
-            _logger.LogInformation("Released {CouponCount} stale coupon reservation(s) and {GiftCount} stale gift reservation(s)", staleCoupons.Count, staleGifts.Count);
+            _logger.LogInformation(
+                "Released {CouponCount} stale coupon reservation(s), {GiftCount} stale gift reservation(s), and {FlashSaleCount} stale flash-sale reservation(s)",
+                staleCoupons.Count, staleGifts.Count, staleFlashSales.Count);
 
         return total;
     }

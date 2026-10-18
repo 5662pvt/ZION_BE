@@ -6,14 +6,20 @@ using ZIONShop.Auth.Authorization;
 using ZIONShop.Auth.CurrentUser;
 using ZIONShop.Common.Api;
 using ZIONShop.Reviews.Application.Features.AdminSearchReviews;
+using ZIONShop.Reviews.Application.Features.AnswerProductQuestion;
+using ZIONShop.Reviews.Application.Features.AskProductQuestion;
 using ZIONShop.Reviews.Application.Features.CreateReview;
+using ZIONShop.Reviews.Application.Features.DeleteProductQuestion;
 using ZIONShop.Reviews.Application.Features.DeleteReview;
 using ZIONShop.Reviews.Application.Features.GetMyReviews;
+using ZIONShop.Reviews.Application.Features.GetProductQuestions;
 using ZIONShop.Reviews.Application.Features.GetProductReviews;
 using ZIONShop.Reviews.Application.Features.GetReviewEligibility;
 using ZIONShop.Reviews.Application.Features.GetReviewSummaries;
 using ZIONShop.Reviews.Application.Features.GetReviewSummary;
 using ZIONShop.Reviews.Application.Features.HideReview;
+using ZIONShop.Reviews.Application.Features.RemoveReviewReply;
+using ZIONShop.Reviews.Application.Features.ReplyToReview;
 using ZIONShop.Reviews.Application.Features.ShowReview;
 using ZIONShop.Reviews.Application.Features.UpdateReview;
 
@@ -31,6 +37,8 @@ public class ReviewsController : ControllerBase
         _mediator = mediator;
         _currentUser = currentUser;
     }
+
+    private bool IsStaffOrAdmin => _currentUser.Roles.Contains(Roles.Staff) || _currentUser.Roles.Contains(Roles.Admin);
 
     [HttpGet("products/{productId:guid}/reviews")]
     [AllowAnonymous]
@@ -113,6 +121,48 @@ public class ReviewsController : ControllerBase
     [AdminAudit("Review.Show", "Review")]
     public async Task<IActionResult> Show(Guid id, CancellationToken ct)
         => (await _mediator.Send(new ShowReviewCommand(id), ct)).ToActionResult("Review shown");
+
+    [HttpPost("admin/reviews/{id:guid}/reply")]
+    [Authorize(Policy = Policies.StaffOrAdmin)]
+    [AdminAudit("Review.Reply", "Review")]
+    public async Task<IActionResult> Reply(Guid id, [FromBody] ReplyToReviewBody body, CancellationToken ct)
+        => (await _mediator.Send(new ReplyToReviewCommand(id, body.Content), ct)).ToActionResult("Reply added");
+
+    [HttpDelete("admin/reviews/{id:guid}/reply")]
+    [Authorize(Policy = Policies.StaffOrAdmin)]
+    [AdminAudit("Review.RemoveReply", "Review")]
+    public async Task<IActionResult> RemoveReply(Guid id, CancellationToken ct)
+        => (await _mediator.Send(new RemoveReviewReplyCommand(id), ct)).ToActionResult("Reply removed");
+
+    [HttpGet("products/{productId:guid}/questions")]
+    [AllowAnonymous]
+    public async Task<IActionResult> GetQuestions(Guid productId, [FromQuery] GetProductQuestionsRequest req, CancellationToken ct)
+    {
+        var query = new GetProductQuestionsQuery(productId, req.Page <= 0 ? 1 : req.Page, req.PageSize <= 0 ? 20 : req.PageSize);
+        return (await _mediator.Send(query, ct)).ToPagedActionResult();
+    }
+
+    [HttpPost("products/{productId:guid}/questions")]
+    [Authorize]
+    public async Task<IActionResult> AskQuestion(Guid productId, [FromBody] AskProductQuestionBody body, CancellationToken ct)
+    {
+        var cmd = new AskProductQuestionCommand(_currentUser.UserId!.Value, productId, body.Content);
+        return (await _mediator.Send(cmd, ct)).ToActionResult("Question submitted");
+    }
+
+    [HttpPost("admin/questions/{id:guid}/answer")]
+    [Authorize(Policy = Policies.StaffOrAdmin)]
+    [AdminAudit("ProductQuestion.Answer", "ProductQuestion")]
+    public async Task<IActionResult> AnswerQuestion(Guid id, [FromBody] AnswerProductQuestionBody body, CancellationToken ct)
+    {
+        var cmd = new AnswerProductQuestionCommand(id, _currentUser.UserId!.Value, body.Content);
+        return (await _mediator.Send(cmd, ct)).ToActionResult("Question answered");
+    }
+
+    [HttpDelete("questions/{id:guid}")]
+    [Authorize]
+    public async Task<IActionResult> DeleteQuestion(Guid id, CancellationToken ct)
+        => (await _mediator.Send(new DeleteProductQuestionCommand(id, _currentUser.UserId!.Value, IsStaffOrAdmin), ct)).ToActionResult("Question deleted");
 }
 
 public record GetProductReviewsRequest(int Page = 1, int PageSize = 20, int? Rating = null);
@@ -121,3 +171,7 @@ public record UpdateReviewBody(int Rating, string? Title, string Content);
 public record HideReviewBody(string? Reason);
 public record AdminSearchReviewsRequest(int Page = 1, int PageSize = 20, string? Status = null, int? Rating = null, string? Keyword = null);
 public record GetMyReviewsRequest(int Page = 1, int PageSize = 20);
+public record ReplyToReviewBody(string Content);
+public record GetProductQuestionsRequest(int Page = 1, int PageSize = 20);
+public record AskProductQuestionBody(string Content);
+public record AnswerProductQuestionBody(string Content);

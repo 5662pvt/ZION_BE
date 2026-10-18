@@ -75,4 +75,63 @@ public class ReviewTests
         review.Title.Should().Be("Updated title");
         review.Content.Should().Be("Updated content that is long enough.");
     }
+
+    [Fact]
+    public void Reply_Should_SetReplyContentAndRepliedAt()
+    {
+        var review = CreateReview();
+
+        var result = review.Reply("  Thanks for the feedback!  ");
+
+        result.IsSuccess.Should().BeTrue();
+        review.ReplyContent.Should().Be("Thanks for the feedback!");
+        review.RepliedAt.Should().NotBeNull();
+    }
+
+    [Fact]
+    public void Reply_Should_OverwritePreviousReply_When_ReplyingTwice()
+    {
+        var review = CreateReview();
+        review.Reply("First reply");
+
+        var result = review.Reply("Second reply");
+
+        result.IsSuccess.Should().BeTrue();
+        review.ReplyContent.Should().Be("Second reply");
+    }
+
+    [Fact]
+    public void Reply_Should_Fail_When_ContentIsEmpty()
+    {
+        var review = CreateReview();
+
+        var result = review.Reply("   ");
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Code.Should().Be("Reviews.ReplyContentRequired");
+    }
+
+    [Fact]
+    public void RemoveReply_Should_ClearReplyContentAndRepliedAt()
+    {
+        var review = CreateReview();
+        review.Reply("Thanks!");
+
+        var result = review.RemoveReply();
+
+        result.IsSuccess.Should().BeTrue();
+        review.ReplyContent.Should().BeNull();
+        review.RepliedAt.Should().BeNull();
+    }
+
+    [Fact]
+    public void RemoveReply_Should_Fail_When_NoReplyExists()
+    {
+        var review = CreateReview();
+
+        var result = review.RemoveReply();
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Code.Should().Be("Reviews.NoReply");
+    }
 }

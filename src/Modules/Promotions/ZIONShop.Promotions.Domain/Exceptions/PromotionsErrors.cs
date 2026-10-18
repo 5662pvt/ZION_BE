@@ -39,4 +39,9 @@ public static class PromotionsErrors
     public static readonly Error MinQuantityNotAllowed = Error.Validation("Promotions.MinQuantityNotAllowed", "'minQuantity' chỉ áp dụng cho khuyến mãi loại 'Gift'");
     public static readonly Error GiftProductNotFound = Error.Validation("Promotions.GiftProductNotFound", "Sản phẩm quà tặng không tồn tại");
     public static readonly Error CouponNotAllowedForGift = Error.Validation("Promotions.CouponNotAllowedForGift", "Khuyến mãi quà tặng không dùng mã giảm giá");
+
+    public static readonly Error FlashSaleNotFound = Error.NotFound("Promotions.FlashSaleNotFound", "Flash sale không tồn tại");
+    public static readonly Error FlashSaleItemNotFound = Error.NotFound("Promotions.FlashSaleItemNotFound", "Sản phẩm flash sale không tồn tại");
+    public static readonly Error FlashSaleProductNotFound = Error.Validation("Promotions.FlashSaleProductNotFound", "Sản phẩm không tồn tại");
+    public static readonly Error FlashSaleItemProductAlreadyAdded = Error.Conflict("Promotions.FlashSaleItemProductAlreadyAdded", "Sản phẩm đã có trong flash sale này");
 }

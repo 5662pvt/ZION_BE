@@ -91,6 +91,30 @@ namespace ZIONShop.Users.Infrastructure.Persistence.Migrations
                     b.ToTable("Addresses", "users");
                 });
 
+            modelBuilder.Entity("ZIONShop.Users.Domain.Entities.Province", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Code")
+                        .IsUnique();
+
+                    b.ToTable("Provinces", "users");
+                });
+
             modelBuilder.Entity("ZIONShop.Users.Domain.Entities.UserProfile", b =>
                 {
                     b.Property<Guid>("Id")
@@ -143,6 +167,33 @@ namespace ZIONShop.Users.Infrastructure.Persistence.Migrations
                     b.ToTable("UserProfiles", "users");
                 });
 
+            modelBuilder.Entity("ZIONShop.Users.Domain.Entities.Ward", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
+                    b.Property<Guid>("ProvinceId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProvinceId", "Code")
+                        .IsUnique();
+
+                    b.ToTable("Wards", "users");
+                });
+
             modelBuilder.Entity("ZIONShop.Users.Domain.Entities.WishlistItem", b =>
                 {
                     b.Property<Guid>("Id")
@@ -171,6 +222,15 @@ namespace ZIONShop.Users.Infrastructure.Persistence.Migrations
                     b.HasOne("ZIONShop.Users.Domain.Entities.UserProfile", null)
                         .WithMany("Addresses")
                         .HasForeignKey("UserProfileId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("ZIONShop.Users.Domain.Entities.Ward", b =>
+                {
+                    b.HasOne("ZIONShop.Users.Domain.Entities.Province", null)
+                        .WithMany()
+                        .HasForeignKey("ProvinceId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });

@@ -7,6 +7,7 @@ using ZIONShop.Users.Application.Features.UpdateAddress;
 using ZIONShop.Users.Application.Mappings;
 using ZIONShop.Users.Application.Services;
 using ZIONShop.Users.Domain.Entities;
+using ZIONShop.Users.Domain.Repositories;
 using ZIONShop.Users.Infrastructure.Persistence;
 using ZIONShop.Users.Infrastructure.Repositories;
 
@@ -17,12 +18,12 @@ public class AddressCommandHandlerTests
     [Fact]
     public async Task AddAddress_Should_SetFirstAddressAsDefault_When_IsDefaultFalse()
     {
-        var (db, profiles, provisioner, mapper) = BuildScope();
+        var (db, profiles, administrativeUnits, provisioner, mapper) = BuildScope();
         var profile = UserProfile.Create(Guid.NewGuid(), "user@zionshop.local", "User");
         await db.UserProfiles.AddAsync(profile);
         await db.SaveChangesAsync();
 
-        var handler = new AddAddressCommandHandler(provisioner, profiles, db, mapper);
+        var handler = new AddAddressCommandHandler(provisioner, profiles, administrativeUnits, db, mapper);
 
         var result = await handler.Handle(new AddAddressCommand(profile.AuthUserId, profile.Email, "Nguyen Van A", "0901234567", "TP.HCM", "Phuong Ben Nghe", "123 Main St", false), CancellationToken.None);
 
@@ -31,16 +32,48 @@ public class AddressCommandHandlerTests
     }
 
     [Fact]
+    public async Task AddAddress_Should_Fail_When_ProvinceIsUnknown()
+    {
+        var (db, profiles, administrativeUnits, provisioner, mapper) = BuildScope();
+        var profile = UserProfile.Create(Guid.NewGuid(), "user@zionshop.local", "User");
+        await db.UserProfiles.AddAsync(profile);
+        await db.SaveChangesAsync();
+
+        var handler = new AddAddressCommandHandler(provisioner, profiles, administrativeUnits, db, mapper);
+
+        var result = await handler.Handle(new AddAddressCommand(profile.AuthUserId, profile.Email, "Nguyen Van A", "0901234567", "Not A Real Province", "Phuong Ben Nghe", "123 Main St", false), CancellationToken.None);
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Code.Should().Be("Users.InvalidProvince");
+    }
+
+    [Fact]
+    public async Task AddAddress_Should_Fail_When_WardDoesNotBelongToProvince()
+    {
+        var (db, profiles, administrativeUnits, provisioner, mapper) = BuildScope();
+        var profile = UserProfile.Create(Guid.NewGuid(), "user@zionshop.local", "User");
+        await db.UserProfiles.AddAsync(profile);
+        await db.SaveChangesAsync();
+
+        var handler = new AddAddressCommandHandler(provisioner, profiles, administrativeUnits, db, mapper);
+
+        var result = await handler.Handle(new AddAddressCommand(profile.AuthUserId, profile.Email, "Nguyen Van A", "0901234567", "TP.HCM", "Phuong Hoan Kiem", "123 Main St", false), CancellationToken.None);
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Code.Should().Be("Users.InvalidWard");
+    }
+
+    [Fact]
     public async Task UpdateAddress_Should_UpdateAddressAndMakeItDefault_When_IsDefaultTrue()
     {
-        var (db, profiles, _, mapper) = BuildScope();
+        var (db, profiles, administrativeUnits, _, mapper) = BuildScope();
         var profile = UserProfile.Create(Guid.NewGuid(), "user@zionshop.local", "User");
         var first = profile.AddAddress("Nguyen Van A", "0901111111", "TP.HCM", "Phuong Ben Nghe", "1 Main St", true);
         var second = profile.AddAddress("Nguyen Van B", "0902222222", "Ha Noi", "Phuong Hoan Kiem", "2 Main St", false);
         await db.UserProfiles.AddAsync(profile);
         await db.SaveChangesAsync();
 
-        var handler = new UpdateAddressCommandHandler(profiles, db, mapper);
+        var handler = new UpdateAddressCommandHandler(profiles, administrativeUnits, db, mapper);
 
         var result = await handler.Handle(new UpdateAddressCommand(profile.AuthUserId, second.Id, "Nguyen Van B Updated", "0903333333", "Da Nang", "Phuong Hai Chau", "2 Updated St", true), CancellationToken.None);
 
@@ -54,9 +87,26 @@ public class AddressCommandHandlerTests
     }
 
     [Fact]
+    public async Task UpdateAddress_Should_Fail_When_ProvinceIsUnknown()
+    {
+        var (db, profiles, administrativeUnits, _, mapper) = BuildScope();
+        var profile = UserProfile.Create(Guid.NewGuid(), "user@zionshop.local", "User");
+        var first = profile.AddAddress("Nguyen Van A", "0901111111", "TP.HCM", "Phuong Ben Nghe", "1 Main St", true);
+        await db.UserProfiles.AddAsync(profile);
+        await db.SaveChangesAsync();
+
+        var handler = new UpdateAddressCommandHandler(profiles, administrativeUnits, db, mapper);
+
+        var result = await handler.Handle(new UpdateAddressCommand(profile.AuthUserId, first.Id, "Nguyen Van A", "0901111111", "Not A Real Province", "Phuong Ben Nghe", "1 Main St", false), CancellationToken.None);
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Code.Should().Be("Users.InvalidProvince");
+    }
+
+    [Fact]
     public async Task SetDefaultAddress_Should_UnsetOtherDefaults_When_AddressExists()
     {
-        var (db, profiles, _, mapper) = BuildScope();
+        var (db, profiles, _, _, mapper) = BuildScope();
         var profile = UserProfile.Create(Guid.NewGuid(), "user@zionshop.local", "User");
         var first = profile.AddAddress("Nguyen Van A", "0901111111", "TP.HCM", "Phuong Ben Nghe", "1 Main St", true);
         var second = profile.AddAddress("Nguyen Van B", "0902222222", "Ha Noi", "Phuong Hoan Kiem", "2 Main St", false);
@@ -79,7 +129,7 @@ public class AddressCommandHandlerTests
     [Fact]
     public async Task RemoveAddress_Should_RemoveAddressAndPromoteAnotherDefault_When_RemovedAddressWasDefault()
     {
-        var (db, profiles, _, mapper) = BuildScope();
+        var (db, profiles, _, _, mapper) = BuildScope();
         var profile = UserProfile.Create(Guid.NewGuid(), "user@zionshop.local", "User");
         var first = profile.AddAddress("Nguyen Van A", "0901111111", "TP.HCM", "Phuong Ben Nghe", "1 Main St", true);
         var second = profile.AddAddress("Nguyen Van B", "0902222222", "Ha Noi", "Phuong Hoan Kiem", "2 Main St", false);
@@ -98,15 +148,30 @@ public class AddressCommandHandlerTests
         saved.Addresses.Single().IsDefault.Should().BeTrue();
     }
 
-    private static (UsersDbContext db, UserProfileRepository profiles, IUserProfileProvisioner provisioner, IMapper mapper) BuildScope()
+    private static (UsersDbContext db, UserProfileRepository profiles, IAdministrativeUnitRepository administrativeUnits, IUserProfileProvisioner provisioner, IMapper mapper) BuildScope()
     {
         var options = new DbContextOptionsBuilder<UsersDbContext>()
             .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
             .Options;
         var db = new UsersDbContext(options);
+        SeedAdministrativeUnits(db);
         var mapper = new MapperConfiguration(cfg => cfg.AddProfile<UsersMappingProfile>()).CreateMapper();
         var profiles = new UserProfileRepository(db);
+        var administrativeUnits = new AdministrativeUnitRepository(db);
 
-        return (db, profiles, new UserProfileProvisioner(profiles, db), mapper);
+        return (db, profiles, administrativeUnits, new UserProfileProvisioner(profiles, db), mapper);
+    }
+
+    private static void SeedAdministrativeUnits(UsersDbContext db)
+    {
+        var hcm = Province.Create("79", "TP.HCM");
+        var hanoi = Province.Create("01", "Ha Noi");
+        var danang = Province.Create("48", "Da Nang");
+        db.Provinces.AddRange(hcm, hanoi, danang);
+        db.Wards.AddRange(
+            Ward.Create("001", "Phuong Ben Nghe", hcm.Id),
+            Ward.Create("002", "Phuong Hoan Kiem", hanoi.Id),
+            Ward.Create("003", "Phuong Hai Chau", danang.Id));
+        db.SaveChanges();
     }
 }

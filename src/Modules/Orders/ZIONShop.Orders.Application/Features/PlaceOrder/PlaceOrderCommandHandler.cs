@@ -33,6 +33,7 @@ public class PlaceOrderCommandHandler : IRequestHandler<PlaceOrderCommand, Resul
     private readonly IProductPriceLookup _prices;
     private readonly IPromotionEvaluator _promotions;
     private readonly IGiftPromotionEvaluator _giftPromotions;
+    private readonly IFlashSaleEvaluator _flashSales;
     private readonly IStockAvailabilityReader _stockAvailability;
     private readonly IShippingFeeCalculator _shippingFeeCalculator;
     private readonly IOrderIdempotencyKeyRepository _idempotencyKeys;
@@ -48,6 +49,7 @@ public class PlaceOrderCommandHandler : IRequestHandler<PlaceOrderCommand, Resul
         IProductPriceLookup prices,
         IPromotionEvaluator promotions,
         IGiftPromotionEvaluator giftPromotions,
+        IFlashSaleEvaluator flashSales,
         IStockAvailabilityReader stockAvailability,
         IShippingFeeCalculator shippingFeeCalculator,
         IOrderIdempotencyKeyRepository idempotencyKeys,
@@ -62,6 +64,7 @@ public class PlaceOrderCommandHandler : IRequestHandler<PlaceOrderCommand, Resul
         _prices = prices;
         _promotions = promotions;
         _giftPromotions = giftPromotions;
+        _flashSales = flashSales;
         _stockAvailability = stockAvailability;
         _shippingFeeCalculator = shippingFeeCalculator;
         _idempotencyKeys = idempotencyKeys;
@@ -109,6 +112,16 @@ public class PlaceOrderCommandHandler : IRequestHandler<PlaceOrderCommand, Resul
         if (!Enum.TryParse<DomainPaymentMethod>(request.PaymentMethod, ignoreCase: true, out var paymentMethod))
             return Result.Failure<PlaceOrderResult>(OrdersErrors.InvalidPaymentMethod);
 
+        // Read-only preview: decides per-line pricing now (OrderLine has no post-creation price mutator,
+        // so the flash price must be baked in before DomainOrder.Place builds its lines). The authoritative
+        // atomic quota claim happens after Place, alongside the coupon/gift reservations, once order.Id
+        // exists -- same quote-before/reserve-after split already used for gifts in this handler. A line
+        // whose quota is lost to a concurrent order in that window keeps its already-baked flash price;
+        // this mirrors the gift flow's same quote/reserve race and is accepted for the same reason.
+        var flashSaleLines = cart.Lines.Select(l => new FlashSaleLine(l.ProductId, l.Quantity)).ToList();
+        var flashQuotes = await _flashSales.QuoteAsync(flashSaleLines, cancellationToken);
+        var flashPriceByProduct = flashQuotes.ToDictionary(q => q.ProductId, q => q.FlashUnitPrice);
+
         var lines = new List<(Guid ProductId, string ProductName, decimal UnitPrice, int Quantity)>();
         var unavailable = new List<string>();
         string? currency = null;
@@ -123,7 +136,8 @@ public class PlaceOrderCommandHandler : IRequestHandler<PlaceOrderCommand, Resul
             }
 
             currency ??= price.Currency;
-            lines.Add((line.ProductId, price.Name, price.UnitPrice, line.Quantity));
+            var unitPrice = flashPriceByProduct.TryGetValue(line.ProductId, out var flashPrice) ? flashPrice : price.UnitPrice;
+            lines.Add((line.ProductId, price.Name, unitPrice, line.Quantity));
         }
 
         if (unavailable.Count > 0)
@@ -141,6 +155,10 @@ public class PlaceOrderCommandHandler : IRequestHandler<PlaceOrderCommand, Resul
 
         var order = DomainOrder.Place(
             request.UserId, paymentMethod, currency ?? _checkout.Currency, shippingFee, shippingAddress, lines, request.Note);
+
+        var hasFlashSale = flashQuotes.Count > 0;
+        if (hasFlashSale)
+            await _flashSales.ReserveAsync(flashSaleLines, order.Id, request.UserId, cancellationToken);
 
         var hasCoupon = !string.IsNullOrWhiteSpace(request.CouponCode);
         if (hasCoupon)
@@ -226,6 +244,8 @@ public class PlaceOrderCommandHandler : IRequestHandler<PlaceOrderCommand, Resul
                 await _promotions.ReleaseAsync(order.Id, cancellationToken);
             if (hasGifts)
                 await _giftPromotions.ReleaseGiftsAsync(order.Id, cancellationToken);
+            if (hasFlashSale)
+                await _flashSales.ReleaseAsync(order.Id, cancellationToken);
 
             var winner = await _idempotencyKeys.GetAsync(request.UserId, request.IdempotencyKey!, cancellationToken);
             var replay = await TryReplayAsync(winner, fingerprint!, cancellationToken);
@@ -237,6 +257,8 @@ public class PlaceOrderCommandHandler : IRequestHandler<PlaceOrderCommand, Resul
                 await _promotions.ReleaseAsync(order.Id, cancellationToken);
             if (hasGifts)
                 await _giftPromotions.ReleaseGiftsAsync(order.Id, cancellationToken);
+            if (hasFlashSale)
+                await _flashSales.ReleaseAsync(order.Id, cancellationToken);
             throw;
         }
 

@@ -8,6 +8,7 @@ using ZIONShop.Users.Application.Features.UpdateProfile;
 using ZIONShop.Users.Application.IntegrationEventHandlers;
 using ZIONShop.Users.Application.Mappings;
 using ZIONShop.Users.Application.Services;
+using ZIONShop.Users.Domain.Entities;
 using ZIONShop.Users.Infrastructure.Persistence;
 using ZIONShop.Users.Infrastructure.Repositories;
 
@@ -115,6 +116,11 @@ public class ProfileProvisioningTests
         var mapper = new MapperConfiguration(cfg => cfg.AddProfile<UsersMappingProfile>()).CreateMapper();
         var profiles = new UserProfileRepository(db);
 
+        var hcm = Province.Create("79", "TP.HCM");
+        db.Provinces.Add(hcm);
+        db.Wards.Add(Ward.Create("001", "Phuong Ben Nghe", hcm.Id));
+        db.SaveChanges();
+
         return (db, profiles, new UserProfileProvisioner(profiles, db), mapper);
     }
 
@@ -122,11 +128,12 @@ public class ProfileProvisioningTests
         (GetUserProfileQueryHandler getProfile, UpdateUserProfileCommandHandler updateProfile, ListAddressesQueryHandler listAddresses, AddAddressCommandHandler addAddress) handlers) BuildHandlers()
     {
         var (db, profiles, provisioner, mapper) = BuildScope();
+        var administrativeUnits = new AdministrativeUnitRepository(db);
         var handlers = (
             getProfile: new GetUserProfileQueryHandler(provisioner, mapper),
             updateProfile: new UpdateUserProfileCommandHandler(provisioner, profiles, db, mapper),
             listAddresses: new ListAddressesQueryHandler(provisioner, mapper),
-            addAddress: new AddAddressCommandHandler(provisioner, profiles, db, mapper));
+            addAddress: new AddAddressCommandHandler(provisioner, profiles, administrativeUnits, db, mapper));
 
         return (db, profiles, provisioner, handlers);
     }

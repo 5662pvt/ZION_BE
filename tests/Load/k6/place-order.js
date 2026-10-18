@@ -110,8 +110,8 @@ function ensureAddress() {
     JSON.stringify({
       recipientName: `Load Test VU${__VU}`,
       phoneNumber: '0900000000',
-      province: 'Ho Chi Minh',
-      ward: 'Ward 1',
+      province: 'Thành phố Hà Nội',
+      ward: 'Phường Ba Đình',
       streetAddress: `${__VU} Load Test Street`,
       isDefault: true,
     }),

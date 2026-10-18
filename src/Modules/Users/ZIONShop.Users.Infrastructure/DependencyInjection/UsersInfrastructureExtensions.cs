@@ -24,6 +24,7 @@ public static class UsersInfrastructureExtensions
 
         services.AddScoped<IUserProfileRepository, UserProfileRepository>();
         services.AddScoped<IWishlistRepository, WishlistRepository>();
+        services.AddScoped<IAdministrativeUnitRepository, AdministrativeUnitRepository>();
         services.AddScoped<IUsersUnitOfWork>(sp => sp.GetRequiredService<UsersDbContext>());
         services.AddScoped<IUserAddressReader, UserAddressReader>();
         services.AddScoped<IUserProfileReader, UserProfileReader>();

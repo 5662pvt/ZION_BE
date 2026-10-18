@@ -21,6 +21,8 @@ public class ReviewConfiguration : IEntityTypeConfiguration<Review>
         builder.Property(r => r.ProductName).HasMaxLength(256).IsRequired();
         builder.Property(r => r.Status).HasConversion<string>().HasMaxLength(16).IsRequired();
         builder.Property(r => r.HiddenReason).HasMaxLength(200);
+        builder.Property(r => r.ReplyContent).HasMaxLength(2000);
+        builder.Property(r => r.RepliedAt);
 
         builder.Property(r => r.CreatedDate).IsRequired();
         builder.Property(r => r.CreatedBy).HasMaxLength(128);

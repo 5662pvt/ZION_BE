@@ -14,6 +14,8 @@ public class UsersDbContext : DbContext, IUsersUnitOfWork
     public DbSet<UserProfile> UserProfiles => Set<UserProfile>();
     public DbSet<Address> Addresses => Set<Address>();
     public DbSet<WishlistItem> WishlistItems => Set<WishlistItem>();
+    public DbSet<Province> Provinces => Set<Province>();
+    public DbSet<Ward> Wards => Set<Ward>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

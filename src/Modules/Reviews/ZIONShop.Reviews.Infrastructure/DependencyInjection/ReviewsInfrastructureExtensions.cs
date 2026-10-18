@@ -18,6 +18,7 @@ public static class ReviewsInfrastructureExtensions
 
         services.AddScoped<IReviewRepository, ReviewRepository>();
         services.AddScoped<IProductRatingSummaryRepository, ProductRatingSummaryRepository>();
+        services.AddScoped<IProductQuestionRepository, ProductQuestionRepository>();
         services.AddScoped<IReviewsUnitOfWork>(sp => sp.GetRequiredService<ReviewsDbContext>());
 
         return services;

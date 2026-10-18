@@ -16,7 +16,8 @@ public class OrderConfirmedIntegrationEventHandlerTests
             .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
             .Options;
         var db = new PromotionsDbContext(options);
-        var handler = new OrderConfirmedIntegrationEventHandler(new CouponRedemptionRepository(db), new GiftRedemptionRepository(db), db, TimeProvider.System);
+        var handler = new OrderConfirmedIntegrationEventHandler(
+            new CouponRedemptionRepository(db), new GiftRedemptionRepository(db), new FlashSaleRedemptionRepository(db), db, TimeProvider.System);
         return (db, handler);
     }
 
@@ -60,5 +61,21 @@ public class OrderConfirmedIntegrationEventHandlerTests
 
         await handler.HandleAsync(new OrderConfirmedIntegrationEvent(Guid.NewGuid(), Guid.NewGuid()), CancellationToken.None);
         // No exception means success; nothing to assert beyond idempotent no-op behavior.
+    }
+
+    [Fact]
+    public async Task HandleAsync_Should_CommitFlashSaleRedemption_When_Reserved()
+    {
+        var (db, handler) = BuildScope();
+        var orderId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+        var redemption = FlashSaleRedemption.Create(Guid.NewGuid(), orderId, userId, 2, 50000m, DateTime.UtcNow);
+        db.FlashSaleRedemptions.Add(redemption);
+        await db.SaveChangesAsync();
+
+        await handler.HandleAsync(new OrderConfirmedIntegrationEvent(orderId, userId), CancellationToken.None);
+
+        var reloaded = await db.FlashSaleRedemptions.AsNoTracking().SingleAsync(r => r.OrderId == orderId);
+        reloaded.Status.Should().Be(RedemptionStatus.Committed);
     }
 }

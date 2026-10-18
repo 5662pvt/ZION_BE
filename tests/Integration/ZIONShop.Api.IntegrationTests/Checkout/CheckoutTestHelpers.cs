@@ -86,8 +86,8 @@ public static class CheckoutTestHelpers
         {
             recipientName = "Nguyen Van Test",
             phoneNumber = "0901234567",
-            province = "TP.HCM",
-            ward = "Phuong Ben Nghe",
+            province = "Thành phố Hà Nội",
+            ward = "Phường Ba Đình",
             streetAddress = "123 Test St",
             isDefault = true
         });

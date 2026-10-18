@@ -11,18 +11,30 @@ namespace ZIONShop.Users.Application.Features.UpdateAddress;
 public class UpdateAddressCommandHandler : IRequestHandler<UpdateAddressCommand, Result<AddressDto>>
 {
     private readonly IUserProfileRepository _profiles;
+    private readonly IAdministrativeUnitRepository _administrativeUnits;
     private readonly IUsersUnitOfWork _uow;
     private readonly IMapper _mapper;
 
-    public UpdateAddressCommandHandler(IUserProfileRepository profiles, IUsersUnitOfWork uow, IMapper mapper)
+    public UpdateAddressCommandHandler(
+        IUserProfileRepository profiles,
+        IAdministrativeUnitRepository administrativeUnits,
+        IUsersUnitOfWork uow,
+        IMapper mapper)
     {
         _profiles = profiles;
+        _administrativeUnits = administrativeUnits;
         _uow = uow;
         _mapper = mapper;
     }
 
     public async Task<Result<AddressDto>> Handle(UpdateAddressCommand request, CancellationToken cancellationToken)
     {
+        var province = await _administrativeUnits.FindProvinceByNameAsync(request.Province, cancellationToken);
+        if (province is null) return Result.Failure<AddressDto>(UsersErrors.InvalidProvince);
+
+        var ward = await _administrativeUnits.FindWardByNameAsync(province.Id, request.Ward, cancellationToken);
+        if (ward is null) return Result.Failure<AddressDto>(UsersErrors.InvalidWard);
+
         var profile = await _profiles.GetByAuthUserIdAsync(request.AuthUserId, cancellationToken);
         if (profile is null) return Result.Failure<AddressDto>(UsersErrors.ProfileNotFound);
 
@@ -30,8 +42,8 @@ public class UpdateAddressCommandHandler : IRequestHandler<UpdateAddressCommand,
             request.AddressId,
             request.RecipientName,
             request.PhoneNumber,
-            request.Province,
-            request.Ward,
+            province.Name,
+            ward.Name,
             request.StreetAddress,
             request.IsDefault);
 

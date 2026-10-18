@@ -22,6 +22,9 @@ public class PromotionsDbContext : DbContext, IPromotionsUnitOfWork
     public DbSet<CouponCode> CouponCodes => Set<CouponCode>();
     public DbSet<CouponRedemption> CouponRedemptions => Set<CouponRedemption>();
     public DbSet<GiftRedemption> GiftRedemptions => Set<GiftRedemption>();
+    public DbSet<FlashSale> FlashSales => Set<FlashSale>();
+    public DbSet<FlashSaleItem> FlashSaleItems => Set<FlashSaleItem>();
+    public DbSet<FlashSaleRedemption> FlashSaleRedemptions => Set<FlashSaleRedemption>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

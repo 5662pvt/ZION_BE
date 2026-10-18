@@ -14,7 +14,9 @@ public static class ReviewMappingExtensions
         review.AuthorName,
         true,
         review.CreatedDate,
-        review.LastModifiedDate);
+        review.LastModifiedDate,
+        review.ReplyContent,
+        review.RepliedAt);
 
     public static AdminReviewDto ToAdminDto(this Review review) => new(
         review.Id,
@@ -28,7 +30,9 @@ public static class ReviewMappingExtensions
         review.LastModifiedDate,
         review.ProductName,
         review.Status.ToString(),
-        review.HiddenReason);
+        review.HiddenReason,
+        review.ReplyContent,
+        review.RepliedAt);
 
     public static ReviewSummaryDto ToSummaryDto(this ProductRatingSummary? summary, Guid productId)
     {
@@ -59,7 +63,19 @@ public static class ReviewMappingExtensions
         review.Content,
         review.Status.ToString(),
         review.HiddenReason,
-        review.CreatedDate);
+        review.CreatedDate,
+        review.ReplyContent,
+        review.RepliedAt);
+
+    public static ProductQuestionDto ToDto(this ProductQuestion question) => new(
+        question.Id,
+        question.ProductId,
+        question.UserId,
+        question.AuthorName,
+        question.Content,
+        question.CreatedDate,
+        question.AnswerContent,
+        question.AnsweredAt);
 
     public static ProductRatingDto ToRatingDto(this ProductRatingSummary? summary, Guid productId) =>
         summary is null ? new ProductRatingDto(productId, 0m, 0) : new ProductRatingDto(productId, summary.Average, summary.Count);

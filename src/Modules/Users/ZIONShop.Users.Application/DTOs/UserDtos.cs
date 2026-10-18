@@ -7,3 +7,7 @@ public record AddressDto(Guid Id, string RecipientName, string PhoneNumber, stri
 public record WishlistItemDto(Guid ProductId, string Name, string Slug, decimal Price, string Currency, string? ThumbnailUrl, bool InStock, DateTime AddedAt);
 
 public record WishlistToggleDto(Guid ProductId, bool InWishlist);
+
+public record ProvinceDto(Guid Id, string Code, string Name);
+
+public record WardDto(Guid Id, string Code, string Name);

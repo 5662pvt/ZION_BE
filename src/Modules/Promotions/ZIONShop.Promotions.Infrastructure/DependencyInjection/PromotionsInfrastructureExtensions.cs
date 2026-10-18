@@ -34,9 +34,13 @@ public static class PromotionsInfrastructureExtensions
         services.AddScoped<ICouponCodeRepository, CouponCodeRepository>();
         services.AddScoped<ICouponRedemptionRepository, CouponRedemptionRepository>();
         services.AddScoped<IGiftRedemptionRepository, GiftRedemptionRepository>();
+        services.AddScoped<IFlashSaleRepository, FlashSaleRepository>();
+        services.AddScoped<IFlashSaleItemRepository, FlashSaleItemRepository>();
+        services.AddScoped<IFlashSaleRedemptionRepository, FlashSaleRedemptionRepository>();
         services.AddScoped<IPromotionsUnitOfWork>(sp => sp.GetRequiredService<PromotionsDbContext>());
         services.AddScoped<IPromotionEvaluator, PromotionEvaluator>();
         services.AddScoped<IGiftPromotionEvaluator, GiftPromotionEvaluator>();
+        services.AddScoped<IFlashSaleEvaluator, FlashSaleEvaluator>();
         services.AddScoped<IPromotionLookup, PromotionLookup>();
 
         services.AddScoped<StaleReservationReleaseProcessor>();

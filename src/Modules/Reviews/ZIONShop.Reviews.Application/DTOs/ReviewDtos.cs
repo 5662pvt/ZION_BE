@@ -9,7 +9,9 @@ public record ReviewDto(
     string AuthorName,
     bool IsVerifiedPurchase,
     DateTime CreatedAt,
-    DateTime? UpdatedAt);
+    DateTime? UpdatedAt,
+    string? ReplyContent,
+    DateTime? RepliedAt);
 
 public record AdminReviewDto(
     Guid Id,
@@ -23,7 +25,9 @@ public record AdminReviewDto(
     DateTime? UpdatedAt,
     string ProductName,
     string Status,
-    string? HiddenReason);
+    string? HiddenReason,
+    string? ReplyContent,
+    DateTime? RepliedAt);
 
 public record ReviewSummaryDto(Guid ProductId, decimal Average, int Count, IReadOnlyDictionary<string, int> Distribution);
 
@@ -41,4 +45,16 @@ public record MyReviewDto(
     string Content,
     string Status,
     string? HiddenReason,
-    DateTime CreatedAt);
+    DateTime CreatedAt,
+    string? ReplyContent,
+    DateTime? RepliedAt);
+
+public record ProductQuestionDto(
+    Guid Id,
+    Guid ProductId,
+    Guid UserId,
+    string AuthorName,
+    string Content,
+    DateTime CreatedAt,
+    string? AnswerContent,
+    DateTime? AnsweredAt);

@@ -12,6 +12,7 @@ public class ReviewsDbContext : DbContext, IReviewsUnitOfWork
 
     public DbSet<Review> Reviews => Set<Review>();
     public DbSet<ProductRatingSummary> ProductRatingSummaries => Set<ProductRatingSummary>();
+    public DbSet<ProductQuestion> ProductQuestions => Set<ProductQuestion>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

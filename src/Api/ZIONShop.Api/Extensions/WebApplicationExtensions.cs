@@ -30,6 +30,7 @@ public static class WebApplicationExtensions
             await AuthDbSeeder.SeedAsync(sp.GetRequiredService<AuthDbContext>(), loadTestCustomers);
 
             await sp.GetRequiredService<UsersDbContext>().Database.MigrateAsync();
+            await AdministrativeUnitsSeeder.SeedAsync(sp.GetRequiredService<UsersDbContext>());
 
             await sp.GetRequiredService<ProductsDbContext>().Database.MigrateAsync();
             await ProductsDbSeeder.SeedAsync(sp.GetRequiredService<ProductsDbContext>());

@@ -19,6 +19,8 @@ public class Review : AggregateRoot
     public string ProductName { get; private set; } = string.Empty;
     public ReviewStatus Status { get; private set; }
     public string? HiddenReason { get; private set; }
+    public string? ReplyContent { get; private set; }
+    public DateTime? RepliedAt { get; private set; }
 
     public static Review Create(Guid productId, Guid userId, Guid orderId, int rating, string? title, string content, string authorName, string productName)
     {
@@ -59,6 +61,28 @@ public class Review : AggregateRoot
         if (Status == ReviewStatus.Published) return Result.Failure(ReviewsErrors.AlreadyPublished);
         Status = ReviewStatus.Published;
         HiddenReason = null;
+        LastModifiedDate = DateTime.UtcNow;
+        return Result.Success();
+    }
+
+    /// <summary>Overwrites any existing reply rather than rejecting a second reply — sellers editing their reply is the common case.</summary>
+    public Result Reply(string content)
+    {
+        var trimmed = content?.Trim();
+        if (string.IsNullOrWhiteSpace(trimmed)) return Result.Failure(ReviewsErrors.ReplyContentRequired);
+
+        ReplyContent = trimmed;
+        RepliedAt = DateTime.UtcNow;
+        LastModifiedDate = DateTime.UtcNow;
+        return Result.Success();
+    }
+
+    public Result RemoveReply()
+    {
+        if (ReplyContent is null) return Result.Failure(ReviewsErrors.NoReply);
+
+        ReplyContent = null;
+        RepliedAt = null;
         LastModifiedDate = DateTime.UtcNow;
         return Result.Success();
     }
