@@ -48,6 +48,8 @@ public class AddFlashSaleItemCommandHandler : IRequestHandler<AddFlashSaleItemCo
 
         var variant = await _catalogReader.GetVariantAsync(variantId.Value, cancellationToken);
         if (variant is null) return Result.Failure<FlashSaleItemDto>(PromotionsErrors.FlashSaleProductNotFound);
+        if (!variant.IsActive) return Result.Failure<FlashSaleItemDto>(PromotionsErrors.FlashSaleVariantInactive);
+        if (variant.ProductStatus != "Published") return Result.Failure<FlashSaleItemDto>(PromotionsErrors.FlashSaleProductNotPublished);
 
         var existingItems = await _items.GetByFlashSaleIdAsync(flashSale.Id, cancellationToken);
         if (existingItems.Any(i => i.VariantId == variantId.Value))

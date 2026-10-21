@@ -45,6 +45,10 @@ public static class PromotionsErrors
     public static readonly Error FlashSaleProductNotFound = Error.Validation("Promotions.FlashSaleProductNotFound", "Sản phẩm không tồn tại");
     public static readonly Error FlashSaleItemProductAlreadyAdded = Error.Conflict("Promotions.FlashSaleItemProductAlreadyAdded", "Phân loại này đã có trong flash sale");
     public static readonly Error FlashSaleVariantRequired = Error.Validation("Promotions.FlashSaleVariantRequired", "Vui lòng chọn phân loại hàng");
+    public static readonly Error FlashSaleVariantInactive = Error.Validation("Promotions.FlashSaleVariantInactive", "Phân loại hàng này đã bị ngừng kinh doanh");
+    public static readonly Error FlashSaleProductNotPublished = Error.Validation("Promotions.FlashSaleProductNotPublished", "Sản phẩm chưa được xuất bản");
 
     public static readonly Error GiftVariantRequired = Error.Validation("Promotions.GiftVariantRequired", "Vui lòng chọn phân loại hàng cho quà tặng");
+    public static readonly Error GiftVariantInactive = Error.Validation("Promotions.GiftVariantInactive", "Phân loại hàng quà tặng này đã bị ngừng kinh doanh");
+    public static readonly Error GiftProductNotPublished = Error.Validation("Promotions.GiftProductNotPublished", "Sản phẩm quà tặng chưa được xuất bản");
 }

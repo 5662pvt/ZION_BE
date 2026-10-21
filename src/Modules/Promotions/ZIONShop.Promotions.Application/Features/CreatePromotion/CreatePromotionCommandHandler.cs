@@ -79,6 +79,8 @@ public class CreatePromotionCommandHandler : IRequestHandler<CreatePromotionComm
 
             var variant = await _catalogReader.GetVariantAsync(variantId.Value, ct);
             if (variant is null) return Result.Failure<List<GiftItemInput>>(PromotionsErrors.GiftProductNotFound);
+            if (!variant.IsActive) return Result.Failure<List<GiftItemInput>>(PromotionsErrors.GiftVariantInactive);
+            if (variant.ProductStatus != "Published") return Result.Failure<List<GiftItemInput>>(PromotionsErrors.GiftProductNotPublished);
 
             resolved.Add(new GiftItemInput(variant.ProductId, g.Quantity, variant.VariantId));
         }

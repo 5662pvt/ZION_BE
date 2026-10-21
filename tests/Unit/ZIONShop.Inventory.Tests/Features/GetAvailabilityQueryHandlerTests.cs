@@ -55,7 +55,7 @@ public class GetAvailabilityQueryHandlerTests
         using var db = CreateDb(dbName);
         var catalog = new Mock<IProductCatalogReader>();
         catalog.Setup(c => c.GetVariantAsync(productId, It.IsAny<CancellationToken>())).ReturnsAsync((ProductVariantCatalogItem?)null);
-        catalog.Setup(c => c.ListVariantsAsync(It.IsAny<CancellationToken>()))
+        catalog.Setup(c => c.ListVariantsByProductAsync(productId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new[] { new ProductVariantCatalogItem(productId, productId, "SKU-A", "Product A", string.Empty, true, "Published") });
         var handler = new GetAvailabilityQueryHandler(new InventoryItemRepository(db), catalog.Object);
 
@@ -76,7 +76,7 @@ public class GetAvailabilityQueryHandlerTests
         using var db = CreateDb(dbName);
         var catalog = new Mock<IProductCatalogReader>();
         catalog.Setup(c => c.GetVariantAsync(productId, It.IsAny<CancellationToken>())).ReturnsAsync((ProductVariantCatalogItem?)null);
-        catalog.Setup(c => c.ListVariantsAsync(It.IsAny<CancellationToken>())).ReturnsAsync(new[]
+        catalog.Setup(c => c.ListVariantsByProductAsync(productId, It.IsAny<CancellationToken>())).ReturnsAsync(new[]
         {
             new ProductVariantCatalogItem(variantA, productId, "TEE-ZB-RED-M", "Ao Thun", "Đỏ / M", true, "Published"),
             new ProductVariantCatalogItem(variantB, productId, "TEE-ZB-BLUE-M", "Ao Thun", "Xanh / M", true, "Published")

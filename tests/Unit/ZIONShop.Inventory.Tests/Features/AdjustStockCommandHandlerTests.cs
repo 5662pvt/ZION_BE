@@ -70,7 +70,7 @@ public class AdjustStockCommandHandlerTests
         using var db = CreateDb(dbName);
         var catalog = new Mock<IProductCatalogReader>();
         catalog.Setup(c => c.GetVariantAsync(productId, It.IsAny<CancellationToken>())).ReturnsAsync((ProductVariantCatalogItem?)null);
-        catalog.Setup(c => c.ListVariantsAsync(It.IsAny<CancellationToken>())).ReturnsAsync(Array.Empty<ProductVariantCatalogItem>());
+        catalog.Setup(c => c.ListVariantsByProductAsync(productId, It.IsAny<CancellationToken>())).ReturnsAsync(Array.Empty<ProductVariantCatalogItem>());
         var handler = new AdjustStockCommandHandler(new InventoryItemRepository(db), new StockMovementRepository(db), db, catalog.Object, new FakeTimeProvider(DateTimeOffset.UtcNow));
 
         var result = await handler.Handle(new AdjustStockCommand(productId, false, 15, "Initial stock", null), CancellationToken.None);
@@ -137,7 +137,7 @@ public class AdjustStockCommandHandlerTests
         using var db = CreateDb(dbName);
         var catalog = new Mock<IProductCatalogReader>();
         catalog.Setup(c => c.GetVariantAsync(productId, It.IsAny<CancellationToken>())).ReturnsAsync((ProductVariantCatalogItem?)null);
-        catalog.Setup(c => c.ListVariantsAsync(It.IsAny<CancellationToken>())).ReturnsAsync(new[]
+        catalog.Setup(c => c.ListVariantsByProductAsync(productId, It.IsAny<CancellationToken>())).ReturnsAsync(new[]
         {
             new ProductVariantCatalogItem(variantA, productId, "TEE-ZB-RED-M", "Ao Thun", "Đỏ / M", true, "Published"),
             new ProductVariantCatalogItem(variantB, productId, "TEE-ZB-BLUE-M", "Ao Thun", "Xanh / M", true, "Published")

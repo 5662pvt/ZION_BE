@@ -98,6 +98,46 @@ public class CreatePromotionCommandHandlerTests
     }
 
     [Fact]
+    public async Task Handle_Should_ReturnFailure_When_GiftVariantIsInactive()
+    {
+        var (db, handler, catalog, _) = BuildScope();
+        var giftProductId = Guid.NewGuid();
+        var giftVariantId = Guid.NewGuid();
+        catalog.WithVariant(giftVariantId, giftProductId, isActive: false);
+
+        var cmd = new CreatePromotionCommand(
+            "Gift", null, "Gift", 0m, null, 100000m,
+            DateTime.UtcNow.AddDays(-1), DateTime.UtcNow.AddDays(30), null, null,
+            "Order", null, null, null, new[] { new GiftItemInputDto(null, giftVariantId, 1) });
+
+        var result = await handler.Handle(cmd, CancellationToken.None);
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Code.Should().Be("Promotions.GiftVariantInactive");
+        (await db.Promotions.CountAsync()).Should().Be(0);
+    }
+
+    [Fact]
+    public async Task Handle_Should_ReturnFailure_When_GiftProductIsNotPublished()
+    {
+        var (db, handler, catalog, _) = BuildScope();
+        var giftProductId = Guid.NewGuid();
+        var giftVariantId = Guid.NewGuid();
+        catalog.WithVariant(giftVariantId, giftProductId, productStatus: "Draft");
+
+        var cmd = new CreatePromotionCommand(
+            "Gift", null, "Gift", 0m, null, 100000m,
+            DateTime.UtcNow.AddDays(-1), DateTime.UtcNow.AddDays(30), null, null,
+            "Order", null, null, null, new[] { new GiftItemInputDto(null, giftVariantId, 1) });
+
+        var result = await handler.Handle(cmd, CancellationToken.None);
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Code.Should().Be("Promotions.GiftProductNotPublished");
+        (await db.Promotions.CountAsync()).Should().Be(0);
+    }
+
+    [Fact]
     public async Task Handle_Should_ReturnFailure_When_GiftTypeHasNoGiftItems()
     {
         var (_, handler, _, _) = BuildScope();

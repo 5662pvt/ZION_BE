@@ -43,8 +43,8 @@ public class FlashSaleEvaluator : IFlashSaleEvaluator
         foreach (var line in lines)
         {
             var variantKey = line.VariantId ?? line.ProductId;
-            var candidates = await FindActiveCandidatesAsync(variantKey, line.Quantity, now, ct);
-            var item = candidates.FirstOrDefault();
+            var activeItems = await FindActiveItemsAsync(variantKey, now, ct);
+            var item = activeItems.FirstOrDefault(i => i.AllocatedQuantity - i.SoldQuantity >= line.Quantity);
             if (item is null) continue;
 
             quotes.Add(new FlashSaleQuote(line.ProductId, item.Id, item.FlashPrice, item.VariantId));
@@ -67,9 +67,12 @@ public class FlashSaleEvaluator : IFlashSaleEvaluator
         foreach (var line in lines)
         {
             var variantKey = line.VariantId ?? line.ProductId;
-            var candidates = await FindActiveCandidatesAsync(variantKey, line.Quantity, now, ct);
+            // Checked against EVERY active item for this variant, not just ones with spare quota right now --
+            // otherwise a retry whose earlier reservation has since exhausted its campaign's quota (from other
+            // orders) would miss its own redemption here and either double-reserve or fall back to a pricier one.
+            var activeItems = await FindActiveItemsAsync(variantKey, now, ct);
 
-            var alreadyRedeemed = candidates.FirstOrDefault(c => activeByItemId.ContainsKey(c.Id));
+            var alreadyRedeemed = activeItems.FirstOrDefault(c => activeByItemId.ContainsKey(c.Id));
             if (alreadyRedeemed is not null)
             {
                 var existing = activeByItemId[alreadyRedeemed.Id];
@@ -77,6 +80,7 @@ public class FlashSaleEvaluator : IFlashSaleEvaluator
                 continue;
             }
 
+            var candidates = activeItems.Where(i => i.AllocatedQuantity - i.SoldQuantity >= line.Quantity).ToList();
             foreach (var candidate in candidates)
             {
                 var reserved = await _items.TryReserveAsync(candidate.Id, line.Quantity, ct);
@@ -116,17 +120,17 @@ public class FlashSaleEvaluator : IFlashSaleEvaluator
     }
 
     /// <summary>
-    /// Active items for the variant key with enough quota for <paramref name="quantity"/>, cheapest first
-    /// (ties broken by the owning campaign's soonest EndsAt). Reserve tries each in order so a quota
-    /// shortfall or a lost reservation race on one campaign falls through to the next.
+    /// Every active item for the variant key, regardless of remaining quota, cheapest first (ties broken by
+    /// the owning campaign's soonest EndsAt). Callers that need to attempt a NEW reservation filter this list
+    /// by quota themselves; the already-redeemed check must run against the unfiltered list (see ReserveAsync).
     /// </summary>
-    private Task<List<FlashSaleItem>> FindActiveCandidatesAsync(Guid variantId, int quantity, DateTime now, CancellationToken ct)
+    private Task<List<FlashSaleItem>> FindActiveItemsAsync(Guid variantId, DateTime now, CancellationToken ct)
     {
         var activeFlashSales = _flashSales.Query().AsNoTracking()
             .Where(f => f.IsActive && f.StartsAt <= now && f.EndsAt >= now);
 
         return _items.Query().AsNoTracking()
-            .Where(i => i.VariantId == variantId && i.AllocatedQuantity - i.SoldQuantity >= quantity)
+            .Where(i => i.VariantId == variantId)
             .Join(activeFlashSales, i => i.FlashSaleId, f => f.Id, (i, f) => new { Item = i, f.EndsAt })
             .OrderBy(x => x.Item.FlashPrice)
             .ThenBy(x => x.EndsAt)

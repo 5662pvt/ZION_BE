@@ -702,6 +702,37 @@ public class PlaceOrderCommandHandlerTests
     }
 
     [Fact]
+    public async Task Handle_Should_UseActualReservedFlashPrice_When_ItDiffersFromAnEarlierPreviewQuote()
+    {
+        var (db, orders) = BuildScope();
+        var userId = Guid.NewGuid();
+        var addressId = Guid.NewGuid();
+        var productId = Guid.NewGuid();
+
+        var cart = new FakeCartReader().WithCart(userId, "VND", new CartSnapshotLine(productId, "Widget", 1, 100000m));
+        var addresses = new FakeUserAddressReader().WithAddress(userId, addressId);
+        var prices = new FakeProductPriceLookup().Add(productId, "Widget", 100000m);
+        var stock = new FakeStockAvailabilityReader().WithAvailable(productId, 1);
+        var cheapItemId = Guid.NewGuid();
+        var pricierItemId = Guid.NewGuid();
+        // Simulates the old race this fix closes: a preview quote picked the cheaper campaign, but by the
+        // time the atomic reservation ran its quota was gone, so a pricier campaign was actually reserved.
+        // The order line must be priced at the ACTUAL reservation, never the stale preview.
+        var flashSales = new FakeFlashSaleEvaluator
+        {
+            NextQuotes = new[] { new FlashSaleQuote(productId, cheapItemId, 40000m) },
+            NextReserveResult = new[] { new FlashSaleQuote(productId, pricierItemId, 70000m) }
+        };
+
+        var handler = new PlaceOrderCommandHandler(orders, db, cart, addresses, prices, new FakePromotionEvaluator(), new FakeGiftPromotionEvaluator(), flashSales, stock, DefaultShippingFeeCalculator(), new FakeOrderIdempotencyKeyRepository(), new FakeIdempotencyLock(), TimeProvider.System, DefaultCheckout());
+        var result = await handler.Handle(new PlaceOrderCommand(userId, addressId, "COD", null), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Order.Lines.Should().ContainSingle(l => l.ProductId == productId && l.UnitPrice == 70000m);
+        result.Value.Order.Subtotal.Should().Be(70000m);
+    }
+
+    [Fact]
     public async Task Handle_Should_FallBackToRegularPrice_When_FlashSaleQuotaExhausted()
     {
         var (db, orders) = BuildScope();
@@ -720,7 +751,8 @@ public class PlaceOrderCommandHandlerTests
 
         result.IsSuccess.Should().BeTrue();
         result.Value.Order.Lines.Should().ContainSingle(l => l.ProductId == productId && l.UnitPrice == 100000m);
-        flashSales.ReserveCalls.Should().BeEmpty(); // nothing quoted, so the reserve call is skipped entirely
+        // Reserve is now the single call (no separate preview Quote) -- it is still made, it just comes back empty.
+        flashSales.ReserveCalls.Should().ContainSingle();
     }
 
     [Fact]
@@ -861,5 +893,60 @@ public class PlaceOrderCommandHandlerTests
         var giftLine = result.Value.Order.Lines.Should().ContainSingle(l => l.IsGift).Subject;
         giftLine.VariantId.Should().Be(giftVariantId);
         giftLine.VariantLabel.Should().Be("Đen");
+    }
+
+    [Fact]
+    public async Task Handle_Should_ReleaseFlashSaleReservation_When_CouponInvalid_AndFlashSaleLineActive()
+    {
+        var (db, orders) = BuildScope();
+        var userId = Guid.NewGuid();
+        var addressId = Guid.NewGuid();
+        var productId = Guid.NewGuid();
+
+        var cart = new FakeCartReader().WithCart(userId, "VND", new CartSnapshotLine(productId, "Widget", 1, 100000m));
+        var addresses = new FakeUserAddressReader().WithAddress(userId, addressId);
+        var prices = new FakeProductPriceLookup().Add(productId, "Widget", 100000m);
+        var stock = new FakeStockAvailabilityReader().WithAvailable(productId, 1);
+        var promotions = new FakePromotionEvaluator().WithError("EXPIRED", "Mã giảm giá đã hết hạn");
+        var flashSaleItemId = Guid.NewGuid();
+        var flashSales = new FakeFlashSaleEvaluator { NextQuotes = new[] { new FlashSaleQuote(productId, flashSaleItemId, 60000m) } };
+
+        var handler = new PlaceOrderCommandHandler(orders, db, cart, addresses, prices, promotions, new FakeGiftPromotionEvaluator(), flashSales, stock, DefaultShippingFeeCalculator(), new FakeOrderIdempotencyKeyRepository(), new FakeIdempotencyLock(), TimeProvider.System, DefaultCheckout());
+        var result = await handler.Handle(new PlaceOrderCommand(userId, addressId, "COD", null, "EXPIRED"), CancellationToken.None);
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Code.Should().Be("Orders.InvalidCoupon");
+        flashSales.ReleasedOrderIds.Should().HaveCount(1);
+        flashSales.ReserveCalls.Should().ContainSingle(c => c.OrderId == flashSales.ReleasedOrderIds[0]);
+        (await db.Orders.CountAsync()).Should().Be(0);
+    }
+
+    [Fact]
+    public async Task Handle_Should_ReleaseFlashSaleAndCoupon_When_GiftReserveThrows()
+    {
+        var (db, orders) = BuildScope();
+        var userId = Guid.NewGuid();
+        var addressId = Guid.NewGuid();
+        var productId = Guid.NewGuid();
+        var giftProductId = Guid.NewGuid();
+        var promotionId = Guid.NewGuid();
+
+        var cart = new FakeCartReader().WithCart(userId, "VND", new CartSnapshotLine(productId, "Widget", 1, 100000m));
+        var addresses = new FakeUserAddressReader().WithAddress(userId, addressId);
+        var prices = new FakeProductPriceLookup().Add(productId, "Widget", 100000m).Add(giftProductId, "Nón", 50000m);
+        var stock = new FakeStockAvailabilityReader().WithAvailable(productId, 1).WithAvailable(giftProductId, 5);
+        var promotions = new FakePromotionEvaluator().WithQuote("SALE10", 10000m);
+        var giftEvaluator = new FakeGiftPromotionEvaluator().WithGrant(promotionId, giftProductId, 1).WithReserveGiftsException();
+        var flashSaleItemId = Guid.NewGuid();
+        var flashSales = new FakeFlashSaleEvaluator { NextQuotes = new[] { new FlashSaleQuote(productId, flashSaleItemId, 60000m) } };
+
+        var handler = new PlaceOrderCommandHandler(orders, db, cart, addresses, prices, promotions, giftEvaluator, flashSales, stock, DefaultShippingFeeCalculator(), new FakeOrderIdempotencyKeyRepository(), new FakeIdempotencyLock(), TimeProvider.System, DefaultCheckout());
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            handler.Handle(new PlaceOrderCommand(userId, addressId, "COD", null, "SALE10"), CancellationToken.None));
+
+        flashSales.ReleasedOrderIds.Should().HaveCount(1);
+        promotions.ReleasedOrderIds.Should().HaveCount(1);
+        (await db.Orders.CountAsync()).Should().Be(0);
     }
 }

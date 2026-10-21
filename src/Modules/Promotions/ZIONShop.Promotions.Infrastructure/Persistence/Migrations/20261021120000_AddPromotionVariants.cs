@@ -84,6 +84,10 @@ namespace ZIONShop.Promotions.Infrastructure.Persistence.Migrations
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            // NOT SAFELY REVERSIBLE once any product has more than one variant: this recreates the old
+            // PK (PromotionId, ProductId) / unique index (FlashSaleId, ProductId), which will fail as soon
+            // as a promotion/flash sale has several VariantId rows sharing the same ProductId. Only run
+            // Down while every product still has exactly one (default) variant.
             migrationBuilder.DropPrimaryKey(
                 name: "PK_promotion_gift_items",
                 schema: "promotions",

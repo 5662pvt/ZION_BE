@@ -138,28 +138,29 @@ public class InventoryVariantsTests
 
     /// <summary>
     /// SetVariants never deletes a replaced variant, only deactivates it (see Product.SetVariants) -- so a
-    /// product that started as a single-default-variant product (Variant.Id == ProductId, same as
-    /// IProductPriceLookup's convention) and was later given real option variants still has that original,
-    /// now-inactive, Id==ProductId variant row forever. The product-id resolver therefore always finds a
-    /// direct variant hit for such a product and never needs the "multiple active variants" ambiguity branch;
-    /// that branch (InventoryErrors.VariantRequired) is covered directly against a mocked catalog in
-    /// GetAvailabilityQueryHandlerTests/AdjustStockCommandHandlerTests instead, where a productId with no
-    /// matching variant row at all can actually be constructed.
+    /// product that started as a single-default-variant product (Variant.Id == ProductId) and was later
+    /// given real option variants still has that original, now-inactive, Id==ProductId variant row forever.
+    /// The legacy product-id route must NOT silently adjust that dead variant just because a row exists at
+    /// that id -- with two ACTIVE variants now on the product, the caller must pick one explicitly via the
+    /// (still-working) <c>/inventory/variants/{variantId}/adjust</c> route instead.
     /// </summary>
     [Fact]
-    public async Task LegacyProductIdRoute_Should_ResolveToDeactivatedDefaultVariant_When_ProductWasLaterGivenRealVariants()
+    public async Task LegacyProductIdRoute_Should_RequireVariant_When_ProductWasLaterGivenMultipleActiveVariants()
     {
         var admin = await AdminClientAsync();
-        var (productId, _, _) = await CreateTwoVariantProductAsync(admin);
+        var (productId, variantRed, variantBlue) = await CreateTwoVariantProductAsync(admin);
 
         var response = await admin.PostAsJsonAsync($"/api/v1/inventory/products/{productId}/adjust", new { delta = 5, reason = "legacy route test" });
-        response.EnsureSuccessStatusCode();
-        var envelope = await response.Content.ReadFromJsonAsync<ApiEnvelope<InventoryItemData>>(ApiEnvelopeJson.Options);
-        var adjusted = envelope!.Data!;
 
-        adjusted.ProductId.Should().Be(productId);
-        adjusted.VariantId.Should().Be(productId, "the original default variant's id always equals the product id");
-        adjusted.OnHand.Should().Be(5);
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        var envelope = await response.Content.ReadFromJsonAsync<ApiEnvelope<object>>(ApiEnvelopeJson.Options);
+        envelope!.Errors.Should().ContainSingle(e => e.Code == "Inventory.VariantRequired");
+
+        // The explicit variant route still works for either active variant.
+        var redAdjusted = await AdjustVariantStockAsync(admin, variantRed, 5);
+        redAdjusted.OnHand.Should().Be(5);
+        var blueAdjusted = await AdjustVariantStockAsync(admin, variantBlue, 7);
+        blueAdjusted.OnHand.Should().Be(7);
     }
 
     [Fact]

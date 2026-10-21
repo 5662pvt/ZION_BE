@@ -96,6 +96,10 @@ namespace ZIONShop.Inventory.Infrastructure.Persistence.Migrations
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            // NOT SAFELY REVERSIBLE once any product has more than one variant: this recreates the old
+            // unique index on (OrderId/ProductId)/ProductId alone, which will fail (or silently collapse
+            // rows) as soon as several VariantId rows share the same ProductId. Only run Down while every
+            // product still has exactly one (default) variant.
             migrationBuilder.DropIndex(
                 name: "IX_StockReservations_OrderId_VariantId",
                 schema: "inventory",

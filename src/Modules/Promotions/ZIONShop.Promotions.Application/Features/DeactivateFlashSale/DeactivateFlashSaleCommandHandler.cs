@@ -40,7 +40,7 @@ public class DeactivateFlashSaleCommandHandler : IRequestHandler<DeactivateFlash
         await _uow.SaveChangesAsync(cancellationToken);
 
         var items = await _items.GetByFlashSaleIdAsync(flashSale.Id, cancellationToken);
-        var variants = await _catalogReader.ListVariantsAsync(cancellationToken);
+        var variants = await _catalogReader.GetVariantsAsync(items.Select(i => i.VariantId).Distinct().ToList(), cancellationToken);
         var variantById = variants.ToDictionary(v => v.VariantId);
 
         var itemDtos = items.Select(i =>

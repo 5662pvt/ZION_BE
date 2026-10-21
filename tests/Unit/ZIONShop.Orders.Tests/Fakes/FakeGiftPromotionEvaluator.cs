@@ -6,6 +6,7 @@ public class FakeGiftPromotionEvaluator : IGiftPromotionEvaluator
 {
     private readonly List<GiftGrant> _grants = new();
     private readonly HashSet<Guid> _reserveFailures = new();
+    private bool _reserveGiftsThrows;
 
     public List<(Guid OrderId, List<Guid> PromotionIds)> ReserveCalls { get; } = new();
     public List<Guid> ReleasedOrderIds { get; } = new();
@@ -24,12 +25,20 @@ public class FakeGiftPromotionEvaluator : IGiftPromotionEvaluator
         return this;
     }
 
+    /// <summary>Simulates ReserveGiftsAsync throwing (e.g. a DB error), to test reservation-release-on-exception paths.</summary>
+    public FakeGiftPromotionEvaluator WithReserveGiftsException()
+    {
+        _reserveGiftsThrows = true;
+        return this;
+    }
+
     public Task<IReadOnlyList<GiftGrant>> QuoteGiftsAsync(GiftRequest request, CancellationToken ct = default)
         => Task.FromResult<IReadOnlyList<GiftGrant>>(_grants.ToList());
 
     public Task<IReadOnlyList<GiftGrant>> ReserveGiftsAsync(GiftRequest request, Guid orderId, IReadOnlyCollection<Guid> promotionIds, CancellationToken ct = default)
     {
         ReserveCalls.Add((orderId, promotionIds.ToList()));
+        if (_reserveGiftsThrows) throw new InvalidOperationException("Simulated gift reserve failure");
         var reserved = _grants.Where(g => promotionIds.Contains(g.PromotionId) && !_reserveFailures.Contains(g.PromotionId)).ToList();
         return Task.FromResult<IReadOnlyList<GiftGrant>>(reserved);
     }

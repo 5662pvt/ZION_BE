@@ -174,6 +174,34 @@ public class FlashSaleEvaluatorTests
     }
 
     [Fact]
+    public async Task ReserveAsync_Should_ReturnExistingRedemption_When_RetryHappensAfterQuotaExhaustedByOtherOrders()
+    {
+        var (db, evaluator) = BuildScope();
+        var productId = Guid.NewGuid();
+        var item = await SeedActiveFlashSaleItemAsync(db, productId, 50000m, allocatedQuantity: 5);
+        var orderId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+        var line = new FlashSaleLine(productId, 4);
+
+        var firstQuotes = await evaluator.ReserveAsync(new[] { line }, orderId, userId);
+        firstQuotes.Should().ContainSingle(q => q.FlashSaleItemId == item.Id);
+
+        // A different order consumes the remaining quota in between, so "candidates with spare quota right
+        // now" no longer includes this item at all.
+        var items = new InMemoryFlashSaleItemRepository(db);
+        (await items.TryReserveAsync(item.Id, 1, CancellationToken.None)).Should().BeTrue();
+
+        // A retry for the SAME order/line (e.g. an idempotency replay) must still find its own existing
+        // redemption instead of dropping the line or attempting a second reservation.
+        var retryQuotes = await evaluator.ReserveAsync(new[] { line }, orderId, userId);
+
+        retryQuotes.Should().ContainSingle(q => q.FlashSaleItemId == item.Id && q.FlashUnitPrice == 50000m);
+        var reloaded = await db.FlashSaleItems.AsNoTracking().FirstAsync(i => i.Id == item.Id);
+        reloaded.SoldQuantity.Should().Be(5, "the retry must not attempt a second reservation for the same order");
+        (await db.FlashSaleRedemptions.CountAsync(r => r.OrderId == orderId)).Should().Be(1);
+    }
+
+    [Fact]
     public async Task ReleaseAsync_Should_DecrementSoldQuantity_And_MarkReleased()
     {
         var (db, evaluator) = BuildScope();

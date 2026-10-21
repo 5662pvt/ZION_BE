@@ -105,6 +105,36 @@ public class AddFlashSaleItemCommandHandlerTests
     }
 
     [Fact]
+    public async Task Handle_Should_ReturnFailure_When_VariantIsInactive()
+    {
+        var (_, handler, catalog, _, flashSaleId) = BuildScope();
+        var productId = Guid.NewGuid();
+        var variantId = Guid.NewGuid();
+        catalog.WithVariant(variantId, productId, isActive: false);
+
+        var cmd = new AddFlashSaleItemCommand(flashSaleId, null, variantId, 50000m, 10);
+        var result = await handler.Handle(cmd, CancellationToken.None);
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Code.Should().Be("Promotions.FlashSaleVariantInactive");
+    }
+
+    [Fact]
+    public async Task Handle_Should_ReturnFailure_When_ProductIsNotPublished()
+    {
+        var (_, handler, catalog, _, flashSaleId) = BuildScope();
+        var productId = Guid.NewGuid();
+        var variantId = Guid.NewGuid();
+        catalog.WithVariant(variantId, productId, productStatus: "Draft");
+
+        var cmd = new AddFlashSaleItemCommand(flashSaleId, null, variantId, 50000m, 10);
+        var result = await handler.Handle(cmd, CancellationToken.None);
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Code.Should().Be("Promotions.FlashSaleProductNotPublished");
+    }
+
+    [Fact]
     public async Task Handle_Should_ReturnFailure_When_SameVariantAddedTwice()
     {
         var (_, handler, catalog, _, flashSaleId) = BuildScope();

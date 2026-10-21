@@ -40,11 +40,12 @@ public class Order : AggregateRoot
         decimal shippingFee,
         ShippingAddress shippingAddress,
         IReadOnlyList<OrderLineInput> lines,
-        string? note)
+        string? note,
+        Guid? orderId = null)
     {
         var order = new Order
         {
-            Id = Guid.NewGuid(),
+            Id = orderId ?? Guid.NewGuid(),
             Code = GenerateCode(),
             UserId = userId,
             PaymentMethod = paymentMethod,

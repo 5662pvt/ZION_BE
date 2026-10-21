@@ -112,16 +112,6 @@ public class PlaceOrderCommandHandler : IRequestHandler<PlaceOrderCommand, Resul
         if (!Enum.TryParse<DomainPaymentMethod>(request.PaymentMethod, ignoreCase: true, out var paymentMethod))
             return Result.Failure<PlaceOrderResult>(OrdersErrors.InvalidPaymentMethod);
 
-        // Read-only preview: decides per-line pricing now (OrderLine has no post-creation price mutator,
-        // so the flash price must be baked in before DomainOrder.Place builds its lines). The authoritative
-        // atomic quota claim happens after Place, alongside the coupon/gift reservations, once order.Id
-        // exists -- same quote-before/reserve-after split already used for gifts in this handler. A line
-        // whose quota is lost to a concurrent order in that window keeps its already-baked flash price;
-        // this mirrors the gift flow's same quote/reserve race and is accepted for the same reason.
-        var flashSaleLines = cart.Lines.Select(l => new FlashSaleLine(l.ProductId, l.Quantity, l.VariantId ?? l.ProductId)).ToList();
-        var flashQuotes = await _flashSales.QuoteAsync(flashSaleLines, cancellationToken);
-        var flashPriceByVariant = flashQuotes.ToDictionary(q => q.VariantId ?? q.ProductId, q => q.FlashUnitPrice);
-
         var lines = new List<OrderLineInput>();
         var unavailable = new List<string>();
         string? currency = null;
@@ -138,8 +128,7 @@ public class PlaceOrderCommandHandler : IRequestHandler<PlaceOrderCommand, Resul
 
             currency ??= price.Currency;
             var resolvedVariantId = price.VariantId ?? price.ProductId;
-            var unitPrice = flashPriceByVariant.TryGetValue(resolvedVariantId, out var flashPrice) ? flashPrice : price.UnitPrice;
-            lines.Add(new OrderLineInput(price.ProductId, price.Name, unitPrice, line.Quantity, resolvedVariantId, price.VariantLabel, price.Sku));
+            lines.Add(new OrderLineInput(price.ProductId, price.Name, price.UnitPrice, line.Quantity, resolvedVariantId, price.VariantLabel, price.Sku));
         }
 
         if (unavailable.Count > 0)
@@ -149,77 +138,104 @@ public class PlaceOrderCommandHandler : IRequestHandler<PlaceOrderCommand, Resul
         if (insufficientStockNames.Count > 0)
             return Result.Failure<PlaceOrderResult>(OrdersErrors.InsufficientStock(string.Join(", ", insufficientStockNames)));
 
-        var subtotal = lines.Sum(l => l.UnitPrice * l.Quantity);
-        var shippingFee = _shippingFeeCalculator.Calculate(subtotal);
-
-        var shippingAddress = new ShippingAddress(
-            address.AddressId, address.RecipientName, address.PhoneNumber, address.Province, address.Ward, address.StreetAddress);
-
-        var order = DomainOrder.Place(
-            request.UserId, paymentMethod, currency ?? _checkout.Currency, shippingFee, shippingAddress, lines, request.Note);
-
+        // The order id is generated here -- instead of letting DomainOrder.Place generate it -- so the
+        // flash-sale quota can be claimed atomically (ReserveAsync) BEFORE the order's lines are built. That
+        // way the line's baked-in UnitPrice always matches the campaign actually redeemed; a separate preview
+        // Quote call followed by a later Reserve (the old flow) could race against other orders between the
+        // two calls and settle on a different campaign (or none) than the one priced into the line.
+        var orderId = Guid.NewGuid();
+        var flashSaleLines = cart.Lines.Select(l => new FlashSaleLine(l.ProductId, l.Quantity, l.VariantId ?? l.ProductId)).ToList();
+        var flashQuotes = await _flashSales.ReserveAsync(flashSaleLines, orderId, request.UserId, cancellationToken);
         var hasFlashSale = flashQuotes.Count > 0;
-        if (hasFlashSale)
-            await _flashSales.ReserveAsync(flashSaleLines, order.Id, request.UserId, cancellationToken);
 
         var hasCoupon = !string.IsNullOrWhiteSpace(request.CouponCode);
-        if (hasCoupon)
-        {
-            var couponLines = lines.Select(l => new CouponLine(l.ProductId, l.Quantity, l.UnitPrice * l.Quantity)).ToList();
-            var couponRequest = new CouponRequest(request.CouponCode!, request.UserId, couponLines, subtotal, shippingFee);
-            var (quote, error) = await _promotions.ReserveAsync(couponRequest, order.Id, cancellationToken);
-            if (error is not null)
-                return Result.Failure<PlaceOrderResult>(OrdersErrors.InvalidCoupon(error.Message));
+        var hasGifts = false;
 
-            order.ApplyCoupon(quote!.Code, quote.DiscountAmount, quote.DiscountTarget);
-        }
-
-        var giftLines = lines.Select(l => new CouponLine(l.ProductId, l.Quantity, l.UnitPrice * l.Quantity)).ToList();
-        var giftRequest = new GiftRequest(request.UserId, giftLines, subtotal);
-        var giftGrants = await _giftPromotions.QuoteGiftsAsync(giftRequest, cancellationToken);
-
-        var keptPromotionIds = new List<Guid>();
-        var keptVariantIds = new HashSet<Guid>();
-        if (giftGrants.Count > 0)
-        {
-            var neededByVariant = giftGrants
-                .GroupBy(g => g.VariantId ?? g.ProductId)
-                .ToDictionary(g => g.Key, g => g.Sum(x => x.Quantity));
-            foreach (var line in lines)
-                if (neededByVariant.ContainsKey(line.ResolvedVariantId))
-                    neededByVariant[line.ResolvedVariantId] += line.Quantity;
-
-            var available = await _stockAvailability.GetAvailableAsync(neededByVariant.Keys.ToList(), cancellationToken);
-            keptVariantIds = neededByVariant
-                .Where(kv => (available.TryGetValue(kv.Key, out var a) ? a : 0) >= kv.Value)
-                .Select(kv => kv.Key)
-                .ToHashSet();
-
-            keptPromotionIds = giftGrants
-                .Where(g => keptVariantIds.Contains(g.VariantId ?? g.ProductId))
-                .Select(g => g.PromotionId)
-                .Distinct()
-                .ToList();
-        }
-
-        var hasGifts = keptPromotionIds.Count > 0;
-        if (hasGifts)
-        {
-            var reservedGrants = await _giftPromotions.ReserveGiftsAsync(giftRequest, order.Id, keptPromotionIds, cancellationToken);
-            if (reservedGrants.Count > 0)
-            {
-                var giftPrices = await _prices.GetManyAsync(reservedGrants.Select(g => g.VariantId ?? g.ProductId).Distinct().ToList(), cancellationToken);
-                foreach (var grant in reservedGrants)
-                {
-                    var grantKey = grant.VariantId ?? grant.ProductId;
-                    if (keptVariantIds.Contains(grantKey) && giftPrices.TryGetValue(grantKey, out var info))
-                        order.AddGiftLine(grant.ProductId, info.Name, grant.Quantity, grant.PromotionId, grantKey, info.VariantLabel, info.Sku);
-                }
-            }
-        }
-
+        // From here on, any non-success exit (validation failure or exception) must release every
+        // reservation already made above (flash; coupon/gifts once attempted) -- otherwise the quota
+        // stays claimed forever by an order that never gets persisted. hasCoupon/hasFlashSale/hasGifts
+        // are declared outside this try so the catch blocks can see them no matter where it throws, and
+        // orderId (not order.Id) is used for release since `order` may not exist yet at that point.
         try
         {
+            if (hasFlashSale)
+            {
+                var flashPriceByVariant = flashQuotes.ToDictionary(q => q.VariantId ?? q.ProductId, q => q.FlashUnitPrice);
+                lines = lines
+                    .Select(l => flashPriceByVariant.TryGetValue(l.ResolvedVariantId, out var flashPrice) ? l with { UnitPrice = flashPrice } : l)
+                    .ToList();
+            }
+
+            var subtotal = lines.Sum(l => l.UnitPrice * l.Quantity);
+            var shippingFee = _shippingFeeCalculator.Calculate(subtotal);
+
+            var shippingAddress = new ShippingAddress(
+                address.AddressId, address.RecipientName, address.PhoneNumber, address.Province, address.Ward, address.StreetAddress);
+
+            var order = DomainOrder.Place(
+                request.UserId, paymentMethod, currency ?? _checkout.Currency, shippingFee, shippingAddress, lines, request.Note, orderId);
+
+            if (hasCoupon)
+            {
+                var couponLines = lines.Select(l => new CouponLine(l.ProductId, l.Quantity, l.UnitPrice * l.Quantity)).ToList();
+                var couponRequest = new CouponRequest(request.CouponCode!, request.UserId, couponLines, subtotal, shippingFee);
+                var (quote, error) = await _promotions.ReserveAsync(couponRequest, order.Id, cancellationToken);
+                if (error is not null)
+                {
+                    // Nothing was actually reserved on this path (ReserveAsync returns before incrementing
+                    // usage when validation fails), so only the earlier flash reservation needs releasing.
+                    if (hasFlashSale)
+                        await _flashSales.ReleaseAsync(orderId, cancellationToken);
+                    return Result.Failure<PlaceOrderResult>(OrdersErrors.InvalidCoupon(error.Message));
+                }
+
+                order.ApplyCoupon(quote!.Code, quote.DiscountAmount, quote.DiscountTarget);
+            }
+
+            var giftLines = lines.Select(l => new CouponLine(l.ProductId, l.Quantity, l.UnitPrice * l.Quantity)).ToList();
+            var giftRequest = new GiftRequest(request.UserId, giftLines, subtotal);
+            var giftGrants = await _giftPromotions.QuoteGiftsAsync(giftRequest, cancellationToken);
+
+            var keptPromotionIds = new List<Guid>();
+            var keptVariantIds = new HashSet<Guid>();
+            if (giftGrants.Count > 0)
+            {
+                var neededByVariant = giftGrants
+                    .GroupBy(g => g.VariantId ?? g.ProductId)
+                    .ToDictionary(g => g.Key, g => g.Sum(x => x.Quantity));
+                foreach (var line in lines)
+                    if (neededByVariant.ContainsKey(line.ResolvedVariantId))
+                        neededByVariant[line.ResolvedVariantId] += line.Quantity;
+
+                var available = await _stockAvailability.GetAvailableAsync(neededByVariant.Keys.ToList(), cancellationToken);
+                keptVariantIds = neededByVariant
+                    .Where(kv => (available.TryGetValue(kv.Key, out var a) ? a : 0) >= kv.Value)
+                    .Select(kv => kv.Key)
+                    .ToHashSet();
+
+                keptPromotionIds = giftGrants
+                    .Where(g => keptVariantIds.Contains(g.VariantId ?? g.ProductId))
+                    .Select(g => g.PromotionId)
+                    .Distinct()
+                    .ToList();
+            }
+
+            hasGifts = keptPromotionIds.Count > 0;
+            if (hasGifts)
+            {
+                var reservedGrants = await _giftPromotions.ReserveGiftsAsync(giftRequest, order.Id, keptPromotionIds, cancellationToken);
+                if (reservedGrants.Count > 0)
+                {
+                    var giftPrices = await _prices.GetManyAsync(reservedGrants.Select(g => g.VariantId ?? g.ProductId).Distinct().ToList(), cancellationToken);
+                    foreach (var grant in reservedGrants)
+                    {
+                        var grantKey = grant.VariantId ?? grant.ProductId;
+                        if (keptVariantIds.Contains(grantKey) && giftPrices.TryGetValue(grantKey, out var info))
+                            order.AddGiftLine(grant.ProductId, info.Name, grant.Quantity, grant.PromotionId, grantKey, info.VariantLabel, info.Sku);
+                    }
+                }
+            }
+
             await _orders.AddAsync(order, cancellationToken);
 
             _uow.AddOutboxEvent(new OrderCreatedIntegrationEvent(
@@ -238,17 +254,19 @@ public class PlaceOrderCommandHandler : IRequestHandler<PlaceOrderCommand, Resul
             }
 
             await _uow.SaveChangesAsync(cancellationToken);
+
+            return Result.Success(new PlaceOrderResult(order.ToDto(), Replayed: false));
         }
         catch (DuplicateIdempotencyKeyException)
         {
             // Lost the race on the (UserId, Key) unique index: a concurrent request for the same key already
             // committed first. Release what we speculatively reserved, then replay the winner's order.
             if (hasCoupon)
-                await _promotions.ReleaseAsync(order.Id, cancellationToken);
+                await _promotions.ReleaseAsync(orderId, cancellationToken);
             if (hasGifts)
-                await _giftPromotions.ReleaseGiftsAsync(order.Id, cancellationToken);
+                await _giftPromotions.ReleaseGiftsAsync(orderId, cancellationToken);
             if (hasFlashSale)
-                await _flashSales.ReleaseAsync(order.Id, cancellationToken);
+                await _flashSales.ReleaseAsync(orderId, cancellationToken);
 
             var winner = await _idempotencyKeys.GetAsync(request.UserId, request.IdempotencyKey!, cancellationToken);
             var replay = await TryReplayAsync(winner, fingerprint!, cancellationToken);
@@ -257,15 +275,13 @@ public class PlaceOrderCommandHandler : IRequestHandler<PlaceOrderCommand, Resul
         catch
         {
             if (hasCoupon)
-                await _promotions.ReleaseAsync(order.Id, cancellationToken);
+                await _promotions.ReleaseAsync(orderId, cancellationToken);
             if (hasGifts)
-                await _giftPromotions.ReleaseGiftsAsync(order.Id, cancellationToken);
+                await _giftPromotions.ReleaseGiftsAsync(orderId, cancellationToken);
             if (hasFlashSale)
-                await _flashSales.ReleaseAsync(order.Id, cancellationToken);
+                await _flashSales.ReleaseAsync(orderId, cancellationToken);
             throw;
         }
-
-        return Result.Success(new PlaceOrderResult(order.ToDto(), Replayed: false));
     }
 
     /// <summary>Returns a replay/conflict result if <paramref name="existingKey"/> already settles this
