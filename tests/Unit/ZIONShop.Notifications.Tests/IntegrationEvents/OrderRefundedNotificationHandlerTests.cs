@@ -1,0 +1,93 @@
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
+using ZIONShop.Contracts.Orders;
+using ZIONShop.Notifications.Application.IntegrationEvents;
+using ZIONShop.Notifications.Domain.Enums;
+using ZIONShop.Notifications.Infrastructure.Persistence;
+using ZIONShop.Notifications.Infrastructure.Repositories;
+using ZIONShop.Notifications.Tests.Fakes;
+
+namespace ZIONShop.Notifications.Tests.IntegrationEvents;
+
+public class OrderRefundedNotificationHandlerTests
+{
+    private static (NotificationsDbContext db, UserNotificationRepository userNotifications) BuildScope()
+    {
+        var options = new DbContextOptionsBuilder<NotificationsDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
+            .Options;
+        var db = new NotificationsDbContext(options);
+        return (db, new UserNotificationRepository(db));
+    }
+
+    private static OrderDetails BuildOrder(Guid orderId, Guid userId) => new(
+        orderId, userId, "ZS0013", "Returned", "COD",
+        200000m, 0, null, null, 30000m, 230000m, "VND",
+        "Nguyen Van A", "0900000000", "123 Đường ABC, Cầu Giấy, Hà Nội", null, DateTime.UtcNow,
+        new[] { new OrderDetailsLine("Widget", 2, 100000m, 200000m) });
+
+    [Fact]
+    public async Task HandleAsync_Should_NotifyCustomer_With_ReturnRefunded_When_OrderExists()
+    {
+        var (db, userNotifications) = BuildScope();
+        var userId = Guid.NewGuid();
+        var orderId = Guid.NewGuid();
+        var orders = new FakeOrderDetailsReader().With(BuildOrder(orderId, userId));
+        var push = new FakeNotificationPush();
+
+        var handler = new OrderRefundedNotificationHandler(userNotifications, db, orders, push, NullLogger<OrderRefundedNotificationHandler>.Instance);
+        await handler.HandleAsync(new OrderRefundedIntegrationEvent(orderId, userId, Guid.NewGuid(), 230000m, "COD"));
+
+        var notification = userNotifications.QueryForUser(userId).Single();
+        notification.Type.Should().Be(UserNotificationType.ReturnRefunded);
+        notification.OrderId.Should().Be(orderId);
+        notification.Message.Should().Contain("tiền mặt");
+        push.Published.Should().ContainSingle(p => p.UserId == userId && p.Dto.Type == "ReturnRefunded");
+    }
+
+    [Fact]
+    public async Task HandleAsync_Should_MentionPaymentMethod_When_Online()
+    {
+        var (db, userNotifications) = BuildScope();
+        var userId = Guid.NewGuid();
+        var orderId = Guid.NewGuid();
+        var orders = new FakeOrderDetailsReader().With(BuildOrder(orderId, userId));
+        var push = new FakeNotificationPush();
+
+        var handler = new OrderRefundedNotificationHandler(userNotifications, db, orders, push, NullLogger<OrderRefundedNotificationHandler>.Instance);
+        await handler.HandleAsync(new OrderRefundedIntegrationEvent(orderId, userId, Guid.NewGuid(), 230000m, "Online"));
+
+        userNotifications.QueryForUser(userId).Single().Message.Should().Contain("phương thức thanh toán");
+    }
+
+    [Fact]
+    public async Task HandleAsync_Should_SkipGracefully_When_OrderNotFound()
+    {
+        var (db, userNotifications) = BuildScope();
+        var userId = Guid.NewGuid();
+        var orderId = Guid.NewGuid();
+        var push = new FakeNotificationPush();
+
+        var handler = new OrderRefundedNotificationHandler(userNotifications, db, new FakeOrderDetailsReader(), push, NullLogger<OrderRefundedNotificationHandler>.Instance);
+        var act = async () => await handler.HandleAsync(new OrderRefundedIntegrationEvent(orderId, userId, Guid.NewGuid(), 230000m, "COD"));
+
+        await act.Should().NotThrowAsync();
+        userNotifications.QueryForUser(userId).Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task HandleAsync_Should_NotThrow_When_PushFails()
+    {
+        var (db, userNotifications) = BuildScope();
+        var userId = Guid.NewGuid();
+        var orderId = Guid.NewGuid();
+        var orders = new FakeOrderDetailsReader().With(BuildOrder(orderId, userId));
+        var push = new FakeNotificationPush { ShouldThrow = true };
+
+        var handler = new OrderRefundedNotificationHandler(userNotifications, db, orders, push, NullLogger<OrderRefundedNotificationHandler>.Instance);
+        var act = async () => await handler.HandleAsync(new OrderRefundedIntegrationEvent(orderId, userId, Guid.NewGuid(), 230000m, "COD"));
+
+        await act.Should().NotThrowAsync();
+        userNotifications.QueryForUser(userId).Should().ContainSingle();
+    }
+}

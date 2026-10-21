@@ -9,5 +9,10 @@ public enum UserNotificationType
     PaymentCompleted,
     PaymentFailed,
     OrderCreatedForReview,
-    OrderCompleted
+    OrderCompleted,
+    ReturnRequested,
+    ReturnApproved,
+    ReturnRejected,
+    ReturnShippedBack,
+    ReturnRefunded
 }

@@ -38,4 +38,10 @@ public class FakePaymentGateway : IPaymentGateway
 
         return CryptographicOperations.FixedTimeEquals(expected, actual);
     }
+
+    public Task<(bool Succeeded, string? ProviderRefundId, string? FailureReason)> RefundAsync(Payment payment, decimal amount, CancellationToken cancellationToken = default)
+    {
+        var providerRefundId = "fakerefund_" + Convert.ToHexString(RandomNumberGenerator.GetBytes(12)).ToLowerInvariant();
+        return Task.FromResult<(bool Succeeded, string? ProviderRefundId, string? FailureReason)>((true, providerRefundId, null));
+    }
 }

@@ -25,6 +25,7 @@ public class OrdersDbContext : DbContext, IOrdersUnitOfWork
     public DbSet<OrderLine> OrderLines => Set<OrderLine>();
     public DbSet<OrderStatusHistory> OrderStatusHistories => Set<OrderStatusHistory>();
     public DbSet<OrderIdempotencyKey> OrderIdempotencyKeys => Set<OrderIdempotencyKey>();
+    public DbSet<ReturnRequest> ReturnRequests => Set<ReturnRequest>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -48,9 +49,17 @@ public class OrdersDbContext : DbContext, IOrdersUnitOfWork
         {
             throw new DuplicateIdempotencyKeyException(ex);
         }
+        catch (DbUpdateException ex) when (IsActiveReturnRequestViolation(ex))
+        {
+            throw new DuplicateReturnRequestException(ex);
+        }
     }
 
     private static bool IsIdempotencyKeyViolation(DbUpdateException ex) =>
         ex.InnerException is PostgresException { SqlState: "23505" } pgEx &&
         pgEx.ConstraintName == OrderIdempotencyKeyConfiguration.UniqueIndexName;
+
+    private static bool IsActiveReturnRequestViolation(DbUpdateException ex) =>
+        ex.InnerException is PostgresException { SqlState: "23505" } pgEx &&
+        pgEx.ConstraintName == ReturnRequestConfiguration.ActiveRequestUniqueIndexName;
 }

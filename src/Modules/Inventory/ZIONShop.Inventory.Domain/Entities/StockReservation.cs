@@ -31,4 +31,5 @@ public class StockReservation : BaseEntity
     public void MarkCommitted() => Status = ReservationStatus.Committed;
     public void MarkReleased() => Status = ReservationStatus.Released;
     public void MarkExpired() => Status = ReservationStatus.Expired;
+    public void MarkReturned() => Status = ReservationStatus.Returned;
 }

@@ -21,6 +21,7 @@ public class PaymentsDbContext : DbContext, IPaymentsUnitOfWork
     public DbSet<Payment> Payments => Set<Payment>();
     public DbSet<PayableOrder> PayableOrders => Set<PayableOrder>();
     public DbSet<ProcessedWebhookEvent> ProcessedWebhookEvents => Set<ProcessedWebhookEvent>();
+    public DbSet<Refund> Refunds => Set<Refund>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

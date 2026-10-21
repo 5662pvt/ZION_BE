@@ -10,13 +10,14 @@ namespace ZIONShop.Orders.Tests.Features;
 
 public class GetOrderQueryHandlerTests
 {
-    private static async Task<(OrderRepository orders, Order seeded, Guid userId)> SeedAsync()
+    private static async Task<(OrderRepository orders, ReturnRequestRepository returns, Order seeded, Guid userId)> SeedAsync()
     {
         var options = new DbContextOptionsBuilder<OrdersDbContext>()
             .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
             .Options;
         var db = new OrdersDbContext(options);
         var orders = new OrderRepository(db);
+        var returns = new ReturnRequestRepository(db);
         var userId = Guid.NewGuid();
 
         var order = Order.Place(
@@ -29,14 +30,14 @@ public class GetOrderQueryHandlerTests
         await orders.AddAsync(order, CancellationToken.None);
         await db.SaveChangesAsync();
 
-        return (orders, order, userId);
+        return (orders, returns, order, userId);
     }
 
     [Fact]
     public async Task Handle_Should_ReturnHistoryOrderedAscendingByAt_When_OrderHasMultipleTransitions()
     {
-        var (orders, seeded, userId) = await SeedAsync();
-        var handler = new GetOrderQueryHandler(orders);
+        var (orders, returns, seeded, userId) = await SeedAsync();
+        var handler = new GetOrderQueryHandler(orders, returns);
 
         var result = await handler.Handle(new GetOrderQuery(seeded.Id, userId, IsStaffOrAdmin: false), CancellationToken.None);
 
@@ -44,13 +45,14 @@ public class GetOrderQueryHandlerTests
         result.Value.History.Should().HaveCount(2);
         result.Value.History.Select(h => h.Status).Should().ContainInOrder("PendingStock", "Confirmed");
         result.Value.History.Should().BeInAscendingOrder(h => h.At);
+        result.Value.ReturnRequest.Should().BeNull();
     }
 
     [Fact]
     public async Task Handle_Should_ReturnNotFound_When_OtherUserRequestsOrder()
     {
-        var (orders, seeded, _) = await SeedAsync();
-        var handler = new GetOrderQueryHandler(orders);
+        var (orders, returns, seeded, _) = await SeedAsync();
+        var handler = new GetOrderQueryHandler(orders, returns);
 
         var result = await handler.Handle(new GetOrderQuery(seeded.Id, Guid.NewGuid(), IsStaffOrAdmin: false), CancellationToken.None);
 

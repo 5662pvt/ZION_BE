@@ -37,6 +37,7 @@ public static class PaymentsInfrastructureExtensions
         services.AddScoped<IPaymentRepository, PaymentRepository>();
         services.AddScoped<IPayableOrderRepository, PayableOrderRepository>();
         services.AddScoped<IProcessedWebhookEventRepository, ProcessedWebhookEventRepository>();
+        services.AddScoped<IRefundRepository, RefundRepository>();
         services.AddScoped<IPaymentsUnitOfWork>(sp => sp.GetRequiredService<PaymentsDbContext>());
         services.AddScoped<IPaymentGateway, FakePaymentGateway>();
 
@@ -48,6 +49,7 @@ public static class PaymentsInfrastructureExtensions
         services.AddIntegrationEventHandler<OrderCancelledIntegrationEvent, OrderCancelledIntegrationEventHandler, PaymentsDbContext>();
         services.AddIntegrationEventHandler<InventoryReservationExpiredIntegrationEvent, InventoryReservationExpiredIntegrationEventHandler, PaymentsDbContext>();
         services.AddIntegrationEventHandler<InventoryReservationFailedIntegrationEvent, InventoryReservationFailedIntegrationEventHandler, PaymentsDbContext>();
+        services.AddIntegrationEventHandler<OrderReturnReceivedIntegrationEvent, OrderReturnReceivedIntegrationEventHandler, PaymentsDbContext>();
 
         return services;
     }

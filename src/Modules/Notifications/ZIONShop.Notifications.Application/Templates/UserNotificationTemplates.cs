@@ -26,4 +26,19 @@ public static class UserNotificationTemplates
 
     public static (string Title, string Message) OrderCompleted(string orderCode) =>
         ("Đơn hàng đã hoàn tất", $"Đơn hàng #{orderCode} đã được hoàn tất.");
+
+    public static (string Title, string Message) ReturnRequested(string orderCode, string reason) =>
+        ("Yêu cầu trả hàng mới", $"Đơn #{orderCode} có yêu cầu trả hàng ({reason}), cần xem xét.");
+
+    public static (string Title, string Message) ReturnApproved(string orderCode) =>
+        ("Yêu cầu trả hàng đã được chấp nhận", $"Vui lòng gửi hàng về cho shop và bấm 'Đã gửi hàng' trong đơn #{orderCode}.");
+
+    public static (string Title, string Message) ReturnRejected(string orderCode, string rejectReason) =>
+        ("Yêu cầu trả hàng bị từ chối", $"Yêu cầu trả hàng cho đơn #{orderCode} đã bị từ chối. Lý do: {rejectReason}.");
+
+    public static (string Title, string Message) ReturnShippedBack(string orderCode, string? trackingCode) =>
+        ("Khách đã gửi hàng trả", $"Đơn #{orderCode}: khách đã gửi hàng về (mã vận đơn: {trackingCode ?? "không có"}). Hãy xác nhận khi nhận được.");
+
+    public static (string Title, string Message) ReturnRefunded(string orderCode, decimal amount, string method) =>
+        ("Đã hoàn tiền", $"Đơn #{orderCode} đã được hoàn {amount:N0}đ ({(string.Equals(method, "Online", StringComparison.OrdinalIgnoreCase) ? "về phương thức thanh toán" : "tiền mặt")}).");
 }

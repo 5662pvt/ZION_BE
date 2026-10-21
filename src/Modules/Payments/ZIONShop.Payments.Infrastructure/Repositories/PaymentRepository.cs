@@ -24,6 +24,9 @@ public class PaymentRepository : IPaymentRepository
     public Task<Payment?> GetPendingByOrderIdAsync(Guid orderId, CancellationToken cancellationToken = default) =>
         _db.Payments.FirstOrDefaultAsync(p => p.OrderId == orderId && p.Status == PaymentStatus.Pending, cancellationToken);
 
+    public Task<Payment?> GetSucceededByOrderIdAsync(Guid orderId, CancellationToken cancellationToken = default) =>
+        _db.Payments.FirstOrDefaultAsync(p => p.OrderId == orderId && p.Status == PaymentStatus.Succeeded, cancellationToken);
+
     public async Task AddAsync(Payment payment, CancellationToken cancellationToken = default) =>
         await _db.Payments.AddAsync(payment, cancellationToken);
 

@@ -17,7 +17,8 @@ public record OrderDto(
     string? CancelReason,
     ShippingAddressDto ShippingAddress,
     IReadOnlyList<OrderLineDto> Lines,
-    IReadOnlyList<OrderStatusHistoryDto> History);
+    IReadOnlyList<OrderStatusHistoryDto> History,
+    ReturnRequestDto? ReturnRequest = null);
 
 public record OrderStatusHistoryDto(string Status, DateTime At, string? Note);
 

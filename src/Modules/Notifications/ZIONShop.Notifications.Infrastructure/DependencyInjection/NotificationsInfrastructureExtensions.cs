@@ -38,6 +38,10 @@ public static class NotificationsInfrastructureExtensions
         services.AddIntegrationEventHandler<OrderCompletedIntegrationEvent, OrderCompletedNotificationHandler, NotificationsDbContext>();
         services.AddIntegrationEventHandler<PaymentCompletedIntegrationEvent, PaymentCompletedNotificationHandler, NotificationsDbContext>();
         services.AddIntegrationEventHandler<PaymentFailedIntegrationEvent, PaymentFailedNotificationHandler, NotificationsDbContext>();
+        services.AddIntegrationEventHandler<OrderReturnRequestedIntegrationEvent, OrderReturnRequestedAdminNotificationHandler, NotificationsDbContext>();
+        services.AddIntegrationEventHandler<OrderReturnDecidedIntegrationEvent, OrderReturnDecidedNotificationHandler, NotificationsDbContext>();
+        services.AddIntegrationEventHandler<OrderReturnShippedBackIntegrationEvent, OrderReturnShippedBackAdminNotificationHandler, NotificationsDbContext>();
+        services.AddIntegrationEventHandler<OrderRefundedIntegrationEvent, OrderRefundedNotificationHandler, NotificationsDbContext>();
 
         return services;
     }

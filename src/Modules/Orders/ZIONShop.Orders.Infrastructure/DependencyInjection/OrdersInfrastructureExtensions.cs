@@ -28,8 +28,10 @@ public static class OrdersInfrastructureExtensions
                 npgsql => npgsql.MigrationsHistoryTable("__EFMigrationsHistory", OrdersDbContext.Schema)));
 
         services.Configure<CheckoutOptions>(configuration.GetSection(CheckoutOptions.SectionName));
+        services.Configure<ReturnsOptions>(configuration.GetSection(ReturnsOptions.SectionName));
 
         services.AddScoped<IOrderRepository, OrderRepository>();
+        services.AddScoped<IReturnRequestRepository, ReturnRequestRepository>();
         services.AddScoped<IOrderIdempotencyKeyRepository, OrderIdempotencyKeyRepository>();
         services.AddScoped<IOrdersUnitOfWork>(sp => sp.GetRequiredService<OrdersDbContext>());
         services.AddScoped<IOrderDetailsReader, OrderDetailsReader>();
@@ -48,6 +50,7 @@ public static class OrdersInfrastructureExtensions
         services.AddIntegrationEventHandler<InventoryReservationExpiredIntegrationEvent, InventoryReservationExpiredIntegrationEventHandler, OrdersDbContext>();
         services.AddIntegrationEventHandler<PaymentCompletedIntegrationEvent, PaymentCompletedIntegrationEventHandler, OrdersDbContext>();
         services.AddIntegrationEventHandler<PaymentFailedIntegrationEvent, PaymentFailedIntegrationEventHandler, OrdersDbContext>();
+        services.AddIntegrationEventHandler<OrderRefundedIntegrationEvent, OrderRefundedIntegrationEventHandler, OrdersDbContext>();
 
         return services;
     }

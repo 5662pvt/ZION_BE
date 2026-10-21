@@ -10,6 +10,8 @@ public static class PaymentsErrors
     public static readonly Error OrderCancelled = Error.Validation("Payments.OrderCancelled", "Đơn hàng đã bị hủy");
     public static readonly Error OrderAlreadyPaid = Error.Conflict("Payments.OrderAlreadyPaid", "Đơn hàng đã được thanh toán");
     public static readonly Error PaymentNotPending = Error.Conflict("Payments.PaymentNotPending", "Giao dịch không còn ở trạng thái chờ xử lý");
+    public static readonly Error PaymentNotRefundable = Error.Conflict("Payments.PaymentNotRefundable", "Giao dịch chưa thành công nên không thể hoàn tiền");
+    public static readonly Error RefundNotPending = Error.Conflict("Payments.RefundNotPending", "Yêu cầu hoàn tiền không còn ở trạng thái chờ xử lý");
     public static readonly Error InvalidSignature = Error.Unauthorized("Payments.InvalidSignature", "Chữ ký không hợp lệ");
     public static readonly Error InvalidWebhookPayload = Error.Validation("Payments.InvalidWebhookPayload", "Payload webhook không hợp lệ");
     public static readonly Error InvalidProjectionTransition = Error.Conflict("Payments.InvalidProjectionTransition", "Invalid projection state transition");

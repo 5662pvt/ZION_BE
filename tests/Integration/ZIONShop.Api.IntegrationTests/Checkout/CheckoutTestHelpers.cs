@@ -11,7 +11,11 @@ public record InventoryItemData(Guid ProductId, string Sku, string ProductName, 
 public record ShippingAddressData(Guid AddressId, string RecipientName, string PhoneNumber, string Province, string Ward, string StreetAddress);
 public record OrderLineData(Guid ProductId, string ProductName, decimal UnitPrice, int Quantity, decimal LineTotal, bool IsGift);
 public record OrderStatusHistoryData(string Status, DateTime At, string? Note);
-public record OrderData(Guid Id, string Code, string Status, string PaymentMethod, decimal Subtotal, decimal ShippingFee, string? CouponCode, decimal DiscountAmount, string? DiscountTarget, decimal Total, string Currency, DateTime CreatedAt, string? Note, string? CancelReason, ShippingAddressData ShippingAddress, List<OrderLineData> Lines, List<OrderStatusHistoryData> History);
+public record ReturnRequestData(
+    Guid Id, Guid OrderId, string OrderCode, string Reason, string? Note, string Status, string? RejectReason,
+    string? ReturnTrackingCode, decimal RefundAmount, string? RefundMethod, DateTime CreatedAt,
+    DateTime? ApprovedAt, DateTime? RejectedAt, DateTime? ShippedBackAt, DateTime? ReceivedAt, DateTime? RefundedAt);
+public record OrderData(Guid Id, string Code, string Status, string PaymentMethod, decimal Subtotal, decimal ShippingFee, string? CouponCode, decimal DiscountAmount, string? DiscountTarget, decimal Total, string Currency, DateTime CreatedAt, string? Note, string? CancelReason, ShippingAddressData ShippingAddress, List<OrderLineData> Lines, List<OrderStatusHistoryData> History, ReturnRequestData? ReturnRequest = null);
 public record AdminOrderSummaryData(Guid Id, string Code, string Status, string PaymentMethod, decimal Total, string Currency, DateTime CreatedAt, int ItemCount, string RecipientName, string PhoneNumber);
 public record CartItemData(Guid Id, Guid ProductId, string ProductName, int Quantity, decimal UnitPrice, decimal Subtotal, string Currency);
 public record CartData(Guid Id, Guid? UserId, string? AnonymousId, decimal Subtotal, string Currency, int TotalQuantity, List<CartItemData> Items);
@@ -204,6 +208,58 @@ public static class CheckoutTestHelpers
         } while (DateTime.UtcNow < deadline);
 
         throw new TimeoutException($"Inventory for SKU '{sku}' did not reach the expected state within {timeout}. Last observed: OnHand={last.OnHand}, Reserved={last.Reserved}.");
+    }
+
+    public static async Task<HttpResponseMessage> RequestReturnRawAsync(HttpClient client, Guid orderId, string reason, string? note = null)
+        => await client.PostAsJsonAsync($"/api/v1/orders/{orderId}/return", new { reason, note });
+
+    public static async Task<ReturnRequestData> RequestReturnAsync(HttpClient client, Guid orderId, string reason, string? note = null)
+    {
+        var response = await RequestReturnRawAsync(client, orderId, reason, note);
+        response.EnsureSuccessStatusCode();
+        var envelope = await response.Content.ReadFromJsonAsync<ApiEnvelope<ReturnRequestData>>(ApiEnvelopeJson.Options);
+        return envelope!.Data!;
+    }
+
+    public static async Task<HttpResponseMessage> GetReturnRawAsync(HttpClient client, Guid orderId)
+        => await client.GetAsync($"/api/v1/orders/{orderId}/return");
+
+    public static async Task<ReturnRequestData?> GetReturnAsync(HttpClient client, Guid orderId)
+    {
+        var response = await GetReturnRawAsync(client, orderId);
+        response.EnsureSuccessStatusCode();
+        var envelope = await response.Content.ReadFromJsonAsync<ApiEnvelope<ReturnRequestData>>(ApiEnvelopeJson.Options);
+        return envelope!.Data;
+    }
+
+    public static async Task<HttpResponseMessage> MarkShippedBackRawAsync(HttpClient client, Guid returnRequestId, string? trackingCode = null)
+        => await client.PostAsJsonAsync($"/api/v1/returns/{returnRequestId}/shipped-back", new { trackingCode });
+
+    public static async Task<ReturnRequestData> MarkShippedBackAsync(HttpClient client, Guid returnRequestId, string? trackingCode = null)
+    {
+        var response = await MarkShippedBackRawAsync(client, returnRequestId, trackingCode);
+        response.EnsureSuccessStatusCode();
+        var envelope = await response.Content.ReadFromJsonAsync<ApiEnvelope<ReturnRequestData>>(ApiEnvelopeJson.Options);
+        return envelope!.Data!;
+    }
+
+    public static async Task<ReturnRequestData> AdminApproveReturnAsync(HttpClient admin, Guid returnRequestId)
+    {
+        var response = await admin.PostAsync($"/api/v1/admin/returns/{returnRequestId}/approve", null);
+        response.EnsureSuccessStatusCode();
+        var envelope = await response.Content.ReadFromJsonAsync<ApiEnvelope<ReturnRequestData>>(ApiEnvelopeJson.Options);
+        return envelope!.Data!;
+    }
+
+    public static async Task<HttpResponseMessage> AdminRejectReturnRawAsync(HttpClient admin, Guid returnRequestId, string reason)
+        => await admin.PostAsJsonAsync($"/api/v1/admin/returns/{returnRequestId}/reject", new { reason });
+
+    public static async Task<ReturnRequestData> AdminMarkReceivedAsync(HttpClient admin, Guid returnRequestId)
+    {
+        var response = await admin.PostAsync($"/api/v1/admin/returns/{returnRequestId}/received", null);
+        response.EnsureSuccessStatusCode();
+        var envelope = await response.Content.ReadFromJsonAsync<ApiEnvelope<ReturnRequestData>>(ApiEnvelopeJson.Options);
+        return envelope!.Data!;
     }
 
     /// <summary>

@@ -68,4 +68,12 @@ public class Payment : AggregateRoot
         Status = PaymentStatus.Cancelled;
         return Result.Success();
     }
+
+    public Result MarkRefunded(DateTime now)
+    {
+        if (Status != PaymentStatus.Succeeded) return Result.Failure(PaymentsErrors.PaymentNotRefundable);
+        Status = PaymentStatus.Refunded;
+        CompletedAt = now;
+        return Result.Success();
+    }
 }

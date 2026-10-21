@@ -24,7 +24,7 @@ public class OrderReportReader : IOrderReportReader
         var orderIds = completions.Select(c => c.OrderId).ToList();
         var orders = await _db.Orders.AsNoTracking()
             .Include(o => o.Lines)
-            .Where(o => orderIds.Contains(o.Id))
+            .Where(o => orderIds.Contains(o.Id) && o.Status != OrderStatus.Returned)
             .ToListAsync(ct);
 
         var completedAtByOrder = completions.ToDictionary(c => c.OrderId, c => c.CompletedAtUtc);

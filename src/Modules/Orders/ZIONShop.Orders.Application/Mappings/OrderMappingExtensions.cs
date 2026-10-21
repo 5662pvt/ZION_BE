@@ -5,7 +5,7 @@ namespace ZIONShop.Orders.Application.Mappings;
 
 public static class OrderMappingExtensions
 {
-    public static OrderDto ToDto(this Order order) => new(
+    public static OrderDto ToDto(this Order order, ReturnRequestDto? returnRequest = null) => new(
         order.Id,
         order.Code,
         order.Status.ToString(),
@@ -31,7 +31,8 @@ public static class OrderMappingExtensions
         order.StatusHistory
             .OrderBy(h => h.At)
             .Select(h => new OrderStatusHistoryDto(h.Status.ToString(), h.At, h.Note))
-            .ToList());
+            .ToList(),
+        returnRequest);
 
     public static OrderSummaryDto ToSummaryDto(this Order order) => new(
         order.Id, order.Code, order.Status.ToString(), order.Total, order.Currency, order.CreatedDate, order.Lines.Count);

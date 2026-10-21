@@ -15,4 +15,7 @@ public interface IPaymentGateway
 
     /// <summary>Verifies a webhook signature against the raw request body using a constant-time comparison.</summary>
     bool VerifySignature(string rawBody, string signature);
+
+    /// <summary>Refunds a previously succeeded payment. Simulated — no webhook round-trip, resolves synchronously-in-effect.</summary>
+    Task<(bool Succeeded, string? ProviderRefundId, string? FailureReason)> RefundAsync(Payment payment, decimal amount, CancellationToken cancellationToken = default);
 }

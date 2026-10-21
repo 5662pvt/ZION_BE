@@ -10,8 +10,13 @@ namespace ZIONShop.Orders.Application.Features.GetOrder;
 public class GetOrderQueryHandler : IRequestHandler<GetOrderQuery, Result<OrderDto>>
 {
     private readonly IOrderRepository _orders;
+    private readonly IReturnRequestRepository _returns;
 
-    public GetOrderQueryHandler(IOrderRepository orders) => _orders = orders;
+    public GetOrderQueryHandler(IOrderRepository orders, IReturnRequestRepository returns)
+    {
+        _orders = orders;
+        _returns = returns;
+    }
 
     public async Task<Result<OrderDto>> Handle(GetOrderQuery request, CancellationToken cancellationToken)
     {
@@ -20,6 +25,9 @@ public class GetOrderQueryHandler : IRequestHandler<GetOrderQuery, Result<OrderD
         if (!request.IsStaffOrAdmin && order.UserId != request.RequestingUserId)
             return Result.Failure<OrderDto>(OrdersErrors.OrderNotFound);
 
-        return Result.Success(order.ToDto());
+        var latestReturn = await _returns.GetLatestByOrderIdAsync(order.Id, cancellationToken);
+        var returnDto = latestReturn?.ToDto(order.Code);
+
+        return Result.Success(order.ToDto(returnDto));
     }
 }

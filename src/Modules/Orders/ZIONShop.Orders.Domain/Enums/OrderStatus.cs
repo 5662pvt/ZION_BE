@@ -8,5 +8,6 @@ public enum OrderStatus
     Paid,
     Shipped,
     Completed,
-    Cancelled
+    Cancelled,
+    Returned
 }

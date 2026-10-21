@@ -179,4 +179,12 @@ public class Order : AggregateRoot
         _statusHistory.Add(OrderStatusHistory.Create(Id, Status));
         return Result.Success();
     }
+
+    public Result MarkReturned()
+    {
+        if (Status != OrderStatus.Completed) return Result.Failure(OrdersErrors.InvalidTransition);
+        Status = OrderStatus.Returned;
+        _statusHistory.Add(OrderStatusHistory.Create(Id, Status));
+        return Result.Success();
+    }
 }

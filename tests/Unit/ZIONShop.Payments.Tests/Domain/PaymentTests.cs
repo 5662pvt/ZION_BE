@@ -95,4 +95,29 @@ public class PaymentTests
         result.IsFailure.Should().BeTrue();
         result.Error.Code.Should().Be("Payments.PaymentNotPending");
     }
+
+    [Fact]
+    public void MarkRefunded_Should_SetRefundedStatus_And_CompletedAt_When_Succeeded()
+    {
+        var payment = CreatePending();
+        payment.Succeed(DateTime.UtcNow);
+        var now = DateTime.UtcNow;
+
+        var result = payment.MarkRefunded(now);
+
+        result.IsSuccess.Should().BeTrue();
+        payment.Status.Should().Be(PaymentStatus.Refunded);
+        payment.CompletedAt.Should().Be(now);
+    }
+
+    [Fact]
+    public void MarkRefunded_Should_Fail_When_NotSucceeded()
+    {
+        var payment = CreatePending();
+
+        var result = payment.MarkRefunded(DateTime.UtcNow);
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Code.Should().Be("Payments.PaymentNotRefundable");
+    }
 }

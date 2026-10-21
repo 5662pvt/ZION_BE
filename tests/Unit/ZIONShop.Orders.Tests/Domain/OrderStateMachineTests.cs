@@ -177,4 +177,31 @@ public class OrderStateMachineTests
 
         result.IsFailure.Should().BeTrue();
     }
+
+    [Fact]
+    public void MarkReturned_Should_Succeed_When_Completed()
+    {
+        var order = CreateOrder(PaymentMethod.COD);
+        order.ConfirmReservation();
+        order.Ship();
+        order.Complete();
+
+        var result = order.MarkReturned();
+
+        result.IsSuccess.Should().BeTrue();
+        order.Status.Should().Be(OrderStatus.Returned);
+    }
+
+    [Fact]
+    public void MarkReturned_Should_Fail_When_NotCompleted()
+    {
+        var order = CreateOrder(PaymentMethod.COD);
+        order.ConfirmReservation();
+        order.Ship();
+
+        var result = order.MarkReturned();
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Code.Should().Be("Orders.InvalidTransition");
+    }
 }
