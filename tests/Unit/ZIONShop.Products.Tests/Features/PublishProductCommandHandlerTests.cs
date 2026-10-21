@@ -25,15 +25,15 @@ public class PublishProductCommandHandlerTests
         var products = new ProductRepository(db);
         var categories = new CategoryRepository(db);
         var cache = new FakeDistributedCacheService();
-        await cache.SetAsync($"zion:products:detail:id:{product.Id}", new object());
-        await cache.SetAsync($"zion:products:detail:slug:{product.Slug}", new object());
+        await cache.SetAsync($"zion:products:v2:detail:id:{product.Id}", new object());
+        await cache.SetAsync($"zion:products:v2:detail:slug:{product.Slug}", new object());
         var handler = new PublishProductCommandHandler(products, categories, db, cache);
 
         var result = await handler.Handle(new PublishProductCommand(product.Id), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
         result.Value.Status.Should().Be("Published");
-        cache.Contains($"zion:products:detail:id:{product.Id}").Should().BeFalse();
-        cache.Contains($"zion:products:detail:slug:{product.Slug}").Should().BeFalse();
+        cache.Contains($"zion:products:v2:detail:id:{product.Id}").Should().BeFalse();
+        cache.Contains($"zion:products:v2:detail:slug:{product.Slug}").Should().BeFalse();
     }
 }

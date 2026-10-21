@@ -26,12 +26,12 @@ public class GetProductByIdQueryHandlerTests
         }
 
         public Task<Product?> GetBySlugAsync(string slug, CancellationToken cancellationToken = default) => _inner.GetBySlugAsync(slug, cancellationToken);
-        public Task<Product?> GetBySkuAsync(string sku, CancellationToken cancellationToken = default) => _inner.GetBySkuAsync(sku, cancellationToken);
-        public Task<bool> SkuExistsAsync(string sku, CancellationToken cancellationToken = default) => _inner.SkuExistsAsync(sku, cancellationToken);
+        public Task<bool> SkuExistsAsync(string sku, Guid? excludeProductId = null, CancellationToken cancellationToken = default) => _inner.SkuExistsAsync(sku, excludeProductId, cancellationToken);
         public Task<bool> SlugExistsAsync(string slug, CancellationToken cancellationToken = default) => _inner.SlugExistsAsync(slug, cancellationToken);
         public Task AddAsync(Product product, CancellationToken cancellationToken = default) => _inner.AddAsync(product, cancellationToken);
         public void Update(Product product) => _inner.Update(product);
         public void AddImage(ProductImage image) => _inner.AddImage(image);
+        public void AddVariant(ProductVariant variant) => _inner.AddVariant(variant);
         public IQueryable<Product> Query() => _inner.Query();
     }
 
@@ -58,7 +58,7 @@ public class GetProductByIdQueryHandlerTests
         var result = await handler.Handle(new GetProductByIdQuery(product.Id), CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
-        cache.Contains("zion:products:detail:id:" + product.Id).Should().BeFalse();
+        cache.Contains("zion:products:v2:detail:id:" + product.Id).Should().BeFalse();
     }
 
     [Fact]

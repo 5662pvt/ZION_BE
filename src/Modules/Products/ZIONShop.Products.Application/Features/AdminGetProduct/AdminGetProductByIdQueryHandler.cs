@@ -30,6 +30,6 @@ public class AdminGetProductByIdQueryHandler : IRequestHandler<AdminGetProductBy
             var category = await _categories.GetByIdAsync(product.CategoryId.Value, cancellationToken);
             categoryName = category?.Name;
         }
-        return Result.Success(product.ToDto(categoryName));
+        return Result.Success(product.ToDto(categoryName, includeInactiveVariants: true));
     }
 }

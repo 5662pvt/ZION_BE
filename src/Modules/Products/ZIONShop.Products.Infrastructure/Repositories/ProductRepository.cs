@@ -12,16 +12,13 @@ public class ProductRepository : IProductRepository
     public ProductRepository(ProductsDbContext db) => _db = db;
 
     public Task<Product?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
-        _db.Products.Include(p => p.Images).FirstOrDefaultAsync(p => p.Id == id, cancellationToken);
+        _db.Products.Include(p => p.Images).Include(p => p.Variants).FirstOrDefaultAsync(p => p.Id == id, cancellationToken);
 
     public Task<Product?> GetBySlugAsync(string slug, CancellationToken cancellationToken = default) =>
-        _db.Products.Include(p => p.Images).FirstOrDefaultAsync(p => p.Slug == slug, cancellationToken);
+        _db.Products.Include(p => p.Images).Include(p => p.Variants).FirstOrDefaultAsync(p => p.Slug == slug, cancellationToken);
 
-    public Task<Product?> GetBySkuAsync(string sku, CancellationToken cancellationToken = default) =>
-        _db.Products.Include(p => p.Images).FirstOrDefaultAsync(p => p.Sku.Value == sku, cancellationToken);
-
-    public Task<bool> SkuExistsAsync(string sku, CancellationToken cancellationToken = default) =>
-        _db.Products.AnyAsync(p => p.Sku.Value == sku, cancellationToken);
+    public Task<bool> SkuExistsAsync(string sku, Guid? excludeProductId = null, CancellationToken cancellationToken = default) =>
+        _db.ProductVariants.AnyAsync(v => v.Sku.Value == sku && (excludeProductId == null || v.ProductId != excludeProductId), cancellationToken);
 
     public Task<bool> SlugExistsAsync(string slug, CancellationToken cancellationToken = default) =>
         _db.Products.AnyAsync(p => p.Slug == slug, cancellationToken);
@@ -32,6 +29,8 @@ public class ProductRepository : IProductRepository
     public void Update(Product product) => _db.Products.Update(product);
 
     public void AddImage(ProductImage image) => _db.ProductImages.Add(image);
+
+    public void AddVariant(ProductVariant variant) => _db.ProductVariants.Add(variant);
 
     public IQueryable<Product> Query() => _db.Products.AsQueryable();
 }

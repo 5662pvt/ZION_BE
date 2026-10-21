@@ -2,7 +2,8 @@ using ZIONShop.EventBus.Abstractions;
 
 namespace ZIONShop.Contracts.Orders;
 
-public sealed record ReturnLine(Guid ProductId, int Quantity);
+/// <summary>VariantId ?? ProductId is the stock/price key.</summary>
+public sealed record ReturnLine(Guid ProductId, int Quantity, Guid? VariantId = null);
 
 public sealed record OrderReturnRequestedIntegrationEvent(Guid OrderId, Guid UserId, Guid ReturnRequestId, string Reason) : IntegrationEvent;
 

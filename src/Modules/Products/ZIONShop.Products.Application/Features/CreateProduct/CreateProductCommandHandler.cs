@@ -25,8 +25,6 @@ public class CreateProductCommandHandler : IRequestHandler<CreateProductCommand,
 
     public async Task<Result<ProductDto>> Handle(CreateProductCommand request, CancellationToken cancellationToken)
     {
-        if (await _products.SkuExistsAsync(request.Sku.Trim().ToUpperInvariant(), cancellationToken))
-            return Result.Failure<ProductDto>(ProductsErrors.SkuAlreadyExists);
         if (await _products.SlugExistsAsync(request.Slug.Trim().ToLowerInvariant(), cancellationToken))
             return Result.Failure<ProductDto>(ProductsErrors.SlugAlreadyExists);
 
@@ -37,24 +35,55 @@ public class CreateProductCommandHandler : IRequestHandler<CreateProductCommand,
             if (category is null) return Result.Failure<ProductDto>(ProductsErrors.CategoryNotFound);
         }
 
-        var product = Product.Create(
-            request.Name,
-            request.Slug,
-            Sku.Create(request.Sku),
-            Money.Create(request.Price, request.Currency),
-            request.CategoryId,
-            request.Description,
-            request.Brand);
-
-        if (request.Images is not null)
+        Product product;
+        if (request.Options is not null || request.Variants is not null)
         {
-            foreach (var img in request.Images)
-                product.AddImage(img.Url, img.Alt, img.DisplayOrder);
+            product = Product.CreateDraft(request.Name, request.Slug, request.CategoryId, request.Description, request.Brand);
+
+            if (request.Images is not null)
+                foreach (var img in request.Images)
+                    product.AddImage(img.Url, img.Alt, img.DisplayOrder);
+
+            foreach (var variant in request.Variants!)
+            {
+                if (await _products.SkuExistsAsync(variant.Sku.Trim().ToUpperInvariant(), null, cancellationToken))
+                    return Result.Failure<ProductDto>(ProductsErrors.SkuAlreadyExists);
+            }
+
+            var optionInputs = (request.Options ?? Array.Empty<CreateProductOptionInput>())
+                .Select(o => new ProductOptionInput(o.Name, o.Values))
+                .ToList();
+            var variantInputs = request.Variants!
+                .Select(v => new ProductVariantInput(v.Id, v.Option1Value, v.Option2Value, v.Sku, v.Price, v.Currency, v.IsActive, v.ImageId))
+                .ToList();
+
+            var setResult = product.SetVariants(optionInputs, variantInputs);
+            if (setResult.IsFailure) return Result.Failure<ProductDto>(setResult.Error);
+
+            product.MarkCreated();
+        }
+        else
+        {
+            if (await _products.SkuExistsAsync(request.Sku!.Trim().ToUpperInvariant(), null, cancellationToken))
+                return Result.Failure<ProductDto>(ProductsErrors.SkuAlreadyExists);
+
+            product = Product.Create(
+                request.Name,
+                request.Slug,
+                Sku.Create(request.Sku!),
+                Money.Create(request.Price!.Value, request.Currency!),
+                request.CategoryId,
+                request.Description,
+                request.Brand);
+
+            if (request.Images is not null)
+                foreach (var img in request.Images)
+                    product.AddImage(img.Url, img.Alt, img.DisplayOrder);
         }
 
         await _products.AddAsync(product, cancellationToken);
         await _uow.SaveChangesAsync(cancellationToken);
 
-        return Result.Success(product.ToDto(category?.Name));
+        return Result.Success(product.ToDto(category?.Name, includeInactiveVariants: true));
     }
 }

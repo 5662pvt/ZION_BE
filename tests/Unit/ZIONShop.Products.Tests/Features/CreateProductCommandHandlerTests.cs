@@ -55,4 +55,47 @@ public class CreateProductCommandHandlerTests
         result.IsFailure.Should().BeTrue();
         result.Error.Code.Should().Be("Products.SkuAlreadyExists");
     }
+
+    [Fact]
+    public async Task Handle_Should_CreateProductWithVariants_When_OptionsAndVariantsProvided()
+    {
+        var (db, products, categories) = BuildScope();
+        var handler = new CreateProductCommandHandler(products, categories, db);
+
+        var options = new[] { new CreateProductOptionInput("Màu sắc", new[] { "Đỏ", "Xanh" }) };
+        var variants = new[]
+        {
+            new CreateProductVariantInput(null, "Đỏ", null, "TEE-RED", 100m, "VND", true, null),
+            new CreateProductVariantInput(null, "Xanh", null, "TEE-BLUE", 110m, "VND", true, null)
+        };
+        var cmd = new CreateProductCommand("Shirt", "shirt", null, null, null, null, null, null, null, options, variants);
+
+        var result = await handler.Handle(cmd, CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Options.Should().ContainSingle();
+        result.Value.Variants.Should().HaveCount(2);
+        result.Value.Variants.Should().OnlyContain(v => v.Id != result.Value.Id);
+        result.Value.MinPrice.Should().Be(100m);
+        result.Value.MaxPrice.Should().Be(110m);
+        result.Value.Status.Should().Be("Draft");
+    }
+
+    [Fact]
+    public async Task Handle_Should_ReturnConflict_When_VariantSkuAlreadyExistsOnAnotherProduct()
+    {
+        var (db, products, categories) = BuildScope();
+        var existing = Product.Create("Existing", "existing", Sku.Create("TEE-RED"), Money.Create(10m, "USD"), null, null, null);
+        await db.Products.AddAsync(existing);
+        await db.SaveChangesAsync();
+
+        var handler = new CreateProductCommandHandler(products, categories, db);
+        var variants = new[] { new CreateProductVariantInput(null, null, null, "TEE-RED", 100m, "VND", true, null) };
+        var cmd = new CreateProductCommand("Shirt", "shirt", null, null, null, null, null, null, null, Array.Empty<CreateProductOptionInput>(), variants);
+
+        var result = await handler.Handle(cmd, CancellationToken.None);
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Code.Should().Be("Products.SkuAlreadyExists");
+    }
 }

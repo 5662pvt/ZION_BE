@@ -28,14 +28,14 @@ public class UpdateProductCommandHandlerTests
     {
         var (db, products, categories, product) = await SeedAsync();
         var cache = new FakeDistributedCacheService();
-        await cache.SetAsync($"zion:products:detail:id:{product.Id}", new object());
-        await cache.SetAsync($"zion:products:detail:slug:{product.Slug}", new object());
+        await cache.SetAsync($"zion:products:v2:detail:id:{product.Id}", new object());
+        await cache.SetAsync($"zion:products:v2:detail:slug:{product.Slug}", new object());
         var handler = new UpdateProductCommandHandler(products, categories, db, cache);
 
         var result = await handler.Handle(new UpdateProductCommand(product.Id, "Updated", "Desc", 15m, "USD", null, "Brand"), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
-        cache.Contains($"zion:products:detail:id:{product.Id}").Should().BeFalse();
-        cache.Contains($"zion:products:detail:slug:{product.Slug}").Should().BeFalse();
+        cache.Contains($"zion:products:v2:detail:id:{product.Id}").Should().BeFalse();
+        cache.Contains($"zion:products:v2:detail:slug:{product.Slug}").Should().BeFalse();
     }
 }

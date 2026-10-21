@@ -30,7 +30,9 @@ public class PublishProductCommandHandler : IRequestHandler<PublishProductComman
         var product = await _products.GetByIdAsync(request.Id, cancellationToken);
         if (product is null) return Result.Failure<ProductDto>(ProductsErrors.ProductNotFound);
 
-        product.Publish();
+        var publishResult = product.Publish();
+        if (publishResult.IsFailure) return Result.Failure<ProductDto>(publishResult.Error);
+
         _products.Update(product);
         await _uow.SaveChangesAsync(cancellationToken);
 
@@ -43,6 +45,6 @@ public class PublishProductCommandHandler : IRequestHandler<PublishProductComman
             categoryName = category?.Name;
         }
 
-        return Result.Success(product.ToDto(categoryName));
+        return Result.Success(product.ToDto(categoryName, includeInactiveVariants: true));
     }
 }

@@ -39,12 +39,14 @@ public class UpdateProductCommandHandler : IRequestHandler<UpdateProductCommand,
             if (category is null) return Result.Failure<ProductDto>(ProductsErrors.CategoryNotFound);
         }
 
-        product.Update(request.Name, request.Description, Money.Create(request.Price, request.Currency), request.CategoryId, request.Brand);
+        var updateResult = product.Update(request.Name, request.Description, Money.Create(request.Price, request.Currency), request.CategoryId, request.Brand);
+        if (updateResult.IsFailure) return Result.Failure<ProductDto>(updateResult.Error);
+
         _products.Update(product);
         await _uow.SaveChangesAsync(cancellationToken);
 
         await _cache.RemoveManyAsync(ProductCacheKeys.DetailById(product.Id), ProductCacheKeys.DetailBySlug(product.Slug));
 
-        return Result.Success(product.ToDto(category?.Name));
+        return Result.Success(product.ToDto(category?.Name, includeInactiveVariants: true));
     }
 }

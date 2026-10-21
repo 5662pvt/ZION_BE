@@ -26,7 +26,7 @@ public class AdminSearchProductsQueryHandler : IRequestHandler<AdminSearchProduc
         if (!string.IsNullOrWhiteSpace(request.Keyword))
         {
             var kw = EscapeLikePattern(request.Keyword.Trim()).ToUpperInvariant();
-            query = query.Where(p => EF.Functions.Like(p.Name.ToUpper(), $"%{kw}%") || EF.Functions.Like(p.Sku.Value.ToUpper(), $"%{kw}%"));
+            query = query.Where(p => EF.Functions.Like(p.Name.ToUpper(), $"%{kw}%") || p.Variants.Any(v => EF.Functions.Like(v.Sku.Value.ToUpper(), $"%{kw}%")));
         }
 
         if (request.CategoryId.HasValue)
@@ -50,12 +50,14 @@ public class AdminSearchProductsQueryHandler : IRequestHandler<AdminSearchProduc
                 p.Id,
                 p.Name,
                 p.Slug,
-                Sku = p.Sku.Value,
-                Price = p.Price.Amount,
-                Currency = p.Price.Currency,
+                Sku = p.Variants.Where(v => v.IsActive).OrderBy(v => v.Price.Amount).ThenBy(v => v.DisplayOrder).Select(v => v.Sku.Value).FirstOrDefault(),
+                Currency = p.Variants.Where(v => v.IsActive).OrderBy(v => v.Price.Amount).ThenBy(v => v.DisplayOrder).Select(v => v.Price.Currency).FirstOrDefault(),
                 Status = p.Status,
                 p.CategoryId,
-                PrimaryImageUrl = p.Images.OrderBy(i => i.DisplayOrder).Select(i => i.Url).FirstOrDefault()
+                PrimaryImageUrl = p.Images.OrderBy(i => i.DisplayOrder).Select(i => i.Url).FirstOrDefault(),
+                p.MinPrice,
+                p.MaxPrice,
+                VariantCount = p.Variants.Count(v => v.IsActive)
             })
             .ToListAsync(cancellationToken);
 
@@ -66,9 +68,9 @@ public class AdminSearchProductsQueryHandler : IRequestHandler<AdminSearchProduc
             .ToDictionaryAsync(c => c.Id, c => c.Name, cancellationToken);
 
         var dtos = items.Select(i => new ProductSummaryDto(
-            i.Id, i.Name, i.Slug, i.Sku, i.Price, i.Currency, i.Status.ToString(),
+            i.Id, i.Name, i.Slug, i.Sku ?? string.Empty, i.MinPrice, i.Currency ?? "VND", i.Status.ToString(),
             i.CategoryId.HasValue && categoryNames.TryGetValue(i.CategoryId.Value, out var cn) ? cn : null,
-            i.PrimaryImageUrl)).ToList();
+            i.PrimaryImageUrl, i.MinPrice, i.MaxPrice, i.VariantCount)).ToList();
 
         return Result.Success(PagedResult<ProductSummaryDto>.Create(dtos, page, pageSize, total));
     }

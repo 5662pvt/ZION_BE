@@ -2,7 +2,8 @@ namespace ZIONShop.Contracts.Cart;
 
 public record CartSnapshot(Guid CartId, string Currency, IReadOnlyList<CartSnapshotLine> Lines);
 
-public record CartSnapshotLine(Guid ProductId, string ProductName, int Quantity, decimal UnitPrice);
+/// <summary>VariantId ?? ProductId is the stock/price key.</summary>
+public record CartSnapshotLine(Guid ProductId, string ProductName, int Quantity, decimal UnitPrice, Guid? VariantId = null);
 
 public interface ICartReader
 {

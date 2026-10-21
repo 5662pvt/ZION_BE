@@ -2,7 +2,8 @@ namespace ZIONShop.Contracts.Promotions;
 
 public sealed record GiftRequest(Guid UserId, IReadOnlyList<CouponLine> Lines, decimal Subtotal);
 
-public sealed record GiftGrant(Guid PromotionId, string PromotionName, Guid ProductId, int Quantity);
+/// <summary>VariantId ?? ProductId is the stock/price key.</summary>
+public sealed record GiftGrant(Guid PromotionId, string PromotionName, Guid ProductId, int Quantity, Guid? VariantId = null);
 
 public interface IGiftPromotionEvaluator
 {

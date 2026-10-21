@@ -12,9 +12,27 @@ public record ProductDto(
     Guid? CategoryId,
     string? CategoryName,
     string? Brand,
-    IReadOnlyList<ProductImageDto> Images);
+    IReadOnlyList<ProductImageDto> Images,
+    IReadOnlyList<ProductOptionDto> Options,
+    IReadOnlyList<ProductVariantDto> Variants,
+    decimal MinPrice,
+    decimal MaxPrice);
 
 public record ProductImageDto(Guid Id, string Url, string? Alt, int DisplayOrder);
+
+public record ProductOptionDto(string Name, IReadOnlyList<string> Values);
+
+public record ProductVariantDto(
+    Guid Id,
+    string Sku,
+    decimal Price,
+    string Currency,
+    string? Option1Value,
+    string? Option2Value,
+    string Label,
+    Guid? ImageId,
+    string? ImageUrl,
+    bool IsActive);
 
 public record ProductSummaryDto(
     Guid Id,
@@ -25,7 +43,10 @@ public record ProductSummaryDto(
     string Currency,
     string Status,
     string? CategoryName,
-    string? PrimaryImageUrl);
+    string? PrimaryImageUrl,
+    decimal MinPrice,
+    decimal MaxPrice,
+    int VariantCount);
 
 public record ProductSuggestionDto(
     Guid Id,
@@ -34,4 +55,7 @@ public record ProductSuggestionDto(
     string Sku,
     decimal Price,
     string Currency,
-    string? ThumbnailUrl);
+    string? ThumbnailUrl,
+    decimal MinPrice,
+    decimal MaxPrice,
+    int VariantCount);

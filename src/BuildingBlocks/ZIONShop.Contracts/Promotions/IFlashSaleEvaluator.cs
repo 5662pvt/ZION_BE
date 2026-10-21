@@ -1,8 +1,10 @@
 namespace ZIONShop.Contracts.Promotions;
 
-public sealed record FlashSaleLine(Guid ProductId, int Quantity);
+/// <summary>VariantId ?? ProductId is the stock/price key.</summary>
+public sealed record FlashSaleLine(Guid ProductId, int Quantity, Guid? VariantId = null);
 
-public sealed record FlashSaleQuote(Guid ProductId, Guid FlashSaleItemId, decimal FlashUnitPrice);
+/// <summary>VariantId ?? ProductId is the stock/price key.</summary>
+public sealed record FlashSaleQuote(Guid ProductId, Guid FlashSaleItemId, decimal FlashUnitPrice, Guid? VariantId = null);
 
 public interface IFlashSaleEvaluator
 {

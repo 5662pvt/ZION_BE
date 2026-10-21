@@ -1,6 +1,6 @@
 namespace ZIONShop.Contracts.Orders;
 
-public sealed record OrderDetailsLine(string ProductName, int Quantity, decimal UnitPrice, decimal LineTotal, bool IsGift = false);
+public sealed record OrderDetailsLine(string ProductName, int Quantity, decimal UnitPrice, decimal LineTotal, bool IsGift = false, string? VariantLabel = null);
 
 public sealed record OrderDetails(Guid OrderId, Guid UserId, string Code, string Status, string PaymentMethod,
     decimal Subtotal, decimal DiscountAmount, string? CouponCode, string? DiscountTarget, decimal ShippingFee, decimal Total, string Currency,

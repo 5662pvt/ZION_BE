@@ -18,4 +18,9 @@ public class FakeProductPriceLookup : IProductPriceLookup
     public Task<IReadOnlyDictionary<Guid, ProductPriceInfo>> GetManyAsync(IReadOnlyCollection<Guid> productIds, CancellationToken cancellationToken = default)
         => Task.FromResult<IReadOnlyDictionary<Guid, ProductPriceInfo>>(
             _products.Where(kv => productIds.Contains(kv.Key)).ToDictionary(kv => kv.Key, kv => kv.Value));
+
+    public Task<IReadOnlyDictionary<Guid, ProductSummaryInfo>> GetProductSummaryAsync(IReadOnlyCollection<Guid> productIds, CancellationToken cancellationToken = default)
+        => Task.FromResult<IReadOnlyDictionary<Guid, ProductSummaryInfo>>(
+            _products.Where(kv => productIds.Contains(kv.Key))
+                .ToDictionary(kv => kv.Key, kv => new ProductSummaryInfo(kv.Value.ProductId, kv.Value.Name, kv.Value.Slug, kv.Value.UnitPrice, kv.Value.Currency, kv.Value.PrimaryImageUrl, kv.Value.IsAvailable)));
 }

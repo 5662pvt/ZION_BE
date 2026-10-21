@@ -15,6 +15,7 @@ using ZIONShop.Products.Application.Features.PublishProduct;
 using ZIONShop.Products.Application.Features.RemoveProductImage;
 using ZIONShop.Products.Application.Features.ReorderProductImages;
 using ZIONShop.Products.Application.Features.SearchProducts;
+using ZIONShop.Products.Application.Features.SetVariants;
 using ZIONShop.Products.Application.Features.SuggestProducts;
 using ZIONShop.Products.Application.Features.UpdateProduct;
 using ZIONShop.Products.Domain.Enums;
@@ -106,6 +107,18 @@ public class ProductsController : ControllerBase
         return (await _mediator.Send(cmd, ct)).ToActionResult("Product updated");
     }
 
+    [HttpPut("{id:guid}/variants")]
+    [Authorize(Policy = Policies.AdminOnly)]
+    [AdminAudit("Product.VariantsUpdate", "Product")]
+    public async Task<IActionResult> SetVariants(Guid id, [FromBody] SetVariantsBody body, CancellationToken ct)
+    {
+        var cmd = new SetVariantsCommand(
+            id,
+            body.Options.Select(o => new SetVariantsOptionInput(o.Name, o.Values)).ToList(),
+            body.Variants.Select(v => new SetVariantsVariantInput(v.Id, v.Option1Value, v.Option2Value, v.Sku, v.Price, v.Currency, v.IsActive, v.ImageId)).ToList());
+        return (await _mediator.Send(cmd, ct)).ToActionResult("Variants updated");
+    }
+
     [HttpPost("{id:guid}/archive")]
     [Authorize(Policy = Policies.AdminOnly)]
     [AdminAudit("Product.Archive", "Product")]
@@ -147,3 +160,6 @@ public record SearchProductsRequest(int Page = 1, int PageSize = 20, string? Key
 public record AdminSearchProductsRequest(int Page = 1, int PageSize = 20, string? Keyword = null, Guid? CategoryId = null, string? Status = null);
 public record UpdateProductBody(string Name, string? Description, decimal Price, string Currency, Guid? CategoryId, string? Brand);
 public record ReorderProductImagesBody(IReadOnlyList<Guid> ImageIds);
+public record SetVariantsOptionBody(string Name, IReadOnlyList<string> Values);
+public record SetVariantsVariantBody(Guid? Id, string? Option1Value, string? Option2Value, string Sku, decimal Price, string Currency, bool IsActive, Guid? ImageId);
+public record SetVariantsBody(IReadOnlyList<SetVariantsOptionBody> Options, IReadOnlyList<SetVariantsVariantBody> Variants);

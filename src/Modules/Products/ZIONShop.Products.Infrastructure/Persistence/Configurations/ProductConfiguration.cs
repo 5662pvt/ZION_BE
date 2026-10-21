@@ -1,7 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using ZIONShop.Products.Domain.Entities;
-using ZIONShop.Products.Domain.ValueObjects;
 
 namespace ZIONShop.Products.Infrastructure.Persistence.Configurations;
 
@@ -19,18 +18,8 @@ public class ProductConfiguration : IEntityTypeConfiguration<Product>
         builder.Property(p => p.Brand).HasMaxLength(128);
         builder.Property(p => p.Status).HasConversion<int>().IsRequired();
         builder.Property(p => p.CategoryId);
-
-        builder.OwnsOne(p => p.Sku, sku =>
-        {
-            sku.Property(s => s.Value).HasColumnName("Sku").HasMaxLength(64).IsRequired();
-            sku.HasIndex(s => s.Value).IsUnique();
-        });
-
-        builder.OwnsOne(p => p.Price, money =>
-        {
-            money.Property(m => m.Amount).HasColumnName("Price").HasColumnType("decimal(18,2)").IsRequired();
-            money.Property(m => m.Currency).HasColumnName("Currency").HasMaxLength(3).IsRequired();
-        });
+        builder.Property(p => p.MinPrice).HasColumnType("decimal(18,2)").IsRequired();
+        builder.Property(p => p.MaxPrice).HasColumnType("decimal(18,2)").IsRequired();
 
         builder.Property(p => p.CreatedDate).IsRequired();
         builder.Property(p => p.CreatedBy).HasMaxLength(128);
@@ -40,6 +29,7 @@ public class ProductConfiguration : IEntityTypeConfiguration<Product>
         builder.Ignore(p => p.RowVersion);
 
         builder.Ignore(p => p.DomainEvents);
+        builder.Ignore(p => p.DefaultVariant);
         builder.HasQueryFilter(p => !p.IsDeleted);
 
         builder.HasMany(p => p.Images)
@@ -48,6 +38,28 @@ public class ProductConfiguration : IEntityTypeConfiguration<Product>
             .OnDelete(DeleteBehavior.Cascade);
 
         builder.Metadata.FindNavigation(nameof(Product.Images))!
+            .SetPropertyAccessMode(PropertyAccessMode.Field);
+
+        builder.HasMany(p => p.Variants)
+            .WithOne()
+            .HasForeignKey(v => v.ProductId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Metadata.FindNavigation(nameof(Product.Variants))!
+            .SetPropertyAccessMode(PropertyAccessMode.Field);
+
+        builder.OwnsMany(p => p.Options, option =>
+        {
+            option.ToTable("ProductOptions");
+            option.WithOwner().HasForeignKey("ProductId");
+            option.Property<Guid>("ProductId");
+            option.HasKey("ProductId", nameof(ProductOption.Position));
+            option.Property(o => o.Position).IsRequired();
+            option.Property(o => o.Name).IsRequired().HasMaxLength(30);
+            option.Property(o => o.Values).HasColumnName("Values").HasColumnType("text[]").IsRequired();
+        });
+
+        builder.Metadata.FindNavigation(nameof(Product.Options))!
             .SetPropertyAccessMode(PropertyAccessMode.Field);
     }
 }

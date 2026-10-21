@@ -52,4 +52,35 @@ public class SearchProductsQueryHandlerTests
         result.IsSuccess.Should().BeTrue();
         result.Value.Items.All(i => i.Price is >= 20m and <= 25m).Should().BeTrue();
     }
+
+    [Fact]
+    public async Task Handle_Should_FilterAndSortByMinPrice_When_ProductHasMultipleVariants()
+    {
+        var (db, products, categories) = await SeedAsync();
+        var cat = await db.Categories.FirstAsync();
+
+        var variantProduct = Product.CreateDraft("Variant Shirt", "variant-shirt", cat.Id, null, null);
+        variantProduct.SetVariants(
+            new[] { new ProductOptionInput("Size", new[] { "S", "M" }) },
+            new[]
+            {
+                new ProductVariantInput(null, "S", null, "SKU-VS-S", 5m, "USD", true, null),
+                new ProductVariantInput(null, "M", null, "SKU-VS-M", 999m, "USD", true, null)
+            });
+        variantProduct.MarkCreated();
+        variantProduct.Publish();
+        await db.Products.AddAsync(variantProduct);
+        await db.SaveChangesAsync();
+
+        var handler = new SearchProductsQueryHandler(products, categories);
+        var result = await handler.Handle(new SearchProductsQuery(1, 100, "Variant Shirt", null, null, null, "price_asc"), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        var item = result.Value.Items.Should().ContainSingle().Subject;
+        item.Price.Should().Be(5m);
+        item.MinPrice.Should().Be(5m);
+        item.MaxPrice.Should().Be(999m);
+        item.VariantCount.Should().Be(2);
+        item.Sku.Should().Be("SKU-VS-S");
+    }
 }

@@ -29,22 +29,22 @@ public class SearchProductsQueryHandler : IRequestHandler<SearchProductsQuery, R
         if (!string.IsNullOrWhiteSpace(request.Keyword))
         {
             var kw = request.Keyword.Trim();
-            query = query.Where(p => EF.Functions.Like(p.Name, $"%{kw}%") || EF.Functions.Like(p.Sku.Value, $"%{kw}%"));
+            query = query.Where(p => EF.Functions.Like(p.Name, $"%{kw}%") || p.Variants.Any(v => EF.Functions.Like(v.Sku.Value, $"%{kw}%")));
         }
 
         if (request.CategoryId.HasValue)
             query = query.Where(p => p.CategoryId == request.CategoryId);
 
         if (request.MinPrice.HasValue)
-            query = query.Where(p => p.Price.Amount >= request.MinPrice.Value);
+            query = query.Where(p => p.MinPrice >= request.MinPrice.Value);
 
         if (request.MaxPrice.HasValue)
-            query = query.Where(p => p.Price.Amount <= request.MaxPrice.Value);
+            query = query.Where(p => p.MinPrice <= request.MaxPrice.Value);
 
         query = (request.Sort ?? "name") switch
         {
-            "price_asc" => query.OrderBy(p => p.Price.Amount),
-            "price_desc" => query.OrderByDescending(p => p.Price.Amount),
+            "price_asc" => query.OrderBy(p => p.MinPrice),
+            "price_desc" => query.OrderByDescending(p => p.MinPrice),
             "newest" => query.OrderByDescending(p => p.CreatedDate),
             _ => query.OrderBy(p => p.Name)
         };
@@ -62,12 +62,14 @@ public class SearchProductsQueryHandler : IRequestHandler<SearchProductsQuery, R
                 p.Id,
                 p.Name,
                 p.Slug,
-                Sku = p.Sku.Value,
-                Price = p.Price.Amount,
-                Currency = p.Price.Currency,
+                Sku = p.Variants.Where(v => v.IsActive).OrderBy(v => v.Price.Amount).ThenBy(v => v.DisplayOrder).Select(v => v.Sku.Value).FirstOrDefault(),
+                Currency = p.Variants.Where(v => v.IsActive).OrderBy(v => v.Price.Amount).ThenBy(v => v.DisplayOrder).Select(v => v.Price.Currency).FirstOrDefault(),
                 Status = p.Status,
                 p.CategoryId,
-                PrimaryImageUrl = p.Images.OrderBy(i => i.DisplayOrder).Select(i => i.Url).FirstOrDefault()
+                PrimaryImageUrl = p.Images.OrderBy(i => i.DisplayOrder).Select(i => i.Url).FirstOrDefault(),
+                p.MinPrice,
+                p.MaxPrice,
+                VariantCount = p.Variants.Count(v => v.IsActive)
             })
             .ToListAsync(cancellationToken);
 
@@ -78,9 +80,9 @@ public class SearchProductsQueryHandler : IRequestHandler<SearchProductsQuery, R
             .ToDictionaryAsync(c => c.Id, c => c.Name, cancellationToken);
 
         var dtos = items.Select(i => new ProductSummaryDto(
-            i.Id, i.Name, i.Slug, i.Sku, i.Price, i.Currency, i.Status.ToString(),
+            i.Id, i.Name, i.Slug, i.Sku ?? string.Empty, i.MinPrice, i.Currency ?? "VND", i.Status.ToString(),
             i.CategoryId.HasValue && categoryNames.TryGetValue(i.CategoryId.Value, out var cn) ? cn : null,
-            i.PrimaryImageUrl)).ToList();
+            i.PrimaryImageUrl, i.MinPrice, i.MaxPrice, i.VariantCount)).ToList();
 
         return Result.Success(PagedResult<ProductSummaryDto>.Create(dtos, page, pageSize, total));
     }

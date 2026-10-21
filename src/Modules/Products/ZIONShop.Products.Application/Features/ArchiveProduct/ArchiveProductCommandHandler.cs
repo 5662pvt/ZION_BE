@@ -43,6 +43,6 @@ public class ArchiveProductCommandHandler : IRequestHandler<ArchiveProductComman
             categoryName = category?.Name;
         }
 
-        return Result.Success(product.ToDto(categoryName));
+        return Result.Success(product.ToDto(categoryName, includeInactiveVariants: true));
     }
 }

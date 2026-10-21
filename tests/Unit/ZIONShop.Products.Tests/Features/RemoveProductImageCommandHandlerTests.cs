@@ -48,7 +48,7 @@ public class RemoveProductImageCommandHandlerTests
         var imageId = product.Images.Single().Id;
         var storage = new FakeImageStorage();
         var cache = new FakeDistributedCacheService();
-        await cache.SetAsync($"zion:products:detail:id:{product.Id}", new object());
+        await cache.SetAsync($"zion:products:v2:detail:id:{product.Id}", new object());
         var handler = new RemoveProductImageCommandHandler(products, storage, db, cache, NullLogger<RemoveProductImageCommandHandler>.Instance);
 
         var result = await handler.Handle(new RemoveProductImageCommand(product.Id, imageId), CancellationToken.None);
@@ -58,7 +58,7 @@ public class RemoveProductImageCommandHandlerTests
 
         var reloaded = await products.GetByIdAsync(product.Id, CancellationToken.None);
         reloaded!.Images.Should().BeEmpty();
-        cache.Contains($"zion:products:detail:id:{product.Id}").Should().BeFalse();
+        cache.Contains($"zion:products:v2:detail:id:{product.Id}").Should().BeFalse();
     }
 
     [Fact]

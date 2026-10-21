@@ -31,21 +31,29 @@ public class SuggestProductsQueryHandler : IRequestHandler<SuggestProductsQuery,
             .Where(p => p.Status == ProductStatus.Published)
             .Where(p =>
                 EF.Functions.Like(p.Name.ToUpper(), $"%{kw}%") ||
-                EF.Functions.Like(p.Sku.Value.ToUpper(), $"%{kw}%") ||
+                p.Variants.Any(v => EF.Functions.Like(v.Sku.Value.ToUpper(), $"%{kw}%")) ||
                 (p.Brand != null && EF.Functions.Like(p.Brand.ToUpper(), $"%{kw}%")))
             .OrderByDescending(p => EF.Functions.Like(p.Name.ToUpper(), $"{kw}%"))
             .ThenBy(p => p.Name)
             .Take(limit)
-            .Select(p => new ProductSuggestionDto(
+            .Select(p => new
+            {
                 p.Id,
                 p.Name,
                 p.Slug,
-                p.Sku.Value,
-                p.Price.Amount,
-                p.Price.Currency,
-                p.Images.OrderBy(i => i.DisplayOrder).Select(i => i.Url).FirstOrDefault()))
+                Sku = p.Variants.Where(v => v.IsActive).OrderBy(v => v.Price.Amount).ThenBy(v => v.DisplayOrder).Select(v => v.Sku.Value).FirstOrDefault(),
+                Currency = p.Variants.Where(v => v.IsActive).OrderBy(v => v.Price.Amount).ThenBy(v => v.DisplayOrder).Select(v => v.Price.Currency).FirstOrDefault(),
+                p.MinPrice,
+                p.MaxPrice,
+                ThumbnailUrl = p.Images.OrderBy(i => i.DisplayOrder).Select(i => i.Url).FirstOrDefault(),
+                VariantCount = p.Variants.Count(v => v.IsActive)
+            })
             .ToListAsync(cancellationToken);
 
-        return Result.Success<IReadOnlyList<ProductSuggestionDto>>(items);
+        var dtos = items
+            .Select(i => new ProductSuggestionDto(i.Id, i.Name, i.Slug, i.Sku ?? string.Empty, i.MinPrice, i.Currency ?? "VND", i.ThumbnailUrl, i.MinPrice, i.MaxPrice, i.VariantCount))
+            .ToList();
+
+        return Result.Success<IReadOnlyList<ProductSuggestionDto>>(dtos);
     }
 }

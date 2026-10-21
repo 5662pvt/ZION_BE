@@ -38,7 +38,7 @@ public class AddProductImageCommandHandlerTests
     {
         var (db, products, product) = await SeedAsync();
         var cache = new FakeDistributedCacheService();
-        await cache.SetAsync($"zion:products:detail:id:{product.Id}", new object());
+        await cache.SetAsync($"zion:products:v2:detail:id:{product.Id}", new object());
         var handler = new AddProductImageCommandHandler(products, new FakeImageStorage(), db, cache);
 
         using var content = new MemoryStream(new byte[] { 1, 2, 3 });
@@ -51,7 +51,7 @@ public class AddProductImageCommandHandlerTests
 
         var reloaded = await products.GetByIdAsync(product.Id, CancellationToken.None);
         reloaded!.Images.Should().ContainSingle();
-        cache.Contains($"zion:products:detail:id:{product.Id}").Should().BeFalse();
+        cache.Contains($"zion:products:v2:detail:id:{product.Id}").Should().BeFalse();
     }
 
     [Fact]

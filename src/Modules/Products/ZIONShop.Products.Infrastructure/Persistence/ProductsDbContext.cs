@@ -13,6 +13,7 @@ public class ProductsDbContext : DbContext, IProductsUnitOfWork
     public DbSet<Product> Products => Set<Product>();
     public DbSet<Category> Categories => Set<Category>();
     public DbSet<ProductImage> ProductImages => Set<ProductImage>();
+    public DbSet<ProductVariant> ProductVariants => Set<ProductVariant>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

@@ -26,15 +26,15 @@ public class ArchiveProductCommandHandlerTests
         var products = new ProductRepository(db);
         var categories = new CategoryRepository(db);
         var cache = new FakeDistributedCacheService();
-        await cache.SetAsync($"zion:products:detail:id:{product.Id}", new object());
-        await cache.SetAsync($"zion:products:detail:slug:{product.Slug}", new object());
+        await cache.SetAsync($"zion:products:v2:detail:id:{product.Id}", new object());
+        await cache.SetAsync($"zion:products:v2:detail:slug:{product.Slug}", new object());
         var handler = new ArchiveProductCommandHandler(products, categories, db, cache);
 
         var result = await handler.Handle(new ArchiveProductCommand(product.Id), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
         result.Value.Status.Should().Be("Archived");
-        cache.Contains($"zion:products:detail:id:{product.Id}").Should().BeFalse();
-        cache.Contains($"zion:products:detail:slug:{product.Slug}").Should().BeFalse();
+        cache.Contains($"zion:products:v2:detail:id:{product.Id}").Should().BeFalse();
+        cache.Contains($"zion:products:v2:detail:slug:{product.Slug}").Should().BeFalse();
     }
 }

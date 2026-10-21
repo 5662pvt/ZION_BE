@@ -31,7 +31,7 @@ public class ReorderProductImagesCommandHandlerTests
         var (db, products, product) = await SeedAsync();
         var ids = product.Images.OrderBy(i => i.DisplayOrder).Select(i => i.Id).Reverse().ToList();
         var cache = new FakeDistributedCacheService();
-        await cache.SetAsync($"zion:products:detail:id:{product.Id}", new object());
+        await cache.SetAsync($"zion:products:v2:detail:id:{product.Id}", new object());
         var handler = new ReorderProductImagesCommandHandler(products, db, cache);
 
         var result = await handler.Handle(new ReorderProductImagesCommand(product.Id, ids), CancellationToken.None);
@@ -39,7 +39,7 @@ public class ReorderProductImagesCommandHandlerTests
         result.IsSuccess.Should().BeTrue();
         var reloaded = await products.GetByIdAsync(product.Id, CancellationToken.None);
         reloaded!.Images.OrderBy(i => i.DisplayOrder).Select(i => i.Id).Should().BeEquivalentTo(ids, o => o.WithStrictOrdering());
-        cache.Contains($"zion:products:detail:id:{product.Id}").Should().BeFalse();
+        cache.Contains($"zion:products:v2:detail:id:{product.Id}").Should().BeFalse();
     }
 
     [Fact]
