@@ -43,8 +43,9 @@ public class FlashSaleEvaluator : IFlashSaleEvaluator
         foreach (var line in lines)
         {
             var variantKey = line.VariantId ?? line.ProductId;
-            var item = await FindActiveItemAsync(variantKey, now, ct);
-            if (item is null || item.Available < line.Quantity) continue;
+            var candidates = await FindActiveCandidatesAsync(variantKey, line.Quantity, now, ct);
+            var item = candidates.FirstOrDefault();
+            if (item is null) continue;
 
             quotes.Add(new FlashSaleQuote(line.ProductId, item.Id, item.FlashPrice, item.VariantId));
         }
@@ -66,23 +67,28 @@ public class FlashSaleEvaluator : IFlashSaleEvaluator
         foreach (var line in lines)
         {
             var variantKey = line.VariantId ?? line.ProductId;
-            var item = await FindActiveItemAsync(variantKey, now, ct);
-            if (item is null) continue;
+            var candidates = await FindActiveCandidatesAsync(variantKey, line.Quantity, now, ct);
 
-            if (activeByItemId.TryGetValue(item.Id, out var existing))
+            var alreadyRedeemed = candidates.FirstOrDefault(c => activeByItemId.ContainsKey(c.Id));
+            if (alreadyRedeemed is not null)
             {
-                quotes.Add(new FlashSaleQuote(line.ProductId, item.Id, existing.UnitFlashPrice, item.VariantId));
+                var existing = activeByItemId[alreadyRedeemed.Id];
+                quotes.Add(new FlashSaleQuote(line.ProductId, alreadyRedeemed.Id, existing.UnitFlashPrice, alreadyRedeemed.VariantId));
                 continue;
             }
 
-            var reserved = await _items.TryReserveAsync(item.Id, line.Quantity, ct);
-            if (!reserved) continue;
+            foreach (var candidate in candidates)
+            {
+                var reserved = await _items.TryReserveAsync(candidate.Id, line.Quantity, ct);
+                if (!reserved) continue;
 
-            var redemption = FlashSaleRedemption.Create(item.Id, orderId, userId, line.Quantity, item.FlashPrice, now);
-            await _redemptions.AddAsync(redemption, ct);
-            changed = true;
+                var redemption = FlashSaleRedemption.Create(candidate.Id, orderId, userId, line.Quantity, candidate.FlashPrice, now);
+                await _redemptions.AddAsync(redemption, ct);
+                changed = true;
 
-            quotes.Add(new FlashSaleQuote(line.ProductId, item.Id, item.FlashPrice, item.VariantId));
+                quotes.Add(new FlashSaleQuote(line.ProductId, candidate.Id, candidate.FlashPrice, candidate.VariantId));
+                break;
+            }
         }
 
         if (changed)
@@ -109,15 +115,22 @@ public class FlashSaleEvaluator : IFlashSaleEvaluator
             await _uow.SaveChangesAsync(ct);
     }
 
-    private Task<FlashSaleItem?> FindActiveItemAsync(Guid variantId, DateTime now, CancellationToken ct)
+    /// <summary>
+    /// Active items for the variant key with enough quota for <paramref name="quantity"/>, cheapest first
+    /// (ties broken by the owning campaign's soonest EndsAt). Reserve tries each in order so a quota
+    /// shortfall or a lost reservation race on one campaign falls through to the next.
+    /// </summary>
+    private Task<List<FlashSaleItem>> FindActiveCandidatesAsync(Guid variantId, int quantity, DateTime now, CancellationToken ct)
     {
-        var activeFlashSaleIds = _flashSales.Query().AsNoTracking()
-            .Where(f => f.IsActive && f.StartsAt <= now && f.EndsAt >= now)
-            .Select(f => f.Id);
+        var activeFlashSales = _flashSales.Query().AsNoTracking()
+            .Where(f => f.IsActive && f.StartsAt <= now && f.EndsAt >= now);
 
         return _items.Query().AsNoTracking()
-            .Where(i => i.VariantId == variantId && activeFlashSaleIds.Contains(i.FlashSaleId))
-            .OrderBy(i => i.FlashPrice)
-            .FirstOrDefaultAsync(ct);
+            .Where(i => i.VariantId == variantId && i.AllocatedQuantity - i.SoldQuantity >= quantity)
+            .Join(activeFlashSales, i => i.FlashSaleId, f => f.Id, (i, f) => new { Item = i, f.EndsAt })
+            .OrderBy(x => x.Item.FlashPrice)
+            .ThenBy(x => x.EndsAt)
+            .Select(x => x.Item)
+            .ToListAsync(ct);
     }
 }

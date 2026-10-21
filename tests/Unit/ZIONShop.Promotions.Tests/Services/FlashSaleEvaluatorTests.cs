@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using ZIONShop.Contracts.Promotions;
 using ZIONShop.Promotions.Domain.Entities;
 using ZIONShop.Promotions.Domain.Enums;
+using ZIONShop.Promotions.Domain.Repositories;
 using ZIONShop.Promotions.Infrastructure.Persistence;
 using ZIONShop.Promotions.Infrastructure.Repositories;
 using ZIONShop.Promotions.Infrastructure.Services;
@@ -22,6 +23,39 @@ public class FlashSaleEvaluatorTests
         var redemptions = new FlashSaleRedemptionRepository(db);
         var evaluator = new FlashSaleEvaluator(flashSales, items, redemptions, db, TimeProvider.System);
         return (db, evaluator);
+    }
+
+    /// <summary>Forces TryReserveAsync to fail for one item id, simulating a lost reservation race on an
+    /// otherwise-eligible candidate (quota check passed at selection time, atomic reserve lost the race).</summary>
+    private static FlashSaleEvaluator BuildEvaluatorWithFlakyReserve(PromotionsDbContext db, Guid flakyItemId)
+    {
+        var flashSales = new FlashSaleRepository(db);
+        var items = new RaceLosingFlashSaleItemRepository(new InMemoryFlashSaleItemRepository(db), flakyItemId);
+        var redemptions = new FlashSaleRedemptionRepository(db);
+        return new FlashSaleEvaluator(flashSales, items, redemptions, db, TimeProvider.System);
+    }
+
+    private sealed class RaceLosingFlashSaleItemRepository : IFlashSaleItemRepository
+    {
+        private readonly IFlashSaleItemRepository _inner;
+        private readonly Guid _flakyItemId;
+
+        public RaceLosingFlashSaleItemRepository(IFlashSaleItemRepository inner, Guid flakyItemId)
+        {
+            _inner = inner;
+            _flakyItemId = flakyItemId;
+        }
+
+        public Task<FlashSaleItem?> GetByIdAsync(Guid id, CancellationToken ct = default) => _inner.GetByIdAsync(id, ct);
+        public Task<List<FlashSaleItem>> GetByFlashSaleIdAsync(Guid flashSaleId, CancellationToken ct = default) => _inner.GetByFlashSaleIdAsync(flashSaleId, ct);
+        public Task AddAsync(FlashSaleItem item, CancellationToken ct = default) => _inner.AddAsync(item, ct);
+        public void Update(FlashSaleItem item) => _inner.Update(item);
+        public IQueryable<FlashSaleItem> Query() => _inner.Query();
+
+        public Task<bool> TryReserveAsync(Guid flashSaleItemId, int quantity, CancellationToken ct = default) =>
+            flashSaleItemId == _flakyItemId ? Task.FromResult(false) : _inner.TryReserveAsync(flashSaleItemId, quantity, ct);
+
+        public Task ReleaseAsync(Guid flashSaleItemId, int quantity, CancellationToken ct = default) => _inner.ReleaseAsync(flashSaleItemId, quantity, ct);
     }
 
     private static async Task<FlashSaleItem> SeedActiveFlashSaleItemAsync(
@@ -196,5 +230,53 @@ public class FlashSaleEvaluatorTests
         var reloadedB = await db.FlashSaleItems.AsNoTracking().FirstAsync(i => i.Id == itemB.Id);
         reloadedA.SoldQuantity.Should().Be(2);
         reloadedB.SoldQuantity.Should().Be(0, "only the reserved variant's quota should move");
+    }
+
+    [Fact]
+    public async Task ReserveAsync_Should_FallBackToOtherCampaign_When_CheapestCampaignLacksQuota()
+    {
+        var (db, evaluator) = BuildScope();
+        var productId = Guid.NewGuid();
+        var itemA = await SeedActiveFlashSaleItemAsync(db, productId, 40000m, allocatedQuantity: 2); // cheaper but not enough quota
+        var itemB = await SeedActiveFlashSaleItemAsync(db, productId, 60000m, allocatedQuantity: 5); // pricier but enough quota
+
+        var quotes = await evaluator.ReserveAsync(new[] { new FlashSaleLine(productId, 3) }, Guid.NewGuid(), Guid.NewGuid());
+
+        quotes.Should().ContainSingle(q => q.FlashSaleItemId == itemB.Id && q.FlashUnitPrice == 60000m);
+        var reloadedA = await db.FlashSaleItems.AsNoTracking().FirstAsync(i => i.Id == itemA.Id);
+        var reloadedB = await db.FlashSaleItems.AsNoTracking().FirstAsync(i => i.Id == itemB.Id);
+        reloadedA.SoldQuantity.Should().Be(0, "the under-quota campaign must not be touched");
+        reloadedB.SoldQuantity.Should().Be(3);
+    }
+
+    [Fact]
+    public async Task ReserveAsync_Should_PickCheapestCampaign_When_BothHaveEnoughQuota()
+    {
+        var (db, evaluator) = BuildScope();
+        var productId = Guid.NewGuid();
+        var itemCheap = await SeedActiveFlashSaleItemAsync(db, productId, 40000m, allocatedQuantity: 5);
+        await SeedActiveFlashSaleItemAsync(db, productId, 60000m, allocatedQuantity: 5);
+
+        var quotes = await evaluator.ReserveAsync(new[] { new FlashSaleLine(productId, 3) }, Guid.NewGuid(), Guid.NewGuid());
+
+        quotes.Should().ContainSingle(q => q.FlashSaleItemId == itemCheap.Id && q.FlashUnitPrice == 40000m);
+    }
+
+    [Fact]
+    public async Task ReserveAsync_Should_FallThroughToNextCandidate_When_FirstCandidateLosesReservationRace()
+    {
+        var (db, _) = BuildScope();
+        var productId = Guid.NewGuid();
+        var itemA = await SeedActiveFlashSaleItemAsync(db, productId, 40000m, allocatedQuantity: 5); // cheapest, but will lose the reserve race
+        var itemB = await SeedActiveFlashSaleItemAsync(db, productId, 60000m, allocatedQuantity: 5);
+        var evaluator = BuildEvaluatorWithFlakyReserve(db, itemA.Id);
+
+        var quotes = await evaluator.ReserveAsync(new[] { new FlashSaleLine(productId, 2) }, Guid.NewGuid(), Guid.NewGuid());
+
+        quotes.Should().ContainSingle(q => q.FlashSaleItemId == itemB.Id && q.FlashUnitPrice == 60000m);
+        var reloadedA = await db.FlashSaleItems.AsNoTracking().FirstAsync(i => i.Id == itemA.Id);
+        var reloadedB = await db.FlashSaleItems.AsNoTracking().FirstAsync(i => i.Id == itemB.Id);
+        reloadedA.SoldQuantity.Should().Be(0, "the race-losing candidate must not end up partially reserved");
+        reloadedB.SoldQuantity.Should().Be(2);
     }
 }
