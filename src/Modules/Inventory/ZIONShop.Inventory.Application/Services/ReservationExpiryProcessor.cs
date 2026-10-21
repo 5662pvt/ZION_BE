@@ -52,14 +52,14 @@ public class ReservationExpiryProcessor
         // SaveChangesAsync commit (or roll back) together.
         await using var transaction = await _uow.BeginTransactionAsync(cancellationToken);
 
-        // Released across the WHOLE batch ordered by ProductId (not grouped/ordered per order) so a
-        // concurrent commit/reserve touching the same products always takes its row locks in the same
+        // Released across the WHOLE batch ordered by VariantId (not grouped/ordered per order) so a
+        // concurrent commit/reserve touching the same variants always takes its row locks in the same
         // order as this scan, avoiding a Postgres deadlock (40P01) between them.
-        foreach (var reservation in expired.OrderBy(r => r.ProductId))
+        foreach (var reservation in expired.OrderBy(r => r.VariantId))
         {
-            if (await _items.TryReleaseAsync(reservation.ProductId, reservation.Quantity, cancellationToken))
+            if (await _items.TryReleaseAsync(reservation.VariantId, reservation.Quantity, cancellationToken))
             {
-                await _movements.AddAsync(StockMovement.Create(reservation.ProductId, StockMovementType.Expire, reservation.Quantity, reservation.OrderId.ToString(), now), cancellationToken);
+                await _movements.AddAsync(StockMovement.Create(reservation.ProductId, reservation.VariantId, StockMovementType.Expire, reservation.Quantity, reservation.OrderId.ToString(), now), cancellationToken);
             }
 
             reservation.MarkExpired();

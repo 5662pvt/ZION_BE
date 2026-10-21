@@ -4,4 +4,4 @@ using ZIONShop.SharedKernel.Results;
 
 namespace ZIONShop.Promotions.Application.Features.AddFlashSaleItem;
 
-public record AddFlashSaleItemCommand(Guid FlashSaleId, Guid ProductId, decimal FlashPrice, int AllocatedQuantity) : IRequest<Result<FlashSaleItemDto>>;
+public record AddFlashSaleItemCommand(Guid FlashSaleId, Guid? ProductId, Guid? VariantId, decimal FlashPrice, int AllocatedQuantity) : IRequest<Result<FlashSaleItemDto>>;

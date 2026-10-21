@@ -25,7 +25,8 @@ public class AddCartItemCommandHandler : IRequestHandler<AddCartItemCommand, Res
 
     public async Task<Result<CartDto>> Handle(AddCartItemCommand request, CancellationToken cancellationToken)
     {
-        var price = await _prices.GetAsync(request.ProductId, cancellationToken);
+        var lookupId = request.VariantId ?? request.ProductId!.Value;
+        var price = await _prices.GetAsync(lookupId, cancellationToken);
         if (price is null || !price.IsAvailable)
             return Result.Failure<CartDto>(CartErrors.ProductUnavailable);
 
@@ -41,10 +42,11 @@ public class AddCartItemCommandHandler : IRequestHandler<AddCartItemCommand, Res
                    ?? DomainCart.CreateForGuest(request.AnonymousId!);
         }
 
+        var resolvedVariantId = price.VariantId ?? price.ProductId;
         var isNew = cart.CreatedDate == default || cart.Items.Count == 0 && cart.CreatedDate.AddSeconds(1) > DateTime.UtcNow;
         try
         {
-            cart.AddItem(request.ProductId, price.Name, request.Quantity, price.UnitPrice, price.Currency);
+            cart.AddItem(price.ProductId, resolvedVariantId, price.Name, request.Quantity, price.UnitPrice, price.Currency, price.VariantLabel, price.Sku);
         }
         catch (InvalidOperationException)
         {

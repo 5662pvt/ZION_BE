@@ -167,8 +167,8 @@ public class ReleaseCommitConcurrencyTests
         {
             itemA.Reserve(1);
             itemB.Reserve(1);
-            await db.StockReservations.AddAsync(StockReservation.Create(orderId, productA, 1, expiresAt, now));
-            await db.StockReservations.AddAsync(StockReservation.Create(orderId, productB, 1, expiresAt, now));
+            await db.StockReservations.AddAsync(StockReservation.Create(orderId, productA, productA, 1, expiresAt, now));
+            await db.StockReservations.AddAsync(StockReservation.Create(orderId, productB, productB, 1, expiresAt, now));
         }
 
         await db.SaveChangesAsync();

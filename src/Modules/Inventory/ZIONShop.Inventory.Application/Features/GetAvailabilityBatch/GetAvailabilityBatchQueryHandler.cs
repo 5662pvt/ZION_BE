@@ -20,15 +20,15 @@ public class GetAvailabilityBatchQueryHandler : IRequestHandler<GetAvailabilityB
 
         var items = await _items.Query()
             .AsNoTracking()
-            .Where(i => ids.Contains(i.ProductId))
+            .Where(i => ids.Contains(i.VariantId))
             .ToListAsync(cancellationToken);
 
-        var byProductId = items.ToDictionary(i => i.ProductId);
+        var byVariantId = items.ToDictionary(i => i.VariantId);
 
         var result = ids
-            .Select(id => byProductId.TryGetValue(id, out var item)
-                ? new AvailabilityDto(id, item.Available, item.Available > 0)
-                : new AvailabilityDto(id, 0, false))
+            .Select(id => byVariantId.TryGetValue(id, out var item)
+                ? new AvailabilityDto(item.ProductId, item.VariantId, item.VariantLabel, item.Available, item.Available > 0)
+                : new AvailabilityDto(id, id, null, 0, false))
             .ToList();
 
         return Result.Success<IReadOnlyList<AvailabilityDto>>(result);

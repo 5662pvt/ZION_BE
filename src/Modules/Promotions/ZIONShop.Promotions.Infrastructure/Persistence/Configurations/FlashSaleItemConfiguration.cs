@@ -16,7 +16,10 @@ public class FlashSaleItemConfiguration : IEntityTypeConfiguration<FlashSaleItem
 
         builder.Property(i => i.ProductId).IsRequired();
         builder.HasIndex(i => i.ProductId);
-        builder.HasIndex(i => new { i.FlashSaleId, i.ProductId }).IsUnique();
+
+        builder.Property(i => i.VariantId).IsRequired();
+        builder.HasIndex(i => i.VariantId);
+        builder.HasIndex(i => new { i.FlashSaleId, i.VariantId }).IsUnique();
 
         builder.Property(i => i.FlashPrice).HasColumnType("decimal(18,2)").IsRequired();
         builder.Property(i => i.AllocatedQuantity).IsRequired();

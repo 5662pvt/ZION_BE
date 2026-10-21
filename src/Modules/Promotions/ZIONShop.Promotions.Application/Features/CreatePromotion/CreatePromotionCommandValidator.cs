@@ -39,12 +39,13 @@ public class CreatePromotionCommandValidator : AbstractValidator<CreatePromotion
         RuleFor(x => x.GiftItems).Must(items => items is null or { Count: 0 }).When(x => x.Type != "Gift")
             .WithMessage("'giftItems' chỉ áp dụng khi type là 'Gift'");
         RuleFor(x => x.GiftItems)
-            .Must(items => items!.Select(i => i.ProductId).Distinct().Count() == items!.Count)
+            .Must(items => items!.Select(i => i.VariantId ?? i.ProductId).Distinct().Count() == items!.Count)
             .When(x => x.Type == "Gift" && x.GiftItems is { Count: > 0 })
             .WithMessage("'giftItems' không được trùng sản phẩm");
         RuleForEach(x => x.GiftItems).ChildRules(item =>
         {
-            item.RuleFor(i => i.ProductId).NotEmpty();
+            item.RuleFor(i => i).Must(i => i.ProductId.HasValue || i.VariantId.HasValue)
+                .WithMessage("Mỗi quà tặng phải có 'productId' hoặc 'variantId'");
             item.RuleFor(i => i.Quantity).InclusiveBetween(1, 10);
         }).When(x => x.GiftItems is { Count: > 0 });
 

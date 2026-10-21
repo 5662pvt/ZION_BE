@@ -6,9 +6,16 @@ public class FakeProductPriceLookup : IProductPriceLookup
 {
     private readonly Dictionary<Guid, ProductPriceInfo> _products = new();
 
-    public FakeProductPriceLookup Add(Guid productId, string name, decimal unitPrice, string currency = "VND", bool isAvailable = true, string? slug = null, string? primaryImageUrl = null)
+    public FakeProductPriceLookup Add(Guid productId, string name, decimal unitPrice, string currency = "VND", bool isAvailable = true, string? slug = null, string? primaryImageUrl = null, Guid? variantId = null, string? variantLabel = null, string? sku = null)
     {
-        _products[productId] = new ProductPriceInfo(productId, name, unitPrice, currency, isAvailable, slug ?? name, primaryImageUrl);
+        _products[productId] = new ProductPriceInfo(productId, name, unitPrice, currency, isAvailable, slug ?? name, primaryImageUrl, variantId, variantLabel, sku);
+        return this;
+    }
+
+    /// <summary>Registers the same entry under a variant id so <c>GetAsync(variantId)</c> resolves it (mirrors the real lookup's VariantId ?? ProductId convention).</summary>
+    public FakeProductPriceLookup AddVariant(Guid productId, Guid variantId, string name, decimal unitPrice, string variantLabel, string? sku = null, string currency = "VND", bool isAvailable = true, string? slug = null, string? primaryImageUrl = null)
+    {
+        _products[variantId] = new ProductPriceInfo(productId, name, unitPrice, currency, isAvailable, slug ?? name, primaryImageUrl, variantId, variantLabel, sku);
         return this;
     }
 

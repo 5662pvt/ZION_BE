@@ -39,7 +39,7 @@ public class Order : AggregateRoot
         string currency,
         decimal shippingFee,
         ShippingAddress shippingAddress,
-        IReadOnlyList<(Guid ProductId, string ProductName, decimal UnitPrice, int Quantity)> lines,
+        IReadOnlyList<OrderLineInput> lines,
         string? note)
     {
         var order = new Order
@@ -56,7 +56,7 @@ public class Order : AggregateRoot
         };
 
         foreach (var line in lines)
-            order._lines.Add(OrderLine.Create(order.Id, line.ProductId, line.ProductName, line.UnitPrice, line.Quantity));
+            order._lines.Add(OrderLine.Create(order.Id, line.ProductId, line.ProductName, line.UnitPrice, line.Quantity, line.VariantId, line.VariantLabel, line.Sku));
 
         order.Subtotal = order._lines.Sum(l => l.LineTotal);
         order._statusHistory.Add(OrderStatusHistory.Create(order.Id, OrderStatus.PendingStock));
@@ -79,19 +79,19 @@ public class Order : AggregateRoot
     }
 
     /// <summary>Adds a free gift line granted by a Gift promotion. Does not affect Subtotal/discount (purchased-line only).</summary>
-    public Result AddGiftLine(Guid productId, string productName, int quantity, Guid promotionId)
+    public Result AddGiftLine(Guid productId, string productName, int quantity, Guid promotionId, Guid? variantId = null, string? variantLabel = null, string? sku = null)
     {
         if (Status != OrderStatus.PendingStock) return Result.Failure(OrdersErrors.InvalidTransition);
-        _lines.Add(OrderLine.CreateGift(Id, productId, productName, quantity, promotionId));
+        _lines.Add(OrderLine.CreateGift(Id, productId, productName, quantity, promotionId, variantId, variantLabel, sku));
         return Result.Success();
     }
 
     private const string GiftDroppedNote = "Quà tặng hết hàng – đã bỏ quà";
 
-    /// <summary>Removes gift lines for the given products (inventory could not cover them). Returns the removed lines.</summary>
-    public IReadOnlyList<OrderLine> DropGiftLines(IReadOnlyCollection<Guid> productIds)
+    /// <summary>Removes gift lines for the given variants (inventory could not cover them). Returns the removed lines.</summary>
+    public IReadOnlyList<OrderLine> DropGiftLines(IReadOnlyCollection<Guid> variantIds)
     {
-        var toRemove = _lines.Where(l => l.IsGift && productIds.Contains(l.ProductId)).ToList();
+        var toRemove = _lines.Where(l => l.IsGift && variantIds.Contains(l.VariantId)).ToList();
         if (toRemove.Count == 0) return Array.Empty<OrderLine>();
 
         foreach (var line in toRemove) _lines.Remove(line);

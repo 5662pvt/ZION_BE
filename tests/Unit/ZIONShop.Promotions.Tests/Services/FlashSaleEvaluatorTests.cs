@@ -26,13 +26,13 @@ public class FlashSaleEvaluatorTests
 
     private static async Task<FlashSaleItem> SeedActiveFlashSaleItemAsync(
         PromotionsDbContext db, Guid productId, decimal flashPrice, int allocatedQuantity,
-        DateTime? startsAt = null, DateTime? endsAt = null)
+        DateTime? startsAt = null, DateTime? endsAt = null, Guid? variantId = null)
     {
         var flashSale = FlashSale.Create("Flash", startsAt ?? DateTime.UtcNow.AddHours(-1), endsAt ?? DateTime.UtcNow.AddHours(1));
         flashSale.Activate();
         db.FlashSales.Add(flashSale);
 
-        var item = FlashSaleItem.Create(flashSale.Id, productId, flashPrice, allocatedQuantity);
+        var item = FlashSaleItem.Create(flashSale.Id, productId, variantId ?? productId, flashPrice, allocatedQuantity);
         db.FlashSaleItems.Add(item);
 
         await db.SaveChangesAsync();
@@ -162,5 +162,39 @@ public class FlashSaleEvaluatorTests
         var (_, evaluator) = BuildScope();
 
         await evaluator.ReleaseAsync(Guid.NewGuid()); // must not throw
+    }
+
+    [Fact]
+    public async Task QuoteAsync_Should_MatchByVariant_When_SameProductHasTwoFlashPricedVariants()
+    {
+        var (db, evaluator) = BuildScope();
+        var productId = Guid.NewGuid();
+        var variantA = Guid.NewGuid();
+        var variantB = Guid.NewGuid();
+        var itemA = await SeedActiveFlashSaleItemAsync(db, productId, 40000m, 5, variantId: variantA);
+        await SeedActiveFlashSaleItemAsync(db, productId, 60000m, 5, variantId: variantB);
+
+        var quotes = await evaluator.QuoteAsync(new[] { new FlashSaleLine(productId, 1, variantA) });
+
+        quotes.Should().ContainSingle(q => q.FlashSaleItemId == itemA.Id && q.FlashUnitPrice == 40000m && q.VariantId == variantA);
+    }
+
+    [Fact]
+    public async Task ReserveAsync_Should_MoveOnlyThatVariantsQuota_When_SameProductHasTwoFlashPricedVariants()
+    {
+        var (db, evaluator) = BuildScope();
+        var productId = Guid.NewGuid();
+        var variantA = Guid.NewGuid();
+        var variantB = Guid.NewGuid();
+        var itemA = await SeedActiveFlashSaleItemAsync(db, productId, 40000m, 5, variantId: variantA);
+        var itemB = await SeedActiveFlashSaleItemAsync(db, productId, 60000m, 5, variantId: variantB);
+
+        var quotes = await evaluator.ReserveAsync(new[] { new FlashSaleLine(productId, 2, variantA) }, Guid.NewGuid(), Guid.NewGuid());
+
+        quotes.Should().ContainSingle(q => q.VariantId == variantA && q.FlashSaleItemId == itemA.Id);
+        var reloadedA = await db.FlashSaleItems.AsNoTracking().FirstAsync(i => i.Id == itemA.Id);
+        var reloadedB = await db.FlashSaleItems.AsNoTracking().FirstAsync(i => i.Id == itemB.Id);
+        reloadedA.SoldQuantity.Should().Be(2);
+        reloadedB.SoldQuantity.Should().Be(0, "only the reserved variant's quota should move");
     }
 }

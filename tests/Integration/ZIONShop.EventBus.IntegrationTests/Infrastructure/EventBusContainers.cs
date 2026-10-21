@@ -1,3 +1,5 @@
+using System.Net;
+using System.Net.Sockets;
 using Testcontainers.PostgreSql;
 using Testcontainers.RabbitMq;
 
@@ -11,7 +13,24 @@ public sealed class EventBusContainers : IAsyncLifetime
     // uses Stop/StartAsync on this same container instead. A fixed host port binding keeps the
     // mapped port (and thus RabbitMqOptions.Port) stable across that restart -- a fresh dynamic
     // mapping would otherwise break any connection/options captured before the restart.
-    public const int RabbitMqHostPort = 57672;
+    // The port is picked at runtime (instead of a hard-coded literal) because Windows/Hyper-V's
+    // WinNAT dynamic port-exclusion ranges shift on every reboot, so any fixed literal can land
+    // inside an excluded range and make Docker refuse to bind it.
+    public static readonly int RabbitMqHostPort = GetAvailablePort();
+
+    private static int GetAvailablePort()
+    {
+        var listener = new TcpListener(IPAddress.Loopback, 0);
+        listener.Start();
+        try
+        {
+            return ((IPEndPoint)listener.LocalEndpoint).Port;
+        }
+        finally
+        {
+            listener.Stop();
+        }
+    }
 
     public RabbitMqContainer RabbitMq { get; } = new RabbitMqBuilder()
         .WithImage("rabbitmq:3-management")

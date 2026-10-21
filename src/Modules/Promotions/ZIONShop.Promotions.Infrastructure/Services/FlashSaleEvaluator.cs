@@ -42,10 +42,11 @@ public class FlashSaleEvaluator : IFlashSaleEvaluator
 
         foreach (var line in lines)
         {
-            var item = await FindActiveItemAsync(line.ProductId, now, ct);
+            var variantKey = line.VariantId ?? line.ProductId;
+            var item = await FindActiveItemAsync(variantKey, now, ct);
             if (item is null || item.Available < line.Quantity) continue;
 
-            quotes.Add(new FlashSaleQuote(line.ProductId, item.Id, item.FlashPrice));
+            quotes.Add(new FlashSaleQuote(line.ProductId, item.Id, item.FlashPrice, item.VariantId));
         }
 
         return quotes;
@@ -64,12 +65,13 @@ public class FlashSaleEvaluator : IFlashSaleEvaluator
 
         foreach (var line in lines)
         {
-            var item = await FindActiveItemAsync(line.ProductId, now, ct);
+            var variantKey = line.VariantId ?? line.ProductId;
+            var item = await FindActiveItemAsync(variantKey, now, ct);
             if (item is null) continue;
 
             if (activeByItemId.TryGetValue(item.Id, out var existing))
             {
-                quotes.Add(new FlashSaleQuote(line.ProductId, item.Id, existing.UnitFlashPrice));
+                quotes.Add(new FlashSaleQuote(line.ProductId, item.Id, existing.UnitFlashPrice, item.VariantId));
                 continue;
             }
 
@@ -80,7 +82,7 @@ public class FlashSaleEvaluator : IFlashSaleEvaluator
             await _redemptions.AddAsync(redemption, ct);
             changed = true;
 
-            quotes.Add(new FlashSaleQuote(line.ProductId, item.Id, item.FlashPrice));
+            quotes.Add(new FlashSaleQuote(line.ProductId, item.Id, item.FlashPrice, item.VariantId));
         }
 
         if (changed)
@@ -107,14 +109,14 @@ public class FlashSaleEvaluator : IFlashSaleEvaluator
             await _uow.SaveChangesAsync(ct);
     }
 
-    private Task<FlashSaleItem?> FindActiveItemAsync(Guid productId, DateTime now, CancellationToken ct)
+    private Task<FlashSaleItem?> FindActiveItemAsync(Guid variantId, DateTime now, CancellationToken ct)
     {
         var activeFlashSaleIds = _flashSales.Query().AsNoTracking()
             .Where(f => f.IsActive && f.StartsAt <= now && f.EndsAt >= now)
             .Select(f => f.Id);
 
         return _items.Query().AsNoTracking()
-            .Where(i => i.ProductId == productId && activeFlashSaleIds.Contains(i.FlashSaleId))
+            .Where(i => i.VariantId == variantId && activeFlashSaleIds.Contains(i.FlashSaleId))
             .OrderBy(i => i.FlashPrice)
             .FirstOrDefaultAsync(ct);
     }

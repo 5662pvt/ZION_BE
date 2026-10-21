@@ -15,17 +15,20 @@ public class AddFlashSaleItemCommandHandler : IRequestHandler<AddFlashSaleItemCo
     private readonly IFlashSaleRepository _flashSales;
     private readonly IFlashSaleItemRepository _items;
     private readonly IProductCatalogReader _catalogReader;
+    private readonly IProductPriceLookup _priceLookup;
     private readonly IPromotionsUnitOfWork _uow;
 
     public AddFlashSaleItemCommandHandler(
         IFlashSaleRepository flashSales,
         IFlashSaleItemRepository items,
         IProductCatalogReader catalogReader,
+        IProductPriceLookup priceLookup,
         IPromotionsUnitOfWork uow)
     {
         _flashSales = flashSales;
         _items = items;
         _catalogReader = catalogReader;
+        _priceLookup = priceLookup;
         _uow = uow;
     }
 
@@ -34,17 +37,26 @@ public class AddFlashSaleItemCommandHandler : IRequestHandler<AddFlashSaleItemCo
         var flashSale = await _flashSales.GetByIdAsync(request.FlashSaleId, cancellationToken);
         if (flashSale is null) return Result.Failure<FlashSaleItemDto>(PromotionsErrors.FlashSaleNotFound);
 
-        var product = await _catalogReader.GetAsync(request.ProductId, cancellationToken);
-        if (product is null) return Result.Failure<FlashSaleItemDto>(PromotionsErrors.FlashSaleProductNotFound);
+        var variantId = request.VariantId;
+        if (variantId is null && request.ProductId.HasValue)
+        {
+            var priceInfo = await _priceLookup.GetAsync(request.ProductId.Value, cancellationToken);
+            variantId = priceInfo?.VariantId;
+        }
+
+        if (variantId is null) return Result.Failure<FlashSaleItemDto>(PromotionsErrors.FlashSaleVariantRequired);
+
+        var variant = await _catalogReader.GetVariantAsync(variantId.Value, cancellationToken);
+        if (variant is null) return Result.Failure<FlashSaleItemDto>(PromotionsErrors.FlashSaleProductNotFound);
 
         var existingItems = await _items.GetByFlashSaleIdAsync(flashSale.Id, cancellationToken);
-        if (existingItems.Any(i => i.ProductId == request.ProductId))
+        if (existingItems.Any(i => i.VariantId == variantId.Value))
             return Result.Failure<FlashSaleItemDto>(PromotionsErrors.FlashSaleItemProductAlreadyAdded);
 
-        var item = FlashSaleItem.Create(flashSale.Id, request.ProductId, request.FlashPrice, request.AllocatedQuantity);
+        var item = FlashSaleItem.Create(flashSale.Id, variant.ProductId, variantId.Value, request.FlashPrice, request.AllocatedQuantity);
         await _items.AddAsync(item, cancellationToken);
         await _uow.SaveChangesAsync(cancellationToken);
 
-        return Result.Success(item.ToDto());
+        return Result.Success(item.ToDto(variant.Sku, variant.VariantLabel));
     }
 }

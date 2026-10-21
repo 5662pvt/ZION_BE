@@ -63,7 +63,7 @@ public class FlashSaleItemTests
     [Fact]
     public void TryReserve_Should_IncrementSoldQuantity_When_WithinAllocation()
     {
-        var item = FlashSaleItem.Create(Guid.NewGuid(), Guid.NewGuid(), 50000m, allocatedQuantity: 10);
+        var item = FlashSaleItem.Create(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), 50000m, allocatedQuantity: 10);
 
         var reserved = item.TryReserve(4);
 
@@ -75,7 +75,7 @@ public class FlashSaleItemTests
     [Fact]
     public void TryReserve_Should_Fail_When_QuantityExceedsRemainingAllocation()
     {
-        var item = FlashSaleItem.Create(Guid.NewGuid(), Guid.NewGuid(), 50000m, allocatedQuantity: 10);
+        var item = FlashSaleItem.Create(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), 50000m, allocatedQuantity: 10);
         item.TryReserve(8);
 
         var reserved = item.TryReserve(3); // only 2 left -- all-or-nothing, must fail entirely
@@ -87,7 +87,7 @@ public class FlashSaleItemTests
     [Fact]
     public void Release_Should_DecrementSoldQuantity_ButFloorAtZero()
     {
-        var item = FlashSaleItem.Create(Guid.NewGuid(), Guid.NewGuid(), 50000m, allocatedQuantity: 10);
+        var item = FlashSaleItem.Create(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), 50000m, allocatedQuantity: 10);
         item.TryReserve(3);
 
         item.Release(5); // releasing more than reserved must still floor at 0, never go negative

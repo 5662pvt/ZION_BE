@@ -747,4 +747,119 @@ public class PlaceOrderCommandHandlerTests
         flashSales.ReleasedOrderIds.Should().HaveCount(1);
         flashSales.ReserveCalls.Should().ContainSingle(c => c.OrderId == flashSales.ReleasedOrderIds[0]);
     }
+
+    [Fact]
+    public async Task Handle_Should_PriceAndStockEachVariantSeparately_When_CartHasTwoVariantsOfSameProduct()
+    {
+        var (db, orders) = BuildScope();
+        var userId = Guid.NewGuid();
+        var addressId = Guid.NewGuid();
+        var productId = Guid.NewGuid();
+        var variantRed = Guid.NewGuid();
+        var variantBlue = Guid.NewGuid();
+
+        var cart = new FakeCartReader().WithCart(userId, "VND",
+            new CartSnapshotLine(productId, "Áo thun", 2, 100000m, variantRed),
+            new CartSnapshotLine(productId, "Áo thun", 1, 100000m, variantBlue));
+        var addresses = new FakeUserAddressReader().WithAddress(userId, addressId);
+        var prices = new FakeProductPriceLookup()
+            .AddVariant(productId, variantRed, "Áo thun", 100000m, "Đỏ")
+            .AddVariant(productId, variantBlue, "Áo thun", 120000m, "Xanh");
+        var stock = new FakeStockAvailabilityReader().WithAvailable(variantRed, 2).WithAvailable(variantBlue, 1);
+
+        var handler = new PlaceOrderCommandHandler(orders, db, cart, addresses, prices, new FakePromotionEvaluator(), new FakeGiftPromotionEvaluator(), new FakeFlashSaleEvaluator(), stock, DefaultShippingFeeCalculator(), new FakeOrderIdempotencyKeyRepository(), new FakeIdempotencyLock(), TimeProvider.System, DefaultCheckout());
+        var result = await handler.Handle(new PlaceOrderCommand(userId, addressId, "COD", null), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Order.Lines.Should().HaveCount(2);
+        result.Value.Order.Lines.Should().ContainSingle(l => l.VariantId == variantRed && l.VariantLabel == "Đỏ" && l.UnitPrice == 100000m && l.Quantity == 2);
+        result.Value.Order.Lines.Should().ContainSingle(l => l.VariantId == variantBlue && l.VariantLabel == "Xanh" && l.UnitPrice == 120000m && l.Quantity == 1);
+        result.Value.Order.Subtotal.Should().Be(320000m);
+    }
+
+    [Fact]
+    public async Task Handle_Should_ReturnInsufficientStockForThatVariantOnly_When_OneOfTwoVariantsIsShort()
+    {
+        var (db, orders) = BuildScope();
+        var userId = Guid.NewGuid();
+        var addressId = Guid.NewGuid();
+        var productId = Guid.NewGuid();
+        var variantRed = Guid.NewGuid();
+        var variantBlue = Guid.NewGuid();
+
+        var cart = new FakeCartReader().WithCart(userId, "VND",
+            new CartSnapshotLine(productId, "Áo thun", 2, 100000m, variantRed),
+            new CartSnapshotLine(productId, "Áo thun", 1, 100000m, variantBlue));
+        var addresses = new FakeUserAddressReader().WithAddress(userId, addressId);
+        var prices = new FakeProductPriceLookup()
+            .AddVariant(productId, variantRed, "Áo thun", 100000m, "Đỏ")
+            .AddVariant(productId, variantBlue, "Áo thun", 120000m, "Xanh");
+        var stock = new FakeStockAvailabilityReader().WithAvailable(variantRed, 2).WithAvailable(variantBlue, 0); // blue short
+
+        var handler = new PlaceOrderCommandHandler(orders, db, cart, addresses, prices, new FakePromotionEvaluator(), new FakeGiftPromotionEvaluator(), new FakeFlashSaleEvaluator(), stock, DefaultShippingFeeCalculator(), new FakeOrderIdempotencyKeyRepository(), new FakeIdempotencyLock(), TimeProvider.System, DefaultCheckout());
+        var result = await handler.Handle(new PlaceOrderCommand(userId, addressId, "COD", null), CancellationToken.None);
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Code.Should().Be("Orders.InsufficientStock");
+        result.Error.Message.Should().Contain("Áo thun – Xanh");
+        result.Error.Message.Should().NotContain("Đỏ");
+        (await db.Orders.CountAsync()).Should().Be(0);
+    }
+
+    [Fact]
+    public async Task Handle_Should_ApplyFlashPriceToMatchingVariantOnly_When_OnlyOneVariantIsFlashSaleQuoted()
+    {
+        var (db, orders) = BuildScope();
+        var userId = Guid.NewGuid();
+        var addressId = Guid.NewGuid();
+        var productId = Guid.NewGuid();
+        var variantRed = Guid.NewGuid();
+        var variantBlue = Guid.NewGuid();
+
+        var cart = new FakeCartReader().WithCart(userId, "VND",
+            new CartSnapshotLine(productId, "Áo thun", 1, 100000m, variantRed),
+            new CartSnapshotLine(productId, "Áo thun", 1, 100000m, variantBlue));
+        var addresses = new FakeUserAddressReader().WithAddress(userId, addressId);
+        var prices = new FakeProductPriceLookup()
+            .AddVariant(productId, variantRed, "Áo thun", 100000m, "Đỏ")
+            .AddVariant(productId, variantBlue, "Áo thun", 100000m, "Xanh");
+        var stock = new FakeStockAvailabilityReader().WithAvailable(variantRed, 1).WithAvailable(variantBlue, 1);
+        var flashSaleItemId = Guid.NewGuid();
+        var flashSales = new FakeFlashSaleEvaluator { NextQuotes = new[] { new FlashSaleQuote(productId, flashSaleItemId, 60000m, variantRed) } };
+
+        var handler = new PlaceOrderCommandHandler(orders, db, cart, addresses, prices, new FakePromotionEvaluator(), new FakeGiftPromotionEvaluator(), flashSales, stock, DefaultShippingFeeCalculator(), new FakeOrderIdempotencyKeyRepository(), new FakeIdempotencyLock(), TimeProvider.System, DefaultCheckout());
+        var result = await handler.Handle(new PlaceOrderCommand(userId, addressId, "COD", null), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Order.Lines.Should().ContainSingle(l => l.VariantId == variantRed && l.UnitPrice == 60000m);
+        result.Value.Order.Lines.Should().ContainSingle(l => l.VariantId == variantBlue && l.UnitPrice == 100000m);
+    }
+
+    [Fact]
+    public async Task Handle_Should_AddGiftLineWithGrantedVariant_When_GiftPromotionGrantsASpecificVariant()
+    {
+        var (db, orders) = BuildScope();
+        var userId = Guid.NewGuid();
+        var addressId = Guid.NewGuid();
+        var productId = Guid.NewGuid();
+        var giftProductId = Guid.NewGuid();
+        var giftVariantId = Guid.NewGuid();
+        var promotionId = Guid.NewGuid();
+
+        var cart = new FakeCartReader().WithCart(userId, "VND", new CartSnapshotLine(productId, "Widget", 2, 100000m));
+        var addresses = new FakeUserAddressReader().WithAddress(userId, addressId);
+        var prices = new FakeProductPriceLookup()
+            .Add(productId, "Widget", 100000m)
+            .AddVariant(giftProductId, giftVariantId, "Nón lưỡi trai", 50000m, "Đen");
+        var giftEvaluator = new FakeGiftPromotionEvaluator().WithGrant(promotionId, giftProductId, 1, variantId: giftVariantId);
+        var stock = new FakeStockAvailabilityReader().WithAvailable(productId, 2).WithAvailable(giftVariantId, 5);
+
+        var handler = new PlaceOrderCommandHandler(orders, db, cart, addresses, prices, new FakePromotionEvaluator(), giftEvaluator, new FakeFlashSaleEvaluator(), stock, DefaultShippingFeeCalculator(), new FakeOrderIdempotencyKeyRepository(), new FakeIdempotencyLock(), TimeProvider.System, DefaultCheckout());
+        var result = await handler.Handle(new PlaceOrderCommand(userId, addressId, "COD", null), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        var giftLine = result.Value.Order.Lines.Should().ContainSingle(l => l.IsGift).Subject;
+        giftLine.VariantId.Should().Be(giftVariantId);
+        giftLine.VariantLabel.Should().Be("Đen");
+    }
 }

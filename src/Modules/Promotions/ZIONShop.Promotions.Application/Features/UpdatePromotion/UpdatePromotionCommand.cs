@@ -20,4 +20,4 @@ public record UpdatePromotionCommand(
     IReadOnlyList<Guid>? TargetProductIds = null,
     IReadOnlyList<Guid>? TargetCategoryIds = null,
     int? MinQuantity = null,
-    IReadOnlyList<GiftItemDto>? GiftItems = null) : IRequest<Result<PromotionDto>>;
+    IReadOnlyList<GiftItemInputDto>? GiftItems = null) : IRequest<Result<PromotionDto>>;

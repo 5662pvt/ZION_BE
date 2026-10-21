@@ -36,19 +36,20 @@ public class GetGiftPreviewQueryHandler : IRequestHandler<GetGiftPreviewQuery, R
         if (grants.Count == 0)
             return Result.Success<IReadOnlyList<GiftPreviewDto>>(Array.Empty<GiftPreviewDto>());
 
-        var productIds = grants.Select(g => g.ProductId).Distinct().ToList();
-        var available = await _stockReader.GetAvailableAsync(productIds, cancellationToken);
-        var productInfo = await _priceLookup.GetManyAsync(productIds, cancellationToken);
-        var cartQuantities = cart.Lines.GroupBy(l => l.ProductId).ToDictionary(g => g.Key, g => g.Sum(l => l.Quantity));
+        var variantKeys = grants.Select(g => g.VariantId ?? g.ProductId).Distinct().ToList();
+        var available = await _stockReader.GetAvailableAsync(variantKeys, cancellationToken);
+        var productInfo = await _priceLookup.GetManyAsync(variantKeys, cancellationToken);
+        var cartQuantities = cart.Lines.GroupBy(l => l.VariantId ?? l.ProductId).ToDictionary(g => g.Key, g => g.Sum(l => l.Quantity));
 
         var items = grants.Select(g =>
         {
-            productInfo.TryGetValue(g.ProductId, out var info);
-            var availableQty = available.TryGetValue(g.ProductId, out var qty) ? qty : 0;
-            var alreadyInCart = cartQuantities.TryGetValue(g.ProductId, out var cartQty) ? cartQty : 0;
+            var key = g.VariantId ?? g.ProductId;
+            productInfo.TryGetValue(key, out var info);
+            var availableQty = available.TryGetValue(key, out var qty) ? qty : 0;
+            var alreadyInCart = cartQuantities.TryGetValue(key, out var cartQty) ? cartQty : 0;
             var isAvailable = availableQty >= g.Quantity + alreadyInCart;
 
-            return new GiftPreviewDto(g.PromotionId, g.PromotionName, g.ProductId, info?.Name ?? string.Empty, info?.PrimaryImageUrl, g.Quantity, isAvailable);
+            return new GiftPreviewDto(g.PromotionId, g.PromotionName, g.ProductId, key, info?.VariantLabel, info?.Name ?? string.Empty, info?.PrimaryImageUrl, g.Quantity, isAvailable);
         }).ToList();
 
         return Result.Success<IReadOnlyList<GiftPreviewDto>>(items);

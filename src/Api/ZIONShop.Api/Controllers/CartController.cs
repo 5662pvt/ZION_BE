@@ -39,7 +39,7 @@ public class CartController : ControllerBase
     public async Task<IActionResult> AddItem([FromBody] AddCartItemBody body, CancellationToken ct)
     {
         var anonymous = ResolveAnonymous();
-        var result = await _mediator.Send(new AddCartItemCommand(_currentUser.UserId, anonymous, body.ProductId, body.Quantity), ct);
+        var result = await _mediator.Send(new AddCartItemCommand(_currentUser.UserId, anonymous, body.ProductId, body.VariantId, body.Quantity), ct);
         return result.ToActionResult("Item added");
     }
 
@@ -90,5 +90,5 @@ public class CartController : ControllerBase
     }
 }
 
-public record AddCartItemBody(Guid ProductId, int Quantity);
+public record AddCartItemBody(Guid? ProductId, Guid? VariantId, int Quantity);
 public record UpdateCartItemBody(int Quantity);

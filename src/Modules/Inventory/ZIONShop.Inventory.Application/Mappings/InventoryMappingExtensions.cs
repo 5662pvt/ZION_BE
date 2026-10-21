@@ -7,6 +7,8 @@ public static class InventoryMappingExtensions
 {
     public static InventoryItemDto ToDto(this InventoryItem item) => new(
         item.ProductId,
+        item.VariantId,
+        item.VariantLabel,
         item.Sku,
         item.ProductName,
         item.OnHand,
@@ -18,6 +20,7 @@ public static class InventoryMappingExtensions
     public static StockMovementDto ToDto(this StockMovement movement) => new(
         movement.Id,
         movement.ProductId,
+        movement.VariantId,
         movement.Type.ToString(),
         movement.Quantity,
         movement.Reference,

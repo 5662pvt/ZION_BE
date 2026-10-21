@@ -12,7 +12,7 @@ public class OrderGiftLineTests
         "VND",
         30000,
         new ShippingAddress(Guid.NewGuid(), "Nguyen Van A", "0900000000", "Hà Nội", "Cầu Giấy", "123 Đường ABC"),
-        new[] { (Guid.NewGuid(), "Widget", 100000m, 2) },
+        new[] { new OrderLineInput(Guid.NewGuid(), "Widget", 100000m, 2) },
         null);
 
     [Fact]
@@ -85,5 +85,39 @@ public class OrderGiftLineTests
 
         dropped.Should().BeEmpty();
         order.StatusHistory.Should().HaveCount(historyCountBefore);
+    }
+
+    [Fact]
+    public void AddGiftLine_Should_StampGrantedVariant_When_GiftIsASpecificVariant()
+    {
+        var order = CreateOrder();
+        var giftProductId = Guid.NewGuid();
+        var giftVariantId = Guid.NewGuid();
+        var promotionId = Guid.NewGuid();
+
+        var result = order.AddGiftLine(giftProductId, "Nón lưỡi trai", 1, promotionId, giftVariantId, "Đen", "HAT-BLK");
+
+        result.IsSuccess.Should().BeTrue();
+        var giftLine = order.Lines.Should().ContainSingle(l => l.IsGift).Subject;
+        giftLine.VariantId.Should().Be(giftVariantId);
+        giftLine.VariantLabel.Should().Be("Đen");
+        giftLine.Sku.Should().Be("HAT-BLK");
+    }
+
+    [Fact]
+    public void DropGiftLines_Should_KeyOffVariantId_Not_ProductId()
+    {
+        var order = CreateOrder();
+        var sharedProductId = Guid.NewGuid();
+        var giftVariantA = Guid.NewGuid();
+        var giftVariantB = Guid.NewGuid();
+        var promotionId = Guid.NewGuid();
+        order.AddGiftLine(sharedProductId, "Áo thun", 1, promotionId, giftVariantA, "Đỏ");
+        order.AddGiftLine(sharedProductId, "Áo thun", 1, promotionId, giftVariantB, "Xanh");
+
+        var dropped = order.DropGiftLines(new[] { giftVariantA });
+
+        dropped.Should().ContainSingle(l => l.VariantId == giftVariantA);
+        order.Lines.Should().ContainSingle(l => l.IsGift && l.VariantId == giftVariantB);
     }
 }

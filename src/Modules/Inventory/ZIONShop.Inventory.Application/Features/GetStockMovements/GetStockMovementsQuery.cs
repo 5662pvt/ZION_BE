@@ -5,4 +5,5 @@ using ZIONShop.SharedKernel.Results;
 
 namespace ZIONShop.Inventory.Application.Features.GetStockMovements;
 
-public record GetStockMovementsQuery(Guid ProductId, int Page, int PageSize) : IRequest<Result<PagedResult<StockMovementDto>>>;
+/// <summary>When <paramref name="IsVariantId"/> is false, <paramref name="Id"/> is resolved via <see cref="Services.ProductOrVariantIdResolver"/> (legacy product-id route); when true it is used directly as a variant id.</summary>
+public record GetStockMovementsQuery(Guid Id, bool IsVariantId, int Page, int PageSize) : IRequest<Result<PagedResult<StockMovementDto>>>;

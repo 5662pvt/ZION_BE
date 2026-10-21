@@ -1,8 +1,10 @@
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 using ZIONShop.Common.Pagination;
+using ZIONShop.Contracts.Products;
 using ZIONShop.Inventory.Application.DTOs;
 using ZIONShop.Inventory.Application.Mappings;
+using ZIONShop.Inventory.Application.Services;
 using ZIONShop.Inventory.Domain.Repositories;
 using ZIONShop.SharedKernel.Results;
 
@@ -11,13 +13,30 @@ namespace ZIONShop.Inventory.Application.Features.GetStockMovements;
 public class GetStockMovementsQueryHandler : IRequestHandler<GetStockMovementsQuery, Result<PagedResult<StockMovementDto>>>
 {
     private readonly IStockMovementRepository _movements;
+    private readonly IProductCatalogReader _catalog;
 
-    public GetStockMovementsQueryHandler(IStockMovementRepository movements) => _movements = movements;
+    public GetStockMovementsQueryHandler(IStockMovementRepository movements, IProductCatalogReader catalog)
+    {
+        _movements = movements;
+        _catalog = catalog;
+    }
 
     public async Task<Result<PagedResult<StockMovementDto>>> Handle(GetStockMovementsQuery request, CancellationToken cancellationToken)
     {
+        Guid variantId;
+        if (request.IsVariantId)
+        {
+            variantId = request.Id;
+        }
+        else
+        {
+            var resolved = await ProductOrVariantIdResolver.ResolveAsync(_catalog, request.Id, cancellationToken);
+            if (resolved.IsFailure) return Result.Failure<PagedResult<StockMovementDto>>(resolved.Error);
+            variantId = resolved.Value;
+        }
+
         var query = _movements.Query().AsNoTracking()
-            .Where(m => m.ProductId == request.ProductId)
+            .Where(m => m.VariantId == variantId)
             .OrderByDescending(m => m.CreatedAt);
 
         var page = request.Page < 1 ? 1 : request.Page;

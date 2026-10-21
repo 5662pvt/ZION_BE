@@ -6,7 +6,7 @@ public class AdjustStockCommandValidator : AbstractValidator<AdjustStockCommand>
 {
     public AdjustStockCommandValidator()
     {
-        RuleFor(x => x.ProductId).NotEmpty();
+        RuleFor(x => x.Id).NotEmpty();
         RuleFor(x => x.Delta).NotEqual(0).WithMessage("Delta must not be zero");
         RuleFor(x => x.Reason).NotEmpty().MaximumLength(256);
     }

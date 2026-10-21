@@ -12,9 +12,12 @@ public class InventoryItemConfiguration : IEntityTypeConfiguration<InventoryItem
         builder.HasKey(i => i.Id);
 
         builder.Property(i => i.ProductId).IsRequired();
-        builder.HasIndex(i => i.ProductId).IsUnique();
+        builder.HasIndex(i => i.ProductId);
+        builder.Property(i => i.VariantId).IsRequired();
+        builder.HasIndex(i => i.VariantId).IsUnique();
         builder.Property(i => i.Sku).IsRequired().HasMaxLength(64);
         builder.Property(i => i.ProductName).IsRequired().HasMaxLength(256);
+        builder.Property(i => i.VariantLabel).HasMaxLength(256);
         builder.Property(i => i.OnHand).IsRequired();
         builder.Property(i => i.Reserved).IsRequired();
         builder.Property(i => i.LowStockThreshold).IsRequired();

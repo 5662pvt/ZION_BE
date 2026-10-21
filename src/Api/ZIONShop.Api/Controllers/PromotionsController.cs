@@ -47,7 +47,7 @@ public class PromotionsController : ControllerBase
         var cmd = new CreatePromotionCommand(
             body.Name, body.Description, body.Type, body.Value, body.MaxDiscountAmount, body.MinOrderSubtotal,
             body.StartsAt, body.EndsAt, body.UsageLimit, body.PerUserLimit, body.Scope, body.TargetProductIds, body.TargetCategoryIds,
-            body.MinQuantity, body.GiftItems?.Select(g => new GiftItemDto(g.ProductId, g.Quantity)).ToList());
+            body.MinQuantity, body.GiftItems?.Select(g => new GiftItemInputDto(g.ProductId, g.VariantId, g.Quantity)).ToList());
         return (await _mediator.Send(cmd, ct)).ToActionResult("Promotion created");
     }
 
@@ -58,7 +58,7 @@ public class PromotionsController : ControllerBase
         var cmd = new UpdatePromotionCommand(
             id, body.Name, body.Description, body.Type, body.Value, body.MaxDiscountAmount, body.MinOrderSubtotal,
             body.StartsAt, body.EndsAt, body.UsageLimit, body.PerUserLimit, body.Scope, body.TargetProductIds, body.TargetCategoryIds,
-            body.MinQuantity, body.GiftItems?.Select(g => new GiftItemDto(g.ProductId, g.Quantity)).ToList());
+            body.MinQuantity, body.GiftItems?.Select(g => new GiftItemInputDto(g.ProductId, g.VariantId, g.Quantity)).ToList());
         return (await _mediator.Send(cmd, ct)).ToActionResult("Promotion updated");
     }
 
@@ -109,4 +109,4 @@ public record PromotionUpsertRequest(
 
 public record CreateCouponBody(string Code);
 public record GenerateCouponsBody(string Prefix, int Count);
-public record GiftItemBody(Guid ProductId, int Quantity);
+public record GiftItemBody(Guid? ProductId, Guid? VariantId, int Quantity);

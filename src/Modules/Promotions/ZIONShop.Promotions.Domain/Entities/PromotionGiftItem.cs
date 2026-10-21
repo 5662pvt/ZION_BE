@@ -1,18 +1,20 @@
 namespace ZIONShop.Promotions.Domain.Entities;
 
-/// <summary>Owned child collection of <see cref="Promotion"/> (table promotion_gift_items, PK (PromotionId, ProductId)).</summary>
+/// <summary>Owned child collection of <see cref="Promotion"/> (table promotion_gift_items, PK (PromotionId, VariantId)). ProductId is kept as a plain parent-product reference.</summary>
 public class PromotionGiftItem
 {
     private PromotionGiftItem() { }
 
     public Guid PromotionId { get; private set; }
     public Guid ProductId { get; private set; }
+    public Guid VariantId { get; private set; }
     public int Quantity { get; private set; }
 
-    public static PromotionGiftItem Create(Guid promotionId, Guid productId, int quantity) => new()
+    public static PromotionGiftItem Create(Guid promotionId, Guid productId, Guid variantId, int quantity) => new()
     {
         PromotionId = promotionId,
         ProductId = productId,
+        VariantId = variantId,
         Quantity = quantity
     };
 }

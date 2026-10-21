@@ -22,10 +22,10 @@ public class OrderReservationReleaseRequestedIntegrationEventHandlerTests
 
         using (var seedDb = CreateDb(dbName))
         {
-            var seedItem = InventoryItem.Create(productId, "SKU-A", "Product A", 10);
+            var seedItem = InventoryItem.Create(productId, productId, "SKU-A", "Product A", null, 10);
             seedItem.Reserve(4);
             await seedDb.InventoryItems.AddAsync(seedItem);
-            await seedDb.StockReservations.AddAsync(StockReservation.Create(orderId, productId, 4, null, DateTime.UtcNow));
+            await seedDb.StockReservations.AddAsync(StockReservation.Create(orderId, productId, productId, 4, null, DateTime.UtcNow));
             await seedDb.SaveChangesAsync();
         }
 
@@ -66,10 +66,10 @@ public class OrderReservationReleaseRequestedIntegrationEventHandlerTests
 
         using (var seedDb = CreateDb(dbName))
         {
-            var seedItem = InventoryItem.Create(productId, "SKU-A", "Product A", 10);
+            var seedItem = InventoryItem.Create(productId, productId, "SKU-A", "Product A", null, 10);
             seedItem.Reserve(4);
             await seedDb.InventoryItems.AddAsync(seedItem);
-            await seedDb.StockReservations.AddAsync(StockReservation.Create(orderId, productId, 4, null, DateTime.UtcNow));
+            await seedDb.StockReservations.AddAsync(StockReservation.Create(orderId, productId, productId, 4, null, DateTime.UtcNow));
             await seedDb.SaveChangesAsync();
         }
 
@@ -106,16 +106,16 @@ public class OrderReservationReleaseRequestedIntegrationEventHandlerTests
 
         var items = new FakeInventoryItemRepository();
         items.Seed(
-            InventoryItem.Create(productHigh, "SKU-H", "Product High", 10),
-            InventoryItem.Create(productLow, "SKU-L", "Product Low", 10));
+            InventoryItem.Create(productHigh, productHigh, "SKU-H", "Product High", null, 10),
+            InventoryItem.Create(productLow, productLow, "SKU-L", "Product Low", null, 10));
         items.Get(productHigh)!.Reserve(2);
         items.Get(productLow)!.Reserve(3);
 
         var recorder = new RecordingInventoryItemRepository(items);
         var reservations = new FakeStockReservationRepository();
         // Submitted high-id-first -- the handler must still release low-id-first.
-        await reservations.AddAsync(StockReservation.Create(orderId, productHigh, 2, null, DateTime.UtcNow));
-        await reservations.AddAsync(StockReservation.Create(orderId, productLow, 3, null, DateTime.UtcNow));
+        await reservations.AddAsync(StockReservation.Create(orderId, productHigh, productHigh, 2, null, DateTime.UtcNow));
+        await reservations.AddAsync(StockReservation.Create(orderId, productLow, productLow, 3, null, DateTime.UtcNow));
 
         var movements = new FakeStockMovementRepository();
         var uow = new FakeInventoryUnitOfWork(items);
@@ -124,7 +124,7 @@ public class OrderReservationReleaseRequestedIntegrationEventHandlerTests
 
         await handler.HandleAsync(new OrderReservationReleaseRequestedIntegrationEvent(orderId, "Order already cancelled"), CancellationToken.None);
 
-        recorder.Calls.Select(c => c.ProductId).Should().Equal(productLow, productHigh);
+        recorder.Calls.Select(c => c.VariantId).Should().Equal(productLow, productHigh);
         recorder.Calls.Select(c => c.Operation).Should().Equal("Release", "Release");
     }
 }

@@ -189,5 +189,5 @@ public class GiftPromotionEvaluator : IGiftPromotionEvaluator
     }
 
     private static IReadOnlyList<GiftGrant> ToGrants(Promotion promotion) =>
-        promotion.GiftItems.Select(i => new GiftGrant(promotion.Id, promotion.Name, i.ProductId, i.Quantity)).ToList();
+        promotion.GiftItems.Select(i => new GiftGrant(promotion.Id, promotion.Name, i.ProductId, i.Quantity, i.VariantId)).ToList();
 }

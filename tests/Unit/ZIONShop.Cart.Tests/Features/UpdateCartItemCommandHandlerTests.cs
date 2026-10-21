@@ -25,7 +25,7 @@ public class UpdateCartItemCommandHandlerTests
         var (db, carts) = BuildScope();
         var userId = Guid.NewGuid();
         var cart = DomainCart.CreateForUser(userId);
-        var item = cart.AddItem(Guid.NewGuid(), "Widget", 1, 10m, "USD");
+        var item = cart.AddItem(Guid.NewGuid(), Guid.NewGuid(), "Widget", 1, 10m, "USD");
         await carts.AddAsync(cart, CancellationToken.None);
         await db.SaveChangesAsync(CancellationToken.None);
 

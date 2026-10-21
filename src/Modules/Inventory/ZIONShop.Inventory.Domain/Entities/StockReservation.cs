@@ -9,18 +9,20 @@ public class StockReservation : BaseEntity
 
     public Guid OrderId { get; private set; }
     public Guid ProductId { get; private set; }
+    public Guid VariantId { get; private set; }
     public int Quantity { get; private set; }
     public ReservationStatus Status { get; private set; }
     public DateTime? ExpiresAt { get; private set; }
     public DateTime CreatedAt { get; private set; }
 
-    public static StockReservation Create(Guid orderId, Guid productId, int quantity, DateTime? expiresAt, DateTime now)
+    public static StockReservation Create(Guid orderId, Guid productId, Guid variantId, int quantity, DateTime? expiresAt, DateTime now)
     {
         return new StockReservation
         {
             Id = Guid.NewGuid(),
             OrderId = orderId,
             ProductId = productId,
+            VariantId = variantId,
             Quantity = quantity,
             Status = ReservationStatus.Active,
             ExpiresAt = expiresAt,

@@ -17,13 +17,15 @@ public class CreatePromotionCommandHandler : IRequestHandler<CreatePromotionComm
     private readonly IPromotionsUnitOfWork _uow;
     private readonly TimeProvider _timeProvider;
     private readonly IProductCatalogReader _catalogReader;
+    private readonly IProductPriceLookup _priceLookup;
 
-    public CreatePromotionCommandHandler(IPromotionRepository promotions, IPromotionsUnitOfWork uow, TimeProvider timeProvider, IProductCatalogReader catalogReader)
+    public CreatePromotionCommandHandler(IPromotionRepository promotions, IPromotionsUnitOfWork uow, TimeProvider timeProvider, IProductCatalogReader catalogReader, IProductPriceLookup priceLookup)
     {
         _promotions = promotions;
         _uow = uow;
         _timeProvider = timeProvider;
         _catalogReader = catalogReader;
+        _priceLookup = priceLookup;
     }
 
     public async Task<Result<PromotionDto>> Handle(CreatePromotionCommand request, CancellationToken cancellationToken)
@@ -37,17 +39,13 @@ public class CreatePromotionCommandHandler : IRequestHandler<CreatePromotionComm
         var value = type is PromotionType.FreeShipping or PromotionType.Gift ? 0m : request.Value;
         var maxDiscountAmount = type is PromotionType.FreeShipping or PromotionType.Gift ? null : request.MaxDiscountAmount;
         var minQuantity = type == PromotionType.Gift ? request.MinQuantity : null;
-        var giftItems = type == PromotionType.Gift
-            ? request.GiftItems?.Select(g => new GiftItemInput(g.ProductId, g.Quantity)).ToList()
-            : null;
 
-        if (type == PromotionType.Gift && giftItems is { Count: > 0 })
+        List<GiftItemInput>? giftItems = null;
+        if (type == PromotionType.Gift && request.GiftItems is { Count: > 0 })
         {
-            foreach (var item in giftItems)
-            {
-                var product = await _catalogReader.GetAsync(item.ProductId, cancellationToken);
-                if (product is null) return Result.Failure<PromotionDto>(PromotionsErrors.GiftProductNotFound);
-            }
+            var resolveResult = await ResolveGiftItemsAsync(request.GiftItems, cancellationToken);
+            if (resolveResult.IsFailure) return Result.Failure<PromotionDto>(resolveResult.Error);
+            giftItems = resolveResult.Value;
         }
 
         var createResult = Promotion.Create(
@@ -62,5 +60,29 @@ public class CreatePromotionCommandHandler : IRequestHandler<CreatePromotionComm
 
         var now = _timeProvider.GetUtcNow().UtcDateTime;
         return Result.Success(promotion.ToDto(Array.Empty<CouponCode>(), now));
+    }
+
+    /// <summary>Resolves each raw gift input to a concrete variant: an explicit variantId is validated via the catalog; a productId-only input falls back to its single active variant (<see cref="IProductPriceLookup"/>'s convention), else <see cref="PromotionsErrors.GiftVariantRequired"/>.</summary>
+    private async Task<Result<List<GiftItemInput>>> ResolveGiftItemsAsync(IReadOnlyList<GiftItemInputDto> items, CancellationToken ct)
+    {
+        var resolved = new List<GiftItemInput>();
+        foreach (var g in items)
+        {
+            var variantId = g.VariantId;
+            if (variantId is null && g.ProductId.HasValue)
+            {
+                var info = await _priceLookup.GetAsync(g.ProductId.Value, ct);
+                variantId = info?.VariantId;
+            }
+
+            if (variantId is null) return Result.Failure<List<GiftItemInput>>(PromotionsErrors.GiftVariantRequired);
+
+            var variant = await _catalogReader.GetVariantAsync(variantId.Value, ct);
+            if (variant is null) return Result.Failure<List<GiftItemInput>>(PromotionsErrors.GiftProductNotFound);
+
+            resolved.Add(new GiftItemInput(variant.ProductId, g.Quantity, variant.VariantId));
+        }
+
+        return Result.Success(resolved);
     }
 }

@@ -25,7 +25,7 @@ public class PaymentFailedIntegrationEventHandlerTests
         var order = Order.Place(
             Guid.NewGuid(), PaymentMethod.Online, "VND", 30000,
             new ShippingAddress(Guid.NewGuid(), "Nguyen Van A", "0900000000", "Hà Nội", "Cầu Giấy", "123 Đường ABC"),
-            new[] { (Guid.NewGuid(), "Widget", 100000m, 1) },
+            new[] { new OrderLineInput(Guid.NewGuid(), "Widget", 100000m, 1) },
             null);
         order.ConfirmReservation(); // -> AwaitingPayment
         await orders.AddAsync(order, CancellationToken.None);

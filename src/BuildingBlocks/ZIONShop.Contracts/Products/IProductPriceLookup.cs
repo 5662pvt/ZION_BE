@@ -10,7 +10,8 @@ public record ProductPriceInfo(
     string? PrimaryImageUrl,
     Guid? VariantId = null,
     string? VariantLabel = null,
-    string? Sku = null);
+    string? Sku = null,
+    string? VariantImageUrl = null);
 
 public record ProductSummaryInfo(Guid ProductId, string Name, string Slug, decimal MinPrice, string Currency, string? PrimaryImageUrl, bool IsPublished);
 

@@ -229,13 +229,18 @@ namespace ZIONShop.Promotions.Infrastructure.Persistence.Migrations
                         .HasColumnType("integer")
                         .HasDefaultValue(0);
 
+                    b.Property<Guid>("VariantId")
+                        .HasColumnType("uuid");
+
                     b.HasKey("Id");
 
                     b.HasIndex("FlashSaleId");
 
                     b.HasIndex("ProductId");
 
-                    b.HasIndex("FlashSaleId", "ProductId")
+                    b.HasIndex("VariantId");
+
+                    b.HasIndex("FlashSaleId", "VariantId")
                         .IsUnique();
 
                     b.ToTable("FlashSaleItems", "promotions");
@@ -431,14 +436,17 @@ namespace ZIONShop.Promotions.Infrastructure.Persistence.Migrations
                             b1.Property<Guid>("PromotionId")
                                 .HasColumnType("uuid");
 
-                            b1.Property<Guid>("ProductId")
+                            b1.Property<Guid>("VariantId")
                                 .ValueGeneratedOnAdd()
+                                .HasColumnType("uuid");
+
+                            b1.Property<Guid>("ProductId")
                                 .HasColumnType("uuid");
 
                             b1.Property<int>("Quantity")
                                 .HasColumnType("integer");
 
-                            b1.HasKey("PromotionId", "ProductId");
+                            b1.HasKey("PromotionId", "VariantId");
 
                             b1.ToTable("promotion_gift_items", "promotions");
 

@@ -11,8 +11,8 @@ namespace ZIONShop.Inventory.Application.IntegrationEventHandlers;
 /// <summary>
 /// Restocks the order's COMMITTED reservations once a return is physically received. Mirrors
 /// <see cref="OrderCancelledIntegrationEventHandler"/>'s committed-return path: process ordered by
-/// ProductId (same deadlock-avoidance rule), one <see cref="StockMovementType.Return"/> movement per
-/// product, one <see cref="IInventoryUnitOfWork.SaveChangesAsync"/>. Reservations are the source of
+/// VariantId (same deadlock-avoidance rule), one <see cref="StockMovementType.Return"/> movement per
+/// variant, one <see cref="IInventoryUnitOfWork.SaveChangesAsync"/>. Reservations are the source of
 /// truth for quantities (they include gift lines and reflect what actually left stock); a mismatch
 /// against <see cref="OrderReturnReceivedIntegrationEvent.Lines"/> is logged but never blocks the
 /// restock. Only <see cref="ReservationStatus.Committed"/> reservations are processed and then marked
@@ -48,7 +48,7 @@ public class OrderReturnReceivedIntegrationEventHandler : IIntegrationEventHandl
         var reservations = await _reservations.GetByOrderIdAsync(@event.OrderId, cancellationToken);
         var toReturn = reservations
             .Where(r => r.Status == ReservationStatus.Committed)
-            .OrderBy(r => r.ProductId)
+            .OrderBy(r => r.VariantId)
             .ToList();
         if (toReturn.Count == 0) return; // idempotent: nothing left to return (already processed or never committed)
 
@@ -57,9 +57,9 @@ public class OrderReturnReceivedIntegrationEventHandler : IIntegrationEventHandl
         var now = _timeProvider.GetUtcNow().UtcDateTime;
         foreach (var reservation in toReturn)
         {
-            if (await _items.TryReturnAsync(reservation.ProductId, reservation.Quantity, cancellationToken))
+            if (await _items.TryReturnAsync(reservation.VariantId, reservation.Quantity, cancellationToken))
             {
-                await _movements.AddAsync(StockMovement.Create(reservation.ProductId, StockMovementType.Return, reservation.Quantity, @event.OrderId.ToString(), now), cancellationToken);
+                await _movements.AddAsync(StockMovement.Create(reservation.ProductId, reservation.VariantId, StockMovementType.Return, reservation.Quantity, @event.OrderId.ToString(), now), cancellationToken);
             }
 
             reservation.MarkReturned();
@@ -70,15 +70,15 @@ public class OrderReturnReceivedIntegrationEventHandler : IIntegrationEventHandl
 
     private void WarnOnLineMismatch(OrderReturnReceivedIntegrationEvent @event, List<StockReservation> toReturn)
     {
-        var reservedByProduct = toReturn
-            .GroupBy(r => r.ProductId)
+        var reservedByVariant = toReturn
+            .GroupBy(r => r.VariantId)
             .ToDictionary(g => g.Key, g => g.Sum(r => r.Quantity));
-        var linesByProduct = @event.Lines
-            .GroupBy(l => l.ProductId)
+        var linesByVariant = @event.Lines
+            .GroupBy(l => l.VariantId ?? l.ProductId)
             .ToDictionary(g => g.Key, g => g.Sum(l => l.Quantity));
 
-        if (reservedByProduct.Count != linesByProduct.Count ||
-            reservedByProduct.Any(kv => !linesByProduct.TryGetValue(kv.Key, out var qty) || qty != kv.Value))
+        if (reservedByVariant.Count != linesByVariant.Count ||
+            reservedByVariant.Any(kv => !linesByVariant.TryGetValue(kv.Key, out var qty) || qty != kv.Value))
         {
             _logger.LogWarning(
                 "OrderReturnReceivedIntegrationEventHandler: event Lines for order {OrderId} disagree with committed reservations -- using reservations as source of truth",

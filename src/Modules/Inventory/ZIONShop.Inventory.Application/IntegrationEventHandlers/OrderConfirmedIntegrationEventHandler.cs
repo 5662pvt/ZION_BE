@@ -37,24 +37,24 @@ public class OrderConfirmedIntegrationEventHandler : IIntegrationEventHandler<Or
     {
         var active = (await _reservations.GetByOrderIdAsync(@event.OrderId, cancellationToken))
             .Where(r => r.Status == ReservationStatus.Active)
-            // Ordered by ProductId so two concurrent multi-product operations (e.g. this commit and a
-            // concurrent release/reserve touching the same products) always take their row locks in the
+            // Ordered by VariantId so two concurrent multi-line operations (e.g. this commit and a
+            // concurrent release/reserve touching the same variants) always take their row locks in the
             // same order, avoiding a Postgres deadlock (40P01) between them -- same rule as TryReserveAsync.
-            .OrderBy(r => r.ProductId)
+            .OrderBy(r => r.VariantId)
             .ToList();
         if (active.Count == 0) return; // idempotent: nothing active to commit
 
         var now = _timeProvider.GetUtcNow().UtcDateTime;
         foreach (var reservation in active)
         {
-            if (!await _items.TryCommitAsync(reservation.ProductId, reservation.Quantity, cancellationToken))
+            if (!await _items.TryCommitAsync(reservation.VariantId, reservation.Quantity, cancellationToken))
             {
-                _logger.LogError("Failed to commit {Quantity} of product {ProductId} for order {OrderId}: no matching inventory row (not found, or Reserved/OnHand below quantity)", reservation.Quantity, reservation.ProductId, @event.OrderId);
+                _logger.LogError("Failed to commit {Quantity} of variant {VariantId} for order {OrderId}: no matching inventory row (not found, or Reserved/OnHand below quantity)", reservation.Quantity, reservation.VariantId, @event.OrderId);
                 continue;
             }
 
             reservation.MarkCommitted();
-            await _movements.AddAsync(StockMovement.Create(reservation.ProductId, StockMovementType.Commit, reservation.Quantity, @event.OrderId.ToString(), now), cancellationToken);
+            await _movements.AddAsync(StockMovement.Create(reservation.ProductId, reservation.VariantId, StockMovementType.Commit, reservation.Quantity, @event.OrderId.ToString(), now), cancellationToken);
         }
 
         await _uow.SaveChangesAsync(cancellationToken);

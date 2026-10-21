@@ -3,9 +3,9 @@ using ZIONShop.Api.IntegrationTests.Infrastructure;
 
 namespace ZIONShop.Api.IntegrationTests.FlashSales;
 
-public record FlashSaleItemData(Guid Id, Guid ProductId, decimal FlashPrice, int AllocatedQuantity, int SoldQuantity, int Available);
+public record FlashSaleItemData(Guid Id, Guid ProductId, decimal FlashPrice, int AllocatedQuantity, int SoldQuantity, int Available, Guid VariantId = default, string? VariantLabel = null, string? Sku = null);
 public record FlashSaleData(Guid Id, string Name, DateTime StartsAt, DateTime EndsAt, bool IsActive, List<FlashSaleItemData> Items);
-public record ActiveFlashSaleItemData(Guid ProductId, string ProductName, string? ImageUrl, decimal FlashPrice, decimal RegularPrice, int Available, int AllocatedQuantity, DateTime EndsAt);
+public record ActiveFlashSaleItemData(Guid ProductId, string ProductName, string? ImageUrl, decimal FlashPrice, decimal RegularPrice, int Available, int AllocatedQuantity, DateTime EndsAt, Guid VariantId = default, string? VariantLabel = null, string? Sku = null);
 public record ActiveFlashSaleData(Guid Id, string Name, DateTime StartsAt, DateTime EndsAt, List<ActiveFlashSaleItemData> Items);
 
 public static class FlashSaleTestHelpers
@@ -21,6 +21,14 @@ public static class FlashSaleTestHelpers
     public static async Task<FlashSaleItemData> AddFlashSaleItemAsync(HttpClient admin, Guid flashSaleId, Guid productId, decimal flashPrice, int allocatedQuantity)
     {
         var response = await admin.PostAsJsonAsync($"/api/v1/admin/flash-sales/{flashSaleId}/items", new { productId, flashPrice, allocatedQuantity });
+        response.EnsureSuccessStatusCode();
+        var envelope = await response.Content.ReadFromJsonAsync<ApiEnvelope<FlashSaleItemData>>(ApiEnvelopeJson.Options);
+        return envelope!.Data!;
+    }
+
+    public static async Task<FlashSaleItemData> AddFlashSaleItemByVariantAsync(HttpClient admin, Guid flashSaleId, Guid variantId, decimal flashPrice, int allocatedQuantity)
+    {
+        var response = await admin.PostAsJsonAsync($"/api/v1/admin/flash-sales/{flashSaleId}/items", new { variantId, flashPrice, allocatedQuantity });
         response.EnsureSuccessStatusCode();
         var envelope = await response.Content.ReadFromJsonAsync<ApiEnvelope<FlashSaleItemData>>(ApiEnvelopeJson.Options);
         return envelope!.Data!;

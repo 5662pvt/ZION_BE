@@ -5,8 +5,8 @@ using ZIONShop.SharedKernel.Results;
 
 namespace ZIONShop.Promotions.Domain.Entities;
 
-/// <summary>Input for a gift reward line; validated against <see cref="Promotion.Create"/>/<see cref="Promotion.Update"/>'s gift rules, not persisted itself (see <see cref="PromotionGiftItem"/>).</summary>
-public sealed record GiftItemInput(Guid ProductId, int Quantity);
+/// <summary>Input for a gift reward line; validated against <see cref="Promotion.Create"/>/<see cref="Promotion.Update"/>'s gift rules, not persisted itself (see <see cref="PromotionGiftItem"/>). VariantId ?? ProductId is the effective key (distinct-check, storage); VariantId defaults to null for callers that only resolve at product granularity.</summary>
+public sealed record GiftItemInput(Guid ProductId, int Quantity, Guid? VariantId = null);
 
 public class Promotion : AggregateRoot
 {
@@ -76,7 +76,7 @@ public class Promotion : AggregateRoot
         if (type == PromotionType.Gift && giftItems is not null)
         {
             foreach (var item in giftItems)
-                promotion._giftItems.Add(PromotionGiftItem.Create(promotion.Id, item.ProductId, item.Quantity));
+                promotion._giftItems.Add(PromotionGiftItem.Create(promotion.Id, item.ProductId, item.VariantId ?? item.ProductId, item.Quantity));
         }
 
         return Result.Success(promotion);
@@ -124,7 +124,7 @@ public class Promotion : AggregateRoot
         if (type == PromotionType.Gift && giftItems is not null)
         {
             foreach (var item in giftItems)
-                _giftItems.Add(PromotionGiftItem.Create(Id, item.ProductId, item.Quantity));
+                _giftItems.Add(PromotionGiftItem.Create(Id, item.ProductId, item.VariantId ?? item.ProductId, item.Quantity));
         }
 
         return Result.Success();
@@ -195,7 +195,7 @@ public class Promotion : AggregateRoot
 
         if (giftItems is null || giftItems.Count == 0) return PromotionsErrors.GiftItemsRequired;
         if (giftItems.Count > 5) return PromotionsErrors.GiftItemsTooMany;
-        if (giftItems.Select(g => g.ProductId).Distinct().Count() != giftItems.Count) return PromotionsErrors.GiftItemsDuplicateProduct;
+        if (giftItems.Select(g => g.VariantId ?? g.ProductId).Distinct().Count() != giftItems.Count) return PromotionsErrors.GiftItemsDuplicateProduct;
         if (giftItems.Any(g => g.Quantity is < 1 or > 10)) return PromotionsErrors.GiftQuantityInvalid;
 
         if (scope == PromotionScope.Order)

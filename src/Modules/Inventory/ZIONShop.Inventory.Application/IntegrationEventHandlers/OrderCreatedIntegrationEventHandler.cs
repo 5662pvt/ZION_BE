@@ -12,8 +12,8 @@ namespace ZIONShop.Inventory.Application.IntegrationEventHandlers;
 /// <summary>
 /// Reserves stock for every line of a newly created order, all-or-nothing, inside one DB transaction.
 /// Availability is enforced by <see cref="IInventoryItemRepository.TryReserveAsync"/>, a single atomic
-/// conditional UPDATE per product (OnHand - Reserved >= quantity) -- there is no read-then-write window,
-/// so concurrent reservations for the same product never conflict and never need a retry loop. Runs with
+/// conditional UPDATE per variant (OnHand - Reserved >= quantity) -- there is no read-then-write window,
+/// so concurrent reservations for the same variant never conflict and never need a retry loop. Runs with
 /// the scoped services the dispatcher resolved it with (same scope/DbContext as the inbox row the
 /// IdempotentIntegrationEventHandler decorator added), so the inbox row commits atomically with the
 /// reservation effect in the same transaction/SaveChanges call.
@@ -64,46 +64,47 @@ public class OrderCreatedIntegrationEventHandler : IIntegrationEventHandler<Orde
         var expiresAt = isOnline ? now.AddMinutes(15) : (DateTime?)null;
 
         var unavailable = new List<Guid>();
-        var toReserve = new List<(Guid ProductId, int Quantity)>();
+        var toReserve = new List<(Guid ProductId, Guid VariantId, int Quantity)>();
 
-        // Ordered by ProductId so two concurrent multi-product orders always acquire their row locks in
+        // Ordered by VariantId so two concurrent multi-line orders always acquire their row locks in
         // the same order, avoiding deadlocks between them.
         var groups = @event.Lines
-            .GroupBy(l => l.ProductId)
+            .GroupBy(l => l.VariantId ?? l.ProductId)
             .Select(g => new
             {
-                ProductId = g.Key,
+                VariantId = g.Key,
+                ProductId = g.First().ProductId,
                 Paid = g.Where(l => !l.IsGift).Sum(l => l.Quantity),
                 Gift = g.Where(l => l.IsGift).Sum(l => l.Quantity)
             })
-            .OrderBy(g => g.ProductId);
+            .OrderBy(g => g.VariantId);
 
         foreach (var group in groups)
         {
             if (group.Paid > 0)
             {
                 int reservedQuantity;
-                if (group.Gift > 0 && await _items.TryReserveAsync(group.ProductId, group.Paid + group.Gift, cancellationToken))
+                if (group.Gift > 0 && await _items.TryReserveAsync(group.VariantId, group.Paid + group.Gift, cancellationToken))
                 {
                     reservedQuantity = group.Paid + group.Gift;
                 }
-                else if (await _items.TryReserveAsync(group.ProductId, group.Paid, cancellationToken))
+                else if (await _items.TryReserveAsync(group.VariantId, group.Paid, cancellationToken))
                 {
                     reservedQuantity = group.Paid; // gift silently dropped, same rule as before
                 }
                 else
                 {
-                    unavailable.Add(group.ProductId);
+                    unavailable.Add(group.VariantId);
                     continue;
                 }
 
-                toReserve.Add((group.ProductId, reservedQuantity));
+                toReserve.Add((group.ProductId, group.VariantId, reservedQuantity));
             }
-            else if (group.Gift > 0 && await _items.TryReserveAsync(group.ProductId, group.Gift, cancellationToken))
+            else if (group.Gift > 0 && await _items.TryReserveAsync(group.VariantId, group.Gift, cancellationToken))
             {
-                toReserve.Add((group.ProductId, group.Gift));
+                toReserve.Add((group.ProductId, group.VariantId, group.Gift));
             }
-            // else: gift-only product with no/insufficient inventory row -> nothing to reserve, gift dropped
+            // else: gift-only line with no/insufficient inventory row -> nothing to reserve, gift dropped
         }
 
         if (unavailable.Count > 0)
@@ -113,7 +114,7 @@ public class OrderCreatedIntegrationEventHandler : IIntegrationEventHandler<Orde
             await transaction.RollbackAsync(cancellationToken);
 
             _logger.LogInformation(
-                "Order {OrderId} could not reserve stock for products {ProductIds}; cancelling with reason '{Reason}'",
+                "Order {OrderId} could not reserve stock for variants {VariantIds}; cancelling with reason '{Reason}'",
                 @event.OrderId, unavailable, OutOfStockReason);
 
             _outbox.Add(new InventoryReservationFailedIntegrationEvent(@event.OrderId, OutOfStockReason, unavailable));
@@ -121,15 +122,15 @@ public class OrderCreatedIntegrationEventHandler : IIntegrationEventHandler<Orde
             return;
         }
 
-        foreach (var (productId, quantity) in toReserve)
+        foreach (var (productId, variantId, quantity) in toReserve)
         {
-            await _reservations.AddAsync(StockReservation.Create(@event.OrderId, productId, quantity, expiresAt, now), cancellationToken);
-            await _movements.AddAsync(StockMovement.Create(productId, StockMovementType.Reserve, quantity, @event.OrderId.ToString(), now), cancellationToken);
+            await _reservations.AddAsync(StockReservation.Create(@event.OrderId, productId, variantId, quantity, expiresAt, now), cancellationToken);
+            await _movements.AddAsync(StockMovement.Create(productId, variantId, StockMovementType.Reserve, quantity, @event.OrderId.ToString(), now), cancellationToken);
         }
 
         _outbox.Add(new InventoryReservedIntegrationEvent(
             @event.OrderId,
-            toReserve.Select(x => new ReservedItem(x.ProductId, x.Quantity)).ToList(),
+            toReserve.Select(x => new ReservedItem(x.ProductId, x.Quantity, x.VariantId)).ToList(),
             expiresAt ?? DateTime.MaxValue));
 
         await _uow.SaveChangesAsync(cancellationToken); // also persists the inbox row added by the decorator

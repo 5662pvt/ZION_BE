@@ -8,6 +8,7 @@ using ZIONShop.Common.Api;
 using ZIONShop.Inventory.Application.Features.AdjustStock;
 using ZIONShop.Inventory.Application.Features.GetAvailability;
 using ZIONShop.Inventory.Application.Features.GetAvailabilityBatch;
+using ZIONShop.Inventory.Application.Features.GetProductStockSummary;
 using ZIONShop.Inventory.Application.Features.GetStockMovements;
 using ZIONShop.Inventory.Application.Features.SearchStock;
 
@@ -29,33 +30,41 @@ public class InventoryController : ControllerBase
     [HttpGet("products/{productId:guid}")]
     [AllowAnonymous]
     public async Task<IActionResult> GetAvailability(Guid productId, CancellationToken ct)
-        => (await _mediator.Send(new GetAvailabilityQuery(productId), ct)).ToActionResult();
+        => (await _mediator.Send(new GetAvailabilityQuery(productId, IsVariantId: false), ct)).ToActionResult();
+
+    [HttpGet("variants/{variantId:guid}")]
+    [AllowAnonymous]
+    public async Task<IActionResult> GetVariantAvailability(Guid variantId, CancellationToken ct)
+        => (await _mediator.Send(new GetAvailabilityQuery(variantId, IsVariantId: true), ct)).ToActionResult();
 
     [HttpGet("availability")]
     [AllowAnonymous]
     public async Task<IActionResult> GetAvailabilityBatch([FromQuery] string? productIds, CancellationToken ct)
     {
-        var ids = new List<Guid>();
-        if (!string.IsNullOrWhiteSpace(productIds))
-        {
-            foreach (var raw in productIds.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
-            {
-                if (!Guid.TryParse(raw, out var id))
-                {
-                    var errors = new List<ErrorDetail> { new() { Field = "productIds", Message = $"'{raw}' không phải GUID hợp lệ" } };
-                    return BadRequest(ApiResponse.Fail("productIds không hợp lệ", errors));
-                }
-                ids.Add(id);
-            }
-        }
+        var (ids, error) = ParseGuidList(productIds, "productIds");
+        if (error is not null) return error;
 
-        if (ids.Count > 100)
-        {
-            var errors = new List<ErrorDetail> { new() { Field = "productIds", Message = "Tối đa 100 productId mỗi lần truy vấn" } };
-            return BadRequest(ApiResponse.Fail("productIds không hợp lệ", errors));
-        }
+        return (await _mediator.Send(new GetAvailabilityBatchQuery(ids), ct)).ToActionResult();
+    }
 
-        return (await _mediator.Send(new GetAvailabilityBatchQuery(ids.Distinct().ToList()), ct)).ToActionResult();
+    [HttpGet("availability/variants")]
+    [AllowAnonymous]
+    public async Task<IActionResult> GetAvailabilityByVariants([FromQuery] string? variantIds, CancellationToken ct)
+    {
+        var (ids, error) = ParseGuidList(variantIds, "variantIds");
+        if (error is not null) return error;
+
+        return (await _mediator.Send(new GetAvailabilityBatchQuery(ids), ct)).ToActionResult();
+    }
+
+    [HttpGet("availability/products")]
+    [AllowAnonymous]
+    public async Task<IActionResult> GetAvailabilityByProducts([FromQuery] string? productIds, CancellationToken ct)
+    {
+        var (ids, error) = ParseGuidList(productIds, "productIds");
+        if (error is not null) return error;
+
+        return (await _mediator.Send(new GetProductStockSummaryQuery(ids), ct)).ToActionResult();
     }
 
     [HttpGet]
@@ -73,7 +82,12 @@ public class InventoryController : ControllerBase
     [HttpGet("products/{productId:guid}/movements")]
     [Authorize(Policy = Policies.StaffOrAdmin)]
     public async Task<IActionResult> GetMovements(Guid productId, [FromQuery] int page = 1, [FromQuery] int pageSize = 20, CancellationToken ct = default)
-        => (await _mediator.Send(new GetStockMovementsQuery(productId, page, pageSize), ct)).ToPagedActionResult();
+        => (await _mediator.Send(new GetStockMovementsQuery(productId, false, page, pageSize), ct)).ToPagedActionResult();
+
+    [HttpGet("variants/{variantId:guid}/movements")]
+    [Authorize(Policy = Policies.StaffOrAdmin)]
+    public async Task<IActionResult> GetVariantMovements(Guid variantId, [FromQuery] int page = 1, [FromQuery] int pageSize = 20, CancellationToken ct = default)
+        => (await _mediator.Send(new GetStockMovementsQuery(variantId, true, page, pageSize), ct)).ToPagedActionResult();
 
     [HttpPost("products/{productId:guid}/adjust")]
     [Authorize(Policy = Policies.AdminOnly)]
@@ -81,8 +95,43 @@ public class InventoryController : ControllerBase
     public async Task<IActionResult> AdjustStock(Guid productId, [FromBody] AdjustStockBody body, CancellationToken ct)
     {
         var createdBy = _currentUser.Email ?? _currentUser.UserId?.ToString();
-        var cmd = new AdjustStockCommand(productId, body.Delta, body.Reason, createdBy);
+        var cmd = new AdjustStockCommand(productId, false, body.Delta, body.Reason, createdBy);
         return (await _mediator.Send(cmd, ct)).ToActionResult("Stock adjusted");
+    }
+
+    [HttpPost("variants/{variantId:guid}/adjust")]
+    [Authorize(Policy = Policies.AdminOnly)]
+    [AdminAudit("Inventory.Adjust", "Inventory", RouteKey = "variantId")]
+    public async Task<IActionResult> AdjustVariantStock(Guid variantId, [FromBody] AdjustStockBody body, CancellationToken ct)
+    {
+        var createdBy = _currentUser.Email ?? _currentUser.UserId?.ToString();
+        var cmd = new AdjustStockCommand(variantId, true, body.Delta, body.Reason, createdBy);
+        return (await _mediator.Send(cmd, ct)).ToActionResult("Stock adjusted");
+    }
+
+    private (List<Guid> Ids, IActionResult? Error) ParseGuidList(string? raw, string field)
+    {
+        var ids = new List<Guid>();
+        if (!string.IsNullOrWhiteSpace(raw))
+        {
+            foreach (var part in raw.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            {
+                if (!Guid.TryParse(part, out var id))
+                {
+                    var errors = new List<ErrorDetail> { new() { Field = field, Message = $"'{part}' không phải GUID hợp lệ" } };
+                    return (ids, BadRequest(ApiResponse.Fail($"{field} không hợp lệ", errors)));
+                }
+                ids.Add(id);
+            }
+        }
+
+        if (ids.Count > 100)
+        {
+            var errors = new List<ErrorDetail> { new() { Field = field, Message = $"Tối đa 100 {field} mỗi lần truy vấn" } };
+            return (ids, BadRequest(ApiResponse.Fail($"{field} không hợp lệ", errors)));
+        }
+
+        return (ids.Distinct().ToList(), null);
     }
 }
 

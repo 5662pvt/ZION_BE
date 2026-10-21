@@ -8,14 +8,17 @@ public class CartItem : BaseEntity
 
     public Guid CartId { get; private set; }
     public Guid ProductId { get; private set; }
+    public Guid VariantId { get; private set; }
     public string ProductName { get; private set; } = string.Empty;
+    public string? VariantLabel { get; private set; }
+    public string? Sku { get; private set; }
     public int Quantity { get; private set; }
     public decimal UnitPrice { get; private set; }
     public string Currency { get; private set; } = "USD";
 
     public decimal Subtotal => Quantity * UnitPrice;
 
-    public static CartItem Create(Guid cartId, Guid productId, string productName, int quantity, decimal unitPrice, string currency)
+    public static CartItem Create(Guid cartId, Guid productId, Guid variantId, string productName, int quantity, decimal unitPrice, string currency, string? variantLabel = null, string? sku = null)
     {
         if (quantity <= 0) throw new ArgumentException("Quantity must be positive", nameof(quantity));
         if (unitPrice < 0) throw new ArgumentException("Unit price cannot be negative", nameof(unitPrice));
@@ -24,7 +27,10 @@ public class CartItem : BaseEntity
             Id = Guid.NewGuid(),
             CartId = cartId,
             ProductId = productId,
+            VariantId = variantId,
             ProductName = productName,
+            VariantLabel = variantLabel,
+            Sku = sku,
             Quantity = quantity,
             UnitPrice = unitPrice,
             Currency = currency

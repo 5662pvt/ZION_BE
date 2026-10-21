@@ -26,7 +26,7 @@ public class MergeGuestCartCommandHandlerTests
         var userId = Guid.NewGuid();
         var anonymousId = Guid.NewGuid().ToString("N");
         var guestCart = DomainCart.CreateForGuest(anonymousId);
-        guestCart.AddItem(Guid.NewGuid(), "Widget", 2, 10m, "USD");
+        guestCart.AddItem(Guid.NewGuid(), Guid.NewGuid(), "Widget", 2, 10m, "USD");
         await carts.AddAsync(guestCart, CancellationToken.None);
         await db.SaveChangesAsync(CancellationToken.None);
 
@@ -51,15 +51,16 @@ public class MergeGuestCartCommandHandlerTests
         var (db, carts) = BuildScope();
         var userId = Guid.NewGuid();
         var sharedProductId = Guid.NewGuid();
+        var sharedVariantId = Guid.NewGuid();
         var anonymousId = Guid.NewGuid().ToString("N");
 
         var userCart = DomainCart.CreateForUser(userId);
-        userCart.AddItem(sharedProductId, "Widget", 1, 10m, "USD");
+        userCart.AddItem(sharedProductId, sharedVariantId, "Widget", 1, 10m, "USD");
         await carts.AddAsync(userCart, CancellationToken.None);
 
         var guestCart = DomainCart.CreateForGuest(anonymousId);
-        guestCart.AddItem(sharedProductId, "Widget", 2, 10m, "USD");
-        guestCart.AddItem(Guid.NewGuid(), "Gadget", 1, 20m, "USD");
+        guestCart.AddItem(sharedProductId, sharedVariantId, "Widget", 2, 10m, "USD");
+        guestCart.AddItem(Guid.NewGuid(), Guid.NewGuid(), "Gadget", 1, 20m, "USD");
         await carts.AddAsync(guestCart, CancellationToken.None);
         await db.SaveChangesAsync(CancellationToken.None);
 
@@ -81,7 +82,7 @@ public class MergeGuestCartCommandHandlerTests
         var (db, carts) = BuildScope();
         var userId = Guid.NewGuid();
         var userCart = DomainCart.CreateForUser(userId);
-        userCart.AddItem(Guid.NewGuid(), "Widget", 1, 10m, "USD");
+        userCart.AddItem(Guid.NewGuid(), Guid.NewGuid(), "Widget", 1, 10m, "USD");
         await carts.AddAsync(userCart, CancellationToken.None);
         await db.SaveChangesAsync(CancellationToken.None);
 

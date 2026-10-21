@@ -8,17 +8,19 @@ public class FlashSaleItem : BaseEntity
 
     public Guid FlashSaleId { get; private set; }
     public Guid ProductId { get; private set; }
+    public Guid VariantId { get; private set; }
     public decimal FlashPrice { get; private set; }
     public int AllocatedQuantity { get; private set; }
     public int SoldQuantity { get; private set; }
 
     public int Available => AllocatedQuantity - SoldQuantity;
 
-    public static FlashSaleItem Create(Guid flashSaleId, Guid productId, decimal flashPrice, int allocatedQuantity) => new()
+    public static FlashSaleItem Create(Guid flashSaleId, Guid productId, Guid variantId, decimal flashPrice, int allocatedQuantity) => new()
     {
         Id = Guid.NewGuid(),
         FlashSaleId = flashSaleId,
         ProductId = productId,
+        VariantId = variantId,
         FlashPrice = flashPrice,
         AllocatedQuantity = allocatedQuantity,
         SoldQuantity = 0

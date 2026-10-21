@@ -24,26 +24,26 @@ internal sealed class InMemoryInventoryItemRepository : IInventoryItemRepository
         _inner = new InventoryItemRepository(db);
     }
 
-    public Task<InventoryItem?> GetByProductIdAsync(Guid productId, CancellationToken cancellationToken = default) =>
-        _inner.GetByProductIdAsync(productId, cancellationToken);
+    public Task<InventoryItem?> GetByVariantIdAsync(Guid variantId, CancellationToken cancellationToken = default) =>
+        _inner.GetByVariantIdAsync(variantId, cancellationToken);
 
     public Task AddAsync(InventoryItem item, CancellationToken cancellationToken = default) =>
         _inner.AddAsync(item, cancellationToken);
 
     public IQueryable<InventoryItem> Query() => _inner.Query();
 
-    public async Task<bool> TryReserveAsync(Guid productId, int quantity, CancellationToken cancellationToken = default)
+    public async Task<bool> TryReserveAsync(Guid variantId, int quantity, CancellationToken cancellationToken = default)
     {
-        var item = await _db.InventoryItems.FirstOrDefaultAsync(i => i.ProductId == productId, cancellationToken);
+        var item = await _db.InventoryItems.FirstOrDefaultAsync(i => i.VariantId == variantId, cancellationToken);
         if (item is null || item.Reserve(quantity).IsFailure) return false;
 
         await _db.SaveChangesAsync(cancellationToken);
         return true;
     }
 
-    public async Task<bool> TryReleaseAsync(Guid productId, int quantity, CancellationToken cancellationToken = default)
+    public async Task<bool> TryReleaseAsync(Guid variantId, int quantity, CancellationToken cancellationToken = default)
     {
-        var item = await _db.InventoryItems.FirstOrDefaultAsync(i => i.ProductId == productId, cancellationToken);
+        var item = await _db.InventoryItems.FirstOrDefaultAsync(i => i.VariantId == variantId, cancellationToken);
         if (item is null || item.Reserved < quantity) return false;
 
         item.Release(quantity);
@@ -51,18 +51,18 @@ internal sealed class InMemoryInventoryItemRepository : IInventoryItemRepository
         return true;
     }
 
-    public async Task<bool> TryCommitAsync(Guid productId, int quantity, CancellationToken cancellationToken = default)
+    public async Task<bool> TryCommitAsync(Guid variantId, int quantity, CancellationToken cancellationToken = default)
     {
-        var item = await _db.InventoryItems.FirstOrDefaultAsync(i => i.ProductId == productId, cancellationToken);
+        var item = await _db.InventoryItems.FirstOrDefaultAsync(i => i.VariantId == variantId, cancellationToken);
         if (item is null || item.Commit(quantity).IsFailure) return false;
 
         await _db.SaveChangesAsync(cancellationToken);
         return true;
     }
 
-    public async Task<bool> TryReturnAsync(Guid productId, int quantity, CancellationToken cancellationToken = default)
+    public async Task<bool> TryReturnAsync(Guid variantId, int quantity, CancellationToken cancellationToken = default)
     {
-        var item = await _db.InventoryItems.FirstOrDefaultAsync(i => i.ProductId == productId, cancellationToken);
+        var item = await _db.InventoryItems.FirstOrDefaultAsync(i => i.VariantId == variantId, cancellationToken);
         if (item is null || item.Return(quantity).IsFailure) return false;
 
         await _db.SaveChangesAsync(cancellationToken);

@@ -22,13 +22,16 @@ public class SearchStockQueryHandler : IRequestHandler<SearchStockQuery, Result<
         if (!string.IsNullOrWhiteSpace(request.Keyword))
         {
             var kw = EscapeLikePattern(request.Keyword.Trim()).ToUpperInvariant();
-            query = query.Where(i => EF.Functions.Like(i.ProductName.ToUpper(), $"%{kw}%") || EF.Functions.Like(i.Sku.ToUpper(), $"%{kw}%"));
+            query = query.Where(i =>
+                EF.Functions.Like(i.ProductName.ToUpper(), $"%{kw}%") ||
+                EF.Functions.Like(i.Sku.ToUpper(), $"%{kw}%") ||
+                (i.VariantLabel != null && EF.Functions.Like(i.VariantLabel.ToUpper(), $"%{kw}%")));
         }
 
         if (request.LowStockOnly)
             query = query.Where(i => i.OnHand - i.Reserved <= i.LowStockThreshold);
 
-        query = query.OrderBy(i => i.ProductName);
+        query = query.OrderBy(i => i.ProductName).ThenBy(i => i.VariantLabel);
 
         var page = request.Page < 1 ? 1 : request.Page;
         var pageSize = request.PageSize is < 1 or > 100 ? 20 : request.PageSize;

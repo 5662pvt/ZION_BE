@@ -2,7 +2,6 @@ using MediatR;
 using Microsoft.EntityFrameworkCore;
 using ZIONShop.Contracts.Products;
 using ZIONShop.Promotions.Application.DTOs;
-using ZIONShop.Promotions.Domain.Entities;
 using ZIONShop.Promotions.Domain.Repositories;
 using ZIONShop.SharedKernel.Results;
 
@@ -44,16 +43,19 @@ public class GetActiveFlashSalesQueryHandler : IRequestHandler<GetActiveFlashSal
             .Where(i => ids.Contains(i.FlashSaleId))
             .ToListAsync(cancellationToken);
 
-        var productIds = items.Select(i => i.ProductId).Distinct().ToList();
-        var productInfo = await _priceLookup.GetManyAsync(productIds, cancellationToken);
+        var variantIds = items.Select(i => i.VariantId).Distinct().ToList();
+        var productInfo = await _priceLookup.GetManyAsync(variantIds, cancellationToken);
 
         var result = activeFlashSales.Select(flashSale =>
         {
             var flashItems = items.Where(i => i.FlashSaleId == flashSale.Id).Select(i =>
             {
-                productInfo.TryGetValue(i.ProductId, out var info);
+                productInfo.TryGetValue(i.VariantId, out var info);
                 return new ActiveFlashSaleItemDto(
                     i.ProductId,
+                    i.VariantId,
+                    info?.VariantLabel,
+                    info?.Sku,
                     info?.Name ?? string.Empty,
                     info?.PrimaryImageUrl,
                     i.FlashPrice,

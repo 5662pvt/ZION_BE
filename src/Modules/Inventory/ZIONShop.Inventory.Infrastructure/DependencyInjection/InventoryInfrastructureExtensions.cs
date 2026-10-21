@@ -32,6 +32,7 @@ public static class InventoryInfrastructureExtensions
         services.AddScoped<IInventoryOutbox, InventoryOutbox>();
         services.AddScoped<IStockAvailabilityReader, StockAvailabilityReader>();
         services.AddScoped<IInventoryStatsReader, InventoryStatsReader>();
+        services.AddScoped<IProductStockSummaryReader, ProductStockSummaryReader>();
 
         services.AddOutbox<InventoryDbContext>(configuration);
         services.AddInboxAdmin<InventoryDbContext>();

@@ -31,19 +31,19 @@ public class Cart : AggregateRoot
         AnonymousId = anonymousId
     };
 
-    public CartItem AddItem(Guid productId, string productName, int quantity, decimal unitPrice, string currency)
+    public CartItem AddItem(Guid productId, Guid variantId, string productName, int quantity, decimal unitPrice, string currency, string? variantLabel = null, string? sku = null)
     {
-        if (_items.Count >= MaxItems && _items.All(i => i.ProductId != productId))
+        if (_items.Count >= MaxItems && _items.All(i => i.VariantId != variantId))
             throw new InvalidOperationException($"Cart cannot contain more than {MaxItems} distinct items.");
 
-        var existing = _items.FirstOrDefault(i => i.ProductId == productId);
+        var existing = _items.FirstOrDefault(i => i.VariantId == variantId);
         if (existing is not null)
         {
             existing.Increase(quantity);
             return existing;
         }
 
-        var item = CartItem.Create(Id, productId, productName, quantity, unitPrice, currency);
+        var item = CartItem.Create(Id, productId, variantId, productName, quantity, unitPrice, currency, variantLabel, sku);
         _items.Add(item);
         return item;
     }
@@ -74,6 +74,6 @@ public class Cart : AggregateRoot
     public void MergeFrom(Cart guest)
     {
         foreach (var item in guest.Items.ToList())
-            AddItem(item.ProductId, item.ProductName, item.Quantity, item.UnitPrice, item.Currency);
+            AddItem(item.ProductId, item.VariantId, item.ProductName, item.Quantity, item.UnitPrice, item.Currency, item.VariantLabel, item.Sku);
     }
 }

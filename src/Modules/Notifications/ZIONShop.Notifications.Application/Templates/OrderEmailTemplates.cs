@@ -77,7 +77,8 @@ public static class OrderEmailTemplates
           .Append("</tr>");
         foreach (var line in lines)
         {
-            var name = line.IsGift ? $"{line.ProductName} (Quà tặng)" : line.ProductName;
+            var baseName = string.IsNullOrEmpty(line.VariantLabel) ? line.ProductName : $"{line.ProductName} ({line.VariantLabel})";
+            var name = line.IsGift ? $"{baseName} (Quà tặng)" : baseName;
             var unitPriceCell = line.IsGift ? "Miễn phí" : FormatMoney(line.UnitPrice);
             var lineTotalCell = line.IsGift ? "Miễn phí" : FormatMoney(line.LineTotal);
             sb.Append("<tr>")

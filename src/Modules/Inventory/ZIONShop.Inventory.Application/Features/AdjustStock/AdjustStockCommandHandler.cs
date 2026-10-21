@@ -4,6 +4,7 @@ using ZIONShop.Contracts.Products;
 using ZIONShop.Inventory.Application.DTOs;
 using ZIONShop.Inventory.Application.Interfaces;
 using ZIONShop.Inventory.Application.Mappings;
+using ZIONShop.Inventory.Application.Services;
 using ZIONShop.Inventory.Domain.Entities;
 using ZIONShop.Inventory.Domain.Enums;
 using ZIONShop.Inventory.Domain.Exceptions;
@@ -36,13 +37,25 @@ public class AdjustStockCommandHandler : IRequestHandler<AdjustStockCommand, Res
 
     public async Task<Result<InventoryItemDto>> Handle(AdjustStockCommand request, CancellationToken cancellationToken)
     {
-        var item = await _items.GetByProductIdAsync(request.ProductId, cancellationToken);
+        Guid variantId;
+        if (request.IsVariantId)
+        {
+            variantId = request.Id;
+        }
+        else
+        {
+            var resolved = await ProductOrVariantIdResolver.ResolveAsync(_catalog, request.Id, cancellationToken);
+            if (resolved.IsFailure) return Result.Failure<InventoryItemDto>(resolved.Error);
+            variantId = resolved.Value;
+        }
+
+        var item = await _items.GetByVariantIdAsync(variantId, cancellationToken);
         if (item is null)
         {
-            var product = await _catalog.GetAsync(request.ProductId, cancellationToken);
-            if (product is null) return Result.Failure<InventoryItemDto>(InventoryErrors.ProductNotFound);
+            var variant = await _catalog.GetVariantAsync(variantId, cancellationToken);
+            if (variant is null) return Result.Failure<InventoryItemDto>(InventoryErrors.VariantNotFound);
 
-            item = InventoryItem.Create(product.ProductId, product.Sku, product.Name, 0);
+            item = InventoryItem.Create(variant.ProductId, variant.VariantId, variant.Sku, variant.ProductName, variant.VariantLabel, 0);
             await _items.AddAsync(item, cancellationToken);
         }
 
@@ -50,7 +63,7 @@ public class AdjustStockCommandHandler : IRequestHandler<AdjustStockCommand, Res
         if (result.IsFailure) return Result.Failure<InventoryItemDto>(result.Error);
 
         await _movements.AddAsync(
-            StockMovement.Create(item.ProductId, StockMovementType.Adjust, request.Delta, request.Reason, _timeProvider.GetUtcNow().UtcDateTime, request.CreatedBy),
+            StockMovement.Create(item.ProductId, item.VariantId, StockMovementType.Adjust, request.Delta, request.Reason, _timeProvider.GetUtcNow().UtcDateTime, request.CreatedBy),
             cancellationToken);
 
         try

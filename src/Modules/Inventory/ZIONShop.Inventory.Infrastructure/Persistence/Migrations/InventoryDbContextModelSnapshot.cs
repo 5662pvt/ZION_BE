@@ -137,6 +137,13 @@ namespace ZIONShop.Inventory.Infrastructure.Persistence.Migrations
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)");
 
+                    b.Property<Guid>("VariantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("VariantLabel")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
                     b.Property<uint>("xmin")
                         .IsConcurrencyToken()
                         .ValueGeneratedOnAddOrUpdate()
@@ -145,7 +152,9 @@ namespace ZIONShop.Inventory.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("ProductId")
+                    b.HasIndex("ProductId");
+
+                    b.HasIndex("VariantId")
                         .IsUnique();
 
                     b.ToTable("InventoryItems", "inventory");
@@ -177,9 +186,12 @@ namespace ZIONShop.Inventory.Infrastructure.Persistence.Migrations
                     b.Property<int>("Type")
                         .HasColumnType("integer");
 
+                    b.Property<Guid>("VariantId")
+                        .HasColumnType("uuid");
+
                     b.HasKey("Id");
 
-                    b.HasIndex("ProductId", "CreatedAt");
+                    b.HasIndex("VariantId", "CreatedAt");
 
                     b.ToTable("StockMovements", "inventory");
                 });
@@ -208,9 +220,12 @@ namespace ZIONShop.Inventory.Infrastructure.Persistence.Migrations
                     b.Property<int>("Status")
                         .HasColumnType("integer");
 
+                    b.Property<Guid>("VariantId")
+                        .HasColumnType("uuid");
+
                     b.HasKey("Id");
 
-                    b.HasIndex("OrderId", "ProductId")
+                    b.HasIndex("OrderId", "VariantId")
                         .IsUnique();
 
                     b.HasIndex("Status", "ExpiresAt");

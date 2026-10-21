@@ -11,8 +11,10 @@ public class InventoryItem : AggregateRoot
     private InventoryItem() { }
 
     public Guid ProductId { get; private set; }
+    public Guid VariantId { get; private set; }
     public string Sku { get; private set; } = string.Empty;
     public string ProductName { get; private set; } = string.Empty;
+    public string? VariantLabel { get; private set; }
     public int OnHand { get; private set; }
     public int Reserved { get; private set; }
     public int LowStockThreshold { get; private set; } = DefaultLowStockThreshold;
@@ -20,14 +22,16 @@ public class InventoryItem : AggregateRoot
     public int Available => OnHand - Reserved;
     public bool IsLowStock => Available <= LowStockThreshold;
 
-    public static InventoryItem Create(Guid productId, string sku, string productName, int onHand, int lowStockThreshold = DefaultLowStockThreshold)
+    public static InventoryItem Create(Guid productId, Guid variantId, string sku, string productName, string? variantLabel, int onHand, int lowStockThreshold = DefaultLowStockThreshold)
     {
         return new InventoryItem
         {
             Id = Guid.NewGuid(),
             ProductId = productId,
+            VariantId = variantId,
             Sku = sku,
             ProductName = productName,
+            VariantLabel = string.IsNullOrWhiteSpace(variantLabel) ? null : variantLabel,
             OnHand = Math.Max(0, onHand),
             Reserved = 0,
             LowStockThreshold = Math.Max(0, lowStockThreshold)

@@ -18,8 +18,8 @@ public class OrderReturnReceivedIntegrationEventHandlerTests
 
         var items = new FakeInventoryItemRepository();
         items.Seed(
-            InventoryItem.Create(productHigh, "SKU-H", "Product High", 10),
-            InventoryItem.Create(productLow, "SKU-L", "Product Low", 10));
+            InventoryItem.Create(productHigh, productHigh, "SKU-H", "Product High", null, 10),
+            InventoryItem.Create(productLow, productLow, "SKU-L", "Product Low", null, 10));
         items.Get(productHigh)!.Reserve(2);
         items.Get(productHigh)!.Commit(2);
         items.Get(productLow)!.Reserve(5);
@@ -28,10 +28,10 @@ public class OrderReturnReceivedIntegrationEventHandlerTests
         var recorder = new RecordingInventoryItemRepository(items);
         var reservations = new FakeStockReservationRepository();
         // Submitted high-id-first -- the handler must still issue its Try*Async calls low-id-first.
-        var highReservation = StockReservation.Create(orderId, productHigh, 2, null, DateTime.UtcNow);
+        var highReservation = StockReservation.Create(orderId, productHigh, productHigh, 2, null, DateTime.UtcNow);
         highReservation.MarkCommitted();
         await reservations.AddAsync(highReservation);
-        var lowReservation = StockReservation.Create(orderId, productLow, 5, null, DateTime.UtcNow);
+        var lowReservation = StockReservation.Create(orderId, productLow, productLow, 5, null, DateTime.UtcNow);
         lowReservation.MarkCommitted();
         await reservations.AddAsync(lowReservation);
 
@@ -47,7 +47,7 @@ public class OrderReturnReceivedIntegrationEventHandlerTests
 
         await handler.HandleAsync(@event, CancellationToken.None);
 
-        recorder.Calls.Select(c => c.ProductId).Should().Equal(productLow, productHigh);
+        recorder.Calls.Select(c => c.VariantId).Should().Equal(productLow, productHigh);
         recorder.Calls.Select(c => c.Operation).Should().Equal("Return", "Return");
 
         items.Get(productLow)!.OnHand.Should().Be(10);
@@ -66,12 +66,12 @@ public class OrderReturnReceivedIntegrationEventHandlerTests
         var orderId = Guid.NewGuid();
 
         var items = new FakeInventoryItemRepository();
-        items.Seed(InventoryItem.Create(productId, "SKU-A", "Product A", 10));
+        items.Seed(InventoryItem.Create(productId, productId, "SKU-A", "Product A", null, 10));
         items.Get(productId)!.Reserve(4);
         items.Get(productId)!.Commit(4);
 
         var reservations = new FakeStockReservationRepository();
-        var reservation = StockReservation.Create(orderId, productId, 4, null, DateTime.UtcNow);
+        var reservation = StockReservation.Create(orderId, productId, productId, 4, null, DateTime.UtcNow);
         reservation.MarkCommitted();
         await reservations.AddAsync(reservation);
 
@@ -107,10 +107,10 @@ public class OrderReturnReceivedIntegrationEventHandlerTests
         var orderId = Guid.NewGuid();
 
         var items = new FakeInventoryItemRepository();
-        items.Seed(InventoryItem.Create(productId, "SKU-A", "Product A", 10));
+        items.Seed(InventoryItem.Create(productId, productId, "SKU-A", "Product A", null, 10));
 
         var reservations = new FakeStockReservationRepository();
-        var activeReservation = StockReservation.Create(orderId, productId, 4, null, DateTime.UtcNow);
+        var activeReservation = StockReservation.Create(orderId, productId, productId, 4, null, DateTime.UtcNow);
         await reservations.AddAsync(activeReservation); // still Active, never confirmed/committed
 
         var movements = new FakeStockMovementRepository();
@@ -136,12 +136,12 @@ public class OrderReturnReceivedIntegrationEventHandlerTests
         var orderId = Guid.NewGuid();
 
         var items = new FakeInventoryItemRepository();
-        items.Seed(InventoryItem.Create(productId, "SKU-A", "Product A", 10));
+        items.Seed(InventoryItem.Create(productId, productId, "SKU-A", "Product A", null, 10));
         items.Get(productId)!.Reserve(4);
         items.Get(productId)!.Commit(4);
 
         var reservations = new FakeStockReservationRepository();
-        var reservation = StockReservation.Create(orderId, productId, 4, null, DateTime.UtcNow);
+        var reservation = StockReservation.Create(orderId, productId, productId, 4, null, DateTime.UtcNow);
         reservation.MarkCommitted();
         await reservations.AddAsync(reservation);
 

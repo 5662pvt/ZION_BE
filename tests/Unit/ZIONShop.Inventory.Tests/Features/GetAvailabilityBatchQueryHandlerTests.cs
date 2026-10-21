@@ -16,7 +16,7 @@ public class GetAvailabilityBatchQueryHandlerTests
         var db = new InventoryDbContext(options);
 
         var productId = Guid.NewGuid();
-        await db.InventoryItems.AddAsync(InventoryItem.Create(productId, "ZT-BATCH-ABC123", "Batch Widget", 10));
+        await db.InventoryItems.AddAsync(InventoryItem.Create(productId, productId, "ZT-BATCH-ABC123", "Batch Widget", null, 10));
         await db.SaveChangesAsync();
 
         return (new InventoryItemRepository(db), productId);

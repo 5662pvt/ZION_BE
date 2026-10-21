@@ -22,10 +22,10 @@ public class OrderCancelledIntegrationEventHandlerTests
 
         using (var seedDb = CreateDb(dbName))
         {
-            var seedItem = InventoryItem.Create(productId, "SKU-A", "Product A", 10);
+            var seedItem = InventoryItem.Create(productId, productId, "SKU-A", "Product A", null, 10);
             seedItem.Reserve(4);
             await seedDb.InventoryItems.AddAsync(seedItem);
-            await seedDb.StockReservations.AddAsync(StockReservation.Create(orderId, productId, 4, null, DateTime.UtcNow));
+            await seedDb.StockReservations.AddAsync(StockReservation.Create(orderId, productId, productId, 4, null, DateTime.UtcNow));
             await seedDb.SaveChangesAsync();
         }
 
@@ -54,11 +54,11 @@ public class OrderCancelledIntegrationEventHandlerTests
         {
             // Simulates a COD order already confirmed: OrderConfirmedIntegrationEventHandler committed the
             // reservation, which moves stock out of OnHand and clears Reserved.
-            var seedItem = InventoryItem.Create(productId, "SKU-A", "Product A", 10);
+            var seedItem = InventoryItem.Create(productId, productId, "SKU-A", "Product A", null, 10);
             seedItem.Reserve(4);
             seedItem.Commit(4);
             await seedDb.InventoryItems.AddAsync(seedItem);
-            var reservation = StockReservation.Create(orderId, productId, 4, null, DateTime.UtcNow);
+            var reservation = StockReservation.Create(orderId, productId, productId, 4, null, DateTime.UtcNow);
             reservation.MarkCommitted();
             await seedDb.StockReservations.AddAsync(reservation);
             await seedDb.SaveChangesAsync();
@@ -88,11 +88,11 @@ public class OrderCancelledIntegrationEventHandlerTests
 
         using (var seedDb = CreateDb(dbName))
         {
-            var seedItem = InventoryItem.Create(productId, "SKU-A", "Product A", 10);
+            var seedItem = InventoryItem.Create(productId, productId, "SKU-A", "Product A", null, 10);
             seedItem.Reserve(4);
             seedItem.Commit(4);
             await seedDb.InventoryItems.AddAsync(seedItem);
-            var reservation = StockReservation.Create(orderId, productId, 4, null, DateTime.UtcNow);
+            var reservation = StockReservation.Create(orderId, productId, productId, 4, null, DateTime.UtcNow);
             reservation.MarkCommitted();
             await seedDb.StockReservations.AddAsync(reservation);
             await seedDb.SaveChangesAsync();
@@ -135,8 +135,8 @@ public class OrderCancelledIntegrationEventHandlerTests
 
         var items = new FakeInventoryItemRepository();
         items.Seed(
-            InventoryItem.Create(productHigh, "SKU-H", "Product High", 10),
-            InventoryItem.Create(productLow, "SKU-L", "Product Low", 10));
+            InventoryItem.Create(productHigh, productHigh, "SKU-H", "Product High", null, 10),
+            InventoryItem.Create(productLow, productLow, "SKU-L", "Product Low", null, 10));
         items.Get(productHigh)!.Reserve(3); // still Active
         items.Get(productLow)!.Reserve(5);
         items.Get(productLow)!.Commit(5); // already Committed
@@ -145,9 +145,9 @@ public class OrderCancelledIntegrationEventHandlerTests
         var reservations = new FakeStockReservationRepository();
         // Submitted high-id-first (Active) then low-id-first (Committed) -- the handler must still issue
         // its Try*Async calls low-id-first regardless of this input order.
-        var activeReservation = StockReservation.Create(orderId, productHigh, 3, null, DateTime.UtcNow);
+        var activeReservation = StockReservation.Create(orderId, productHigh, productHigh, 3, null, DateTime.UtcNow);
         await reservations.AddAsync(activeReservation);
-        var committedReservation = StockReservation.Create(orderId, productLow, 5, null, DateTime.UtcNow);
+        var committedReservation = StockReservation.Create(orderId, productLow, productLow, 5, null, DateTime.UtcNow);
         committedReservation.MarkCommitted();
         await reservations.AddAsync(committedReservation);
 
@@ -157,7 +157,7 @@ public class OrderCancelledIntegrationEventHandlerTests
 
         await handler.HandleAsync(new OrderCancelledIntegrationEvent(orderId, Guid.NewGuid(), "Customer cancelled"), CancellationToken.None);
 
-        recorder.Calls.Select(c => c.ProductId).Should().Equal(productLow, productHigh);
+        recorder.Calls.Select(c => c.VariantId).Should().Equal(productLow, productHigh);
         recorder.Calls.Select(c => c.Operation).Should().Equal("Return", "Release");
 
         items.Get(productHigh)!.Reserved.Should().Be(0);

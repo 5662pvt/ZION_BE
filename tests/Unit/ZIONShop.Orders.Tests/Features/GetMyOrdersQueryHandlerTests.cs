@@ -22,7 +22,7 @@ public class GetMyOrdersQueryHandlerTests
         Order MakeOrder() => Order.Place(
             userId, PaymentMethod.COD, "VND", 30000,
             new ShippingAddress(Guid.NewGuid(), "Nguyen Van A", "0900000000", "Hà Nội", "Cầu Giấy", "123 Đường ABC"),
-            new[] { (Guid.NewGuid(), "Widget", 100000m, 1) },
+            new[] { new OrderLineInput(Guid.NewGuid(), "Widget", 100000m, 1) },
             null);
 
         // VN day 2026-06-15 == UTC [2026-06-14 17:00, 2026-06-15 17:00)

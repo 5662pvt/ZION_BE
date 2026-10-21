@@ -34,15 +34,15 @@ public class OrderCancelledIntegrationEventHandler : IIntegrationEventHandler<Or
         var reservations = await _reservations.GetByOrderIdAsync(@event.OrderId, cancellationToken);
         // COD stock is committed (moved out of OnHand) on OrderConfirmed, before shipping — a later
         // cancellation must give that committed stock back, not just drop the (already-cleared) reservation.
-        // Active and committed reservations are processed together in ONE pass ordered by ProductId (rather
+        // Active and committed reservations are processed together in ONE pass ordered by VariantId (rather
         // than two separate release-then-return passes) so two concurrent cancels/reserves/commits touching
-        // the same products always take their row locks in the same order and never deadlock -- splitting
+        // the same variants always take their row locks in the same order and never deadlock -- splitting
         // into two ordered-but-sequential phases would not be enough, since one order's active lines and
-        // another order's committed lines for the same products could still interleave in opposite order
+        // another order's committed lines for the same variants could still interleave in opposite order
         // across the two phases.
         var toProcess = reservations
             .Where(r => r.Status is ReservationStatus.Active or ReservationStatus.Committed)
-            .OrderBy(r => r.ProductId)
+            .OrderBy(r => r.VariantId)
             .ToList();
         if (toProcess.Count == 0) return; // idempotent: nothing left to release or return
 
@@ -51,16 +51,16 @@ public class OrderCancelledIntegrationEventHandler : IIntegrationEventHandler<Or
         {
             if (reservation.Status == ReservationStatus.Active)
             {
-                if (await _items.TryReleaseAsync(reservation.ProductId, reservation.Quantity, cancellationToken))
+                if (await _items.TryReleaseAsync(reservation.VariantId, reservation.Quantity, cancellationToken))
                 {
-                    await _movements.AddAsync(StockMovement.Create(reservation.ProductId, StockMovementType.Release, reservation.Quantity, @event.OrderId.ToString(), now), cancellationToken);
+                    await _movements.AddAsync(StockMovement.Create(reservation.ProductId, reservation.VariantId, StockMovementType.Release, reservation.Quantity, @event.OrderId.ToString(), now), cancellationToken);
                 }
             }
             else
             {
-                if (await _items.TryReturnAsync(reservation.ProductId, reservation.Quantity, cancellationToken))
+                if (await _items.TryReturnAsync(reservation.VariantId, reservation.Quantity, cancellationToken))
                 {
-                    await _movements.AddAsync(StockMovement.Create(reservation.ProductId, StockMovementType.Return, reservation.Quantity, @event.OrderId.ToString(), now), cancellationToken);
+                    await _movements.AddAsync(StockMovement.Create(reservation.ProductId, reservation.VariantId, StockMovementType.Return, reservation.Quantity, @event.OrderId.ToString(), now), cancellationToken);
                 }
             }
 

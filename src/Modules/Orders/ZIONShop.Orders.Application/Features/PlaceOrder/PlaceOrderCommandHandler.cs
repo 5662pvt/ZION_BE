@@ -118,26 +118,28 @@ public class PlaceOrderCommandHandler : IRequestHandler<PlaceOrderCommand, Resul
         // exists -- same quote-before/reserve-after split already used for gifts in this handler. A line
         // whose quota is lost to a concurrent order in that window keeps its already-baked flash price;
         // this mirrors the gift flow's same quote/reserve race and is accepted for the same reason.
-        var flashSaleLines = cart.Lines.Select(l => new FlashSaleLine(l.ProductId, l.Quantity)).ToList();
+        var flashSaleLines = cart.Lines.Select(l => new FlashSaleLine(l.ProductId, l.Quantity, l.VariantId ?? l.ProductId)).ToList();
         var flashQuotes = await _flashSales.QuoteAsync(flashSaleLines, cancellationToken);
-        var flashPriceByProduct = flashQuotes.ToDictionary(q => q.ProductId, q => q.FlashUnitPrice);
+        var flashPriceByVariant = flashQuotes.ToDictionary(q => q.VariantId ?? q.ProductId, q => q.FlashUnitPrice);
 
-        var lines = new List<(Guid ProductId, string ProductName, decimal UnitPrice, int Quantity)>();
+        var lines = new List<OrderLineInput>();
         var unavailable = new List<string>();
         string? currency = null;
 
         foreach (var line in cart.Lines)
         {
-            var price = await _prices.GetAsync(line.ProductId, cancellationToken);
+            var variantKey = line.VariantId ?? line.ProductId;
+            var price = await _prices.GetAsync(variantKey, cancellationToken);
             if (price is null || !price.IsAvailable)
             {
-                unavailable.Add(line.ProductName);
+                unavailable.Add(price is null ? line.ProductName : FormatProductLabel(price.Name, price.VariantLabel));
                 continue;
             }
 
             currency ??= price.Currency;
-            var unitPrice = flashPriceByProduct.TryGetValue(line.ProductId, out var flashPrice) ? flashPrice : price.UnitPrice;
-            lines.Add((line.ProductId, price.Name, unitPrice, line.Quantity));
+            var resolvedVariantId = price.VariantId ?? price.ProductId;
+            var unitPrice = flashPriceByVariant.TryGetValue(resolvedVariantId, out var flashPrice) ? flashPrice : price.UnitPrice;
+            lines.Add(new OrderLineInput(price.ProductId, price.Name, unitPrice, line.Quantity, resolvedVariantId, price.VariantLabel, price.Sku));
         }
 
         if (unavailable.Count > 0)
@@ -177,24 +179,24 @@ public class PlaceOrderCommandHandler : IRequestHandler<PlaceOrderCommand, Resul
         var giftGrants = await _giftPromotions.QuoteGiftsAsync(giftRequest, cancellationToken);
 
         var keptPromotionIds = new List<Guid>();
-        var keptProductIds = new HashSet<Guid>();
+        var keptVariantIds = new HashSet<Guid>();
         if (giftGrants.Count > 0)
         {
-            var neededByProduct = giftGrants
-                .GroupBy(g => g.ProductId)
+            var neededByVariant = giftGrants
+                .GroupBy(g => g.VariantId ?? g.ProductId)
                 .ToDictionary(g => g.Key, g => g.Sum(x => x.Quantity));
             foreach (var line in lines)
-                if (neededByProduct.ContainsKey(line.ProductId))
-                    neededByProduct[line.ProductId] += line.Quantity;
+                if (neededByVariant.ContainsKey(line.ResolvedVariantId))
+                    neededByVariant[line.ResolvedVariantId] += line.Quantity;
 
-            var available = await _stockAvailability.GetAvailableAsync(neededByProduct.Keys.ToList(), cancellationToken);
-            keptProductIds = neededByProduct
+            var available = await _stockAvailability.GetAvailableAsync(neededByVariant.Keys.ToList(), cancellationToken);
+            keptVariantIds = neededByVariant
                 .Where(kv => (available.TryGetValue(kv.Key, out var a) ? a : 0) >= kv.Value)
                 .Select(kv => kv.Key)
                 .ToHashSet();
 
             keptPromotionIds = giftGrants
-                .Where(g => keptProductIds.Contains(g.ProductId))
+                .Where(g => keptVariantIds.Contains(g.VariantId ?? g.ProductId))
                 .Select(g => g.PromotionId)
                 .Distinct()
                 .ToList();
@@ -206,11 +208,12 @@ public class PlaceOrderCommandHandler : IRequestHandler<PlaceOrderCommand, Resul
             var reservedGrants = await _giftPromotions.ReserveGiftsAsync(giftRequest, order.Id, keptPromotionIds, cancellationToken);
             if (reservedGrants.Count > 0)
             {
-                var giftPrices = await _prices.GetManyAsync(reservedGrants.Select(g => g.ProductId).Distinct().ToList(), cancellationToken);
+                var giftPrices = await _prices.GetManyAsync(reservedGrants.Select(g => g.VariantId ?? g.ProductId).Distinct().ToList(), cancellationToken);
                 foreach (var grant in reservedGrants)
                 {
-                    if (keptProductIds.Contains(grant.ProductId) && giftPrices.TryGetValue(grant.ProductId, out var info))
-                        order.AddGiftLine(grant.ProductId, info.Name, grant.Quantity, grant.PromotionId);
+                    var grantKey = grant.VariantId ?? grant.ProductId;
+                    if (keptVariantIds.Contains(grantKey) && giftPrices.TryGetValue(grantKey, out var info))
+                        order.AddGiftLine(grant.ProductId, info.Name, grant.Quantity, grant.PromotionId, grantKey, info.VariantLabel, info.Sku);
                 }
             }
         }
@@ -223,7 +226,7 @@ public class PlaceOrderCommandHandler : IRequestHandler<PlaceOrderCommand, Resul
                 order.Id,
                 order.UserId,
                 order.Total,
-                order.Lines.Select(l => new ContractsOrderLine(l.ProductId, l.Quantity, l.UnitPrice, l.IsGift)).ToList(),
+                order.Lines.Select(l => new ContractsOrderLine(l.ProductId, l.Quantity, l.UnitPrice, l.IsGift, l.VariantId)).ToList(),
                 order.PaymentMethod.ToString(),
                 order.Currency));
 
@@ -281,16 +284,19 @@ public class PlaceOrderCommandHandler : IRequestHandler<PlaceOrderCommand, Resul
     }
 
     private async Task<List<string>> GetInsufficientStockProductNamesAsync(
-        List<(Guid ProductId, string ProductName, decimal UnitPrice, int Quantity)> lines,
+        List<OrderLineInput> lines,
         CancellationToken cancellationToken)
     {
-        var productIds = lines.Select(l => l.ProductId).Distinct().ToList();
-        var available = await _stockAvailability.GetAvailableAsync(productIds, cancellationToken);
+        var variantIds = lines.Select(l => l.ResolvedVariantId).Distinct().ToList();
+        var available = await _stockAvailability.GetAvailableAsync(variantIds, cancellationToken);
 
         return lines
-            .GroupBy(l => l.ProductId)
+            .GroupBy(l => l.ResolvedVariantId)
             .Where(g => (available.TryGetValue(g.Key, out var a) ? a : 0) < g.Sum(l => l.Quantity))
-            .Select(g => g.First().ProductName)
+            .Select(g => FormatProductLabel(g.First().ProductName, g.First().VariantLabel))
             .ToList();
     }
+
+    private static string FormatProductLabel(string productName, string? variantLabel) =>
+        string.IsNullOrEmpty(variantLabel) ? productName : $"{productName} – {variantLabel}";
 }

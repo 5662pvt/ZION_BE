@@ -25,8 +25,8 @@ public class ClearCartCommandHandlerTests
         var (db, carts) = BuildScope();
         var userId = Guid.NewGuid();
         var cart = DomainCart.CreateForUser(userId);
-        cart.AddItem(Guid.NewGuid(), "Widget", 1, 10m, "USD");
-        cart.AddItem(Guid.NewGuid(), "Gadget", 2, 20m, "USD");
+        cart.AddItem(Guid.NewGuid(), Guid.NewGuid(), "Widget", 1, 10m, "USD");
+        cart.AddItem(Guid.NewGuid(), Guid.NewGuid(), "Gadget", 2, 20m, "USD");
         await carts.AddAsync(cart, CancellationToken.None);
         await db.SaveChangesAsync(CancellationToken.None);
 

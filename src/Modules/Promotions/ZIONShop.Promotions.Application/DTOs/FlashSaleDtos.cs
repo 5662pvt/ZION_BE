@@ -1,6 +1,6 @@
 namespace ZIONShop.Promotions.Application.DTOs;
 
-public record FlashSaleItemDto(Guid Id, Guid ProductId, decimal FlashPrice, int AllocatedQuantity, int SoldQuantity, int Available);
+public record FlashSaleItemDto(Guid Id, Guid ProductId, Guid VariantId, string? VariantLabel, string? Sku, decimal FlashPrice, int AllocatedQuantity, int SoldQuantity, int Available);
 
 public record FlashSaleSummaryDto(Guid Id, string Name, DateTime StartsAt, DateTime EndsAt, bool IsActive, int ItemCount);
 
@@ -8,6 +8,9 @@ public record FlashSaleDto(Guid Id, string Name, DateTime StartsAt, DateTime End
 
 public record ActiveFlashSaleItemDto(
     Guid ProductId,
+    Guid VariantId,
+    string? VariantLabel,
+    string? Sku,
     string ProductName,
     string? ImageUrl,
     decimal FlashPrice,

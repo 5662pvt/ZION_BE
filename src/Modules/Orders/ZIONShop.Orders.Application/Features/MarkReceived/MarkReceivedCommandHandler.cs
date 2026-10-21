@@ -35,7 +35,7 @@ public class MarkReceivedCommandHandler : IRequestHandler<MarkReceivedCommand, R
         var order = await _orders.GetByIdAsync(returnRequest.OrderId, cancellationToken);
         if (order is null) return Result.Failure<AdminReturnRequestDto>(OrdersErrors.OrderNotFound);
 
-        var lines = order.Lines.Select(l => new ReturnLine(l.ProductId, l.Quantity)).ToList();
+        var lines = order.Lines.Select(l => new ReturnLine(l.ProductId, l.Quantity, l.VariantId)).ToList();
         _uow.AddOutboxEvent(new OrderReturnReceivedIntegrationEvent(
             order.Id, returnRequest.UserId, returnRequest.Id, returnRequest.RefundAmount, order.PaymentMethod.ToString(), lines));
 

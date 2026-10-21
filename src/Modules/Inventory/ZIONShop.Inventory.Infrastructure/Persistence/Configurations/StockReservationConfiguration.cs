@@ -13,12 +13,13 @@ public class StockReservationConfiguration : IEntityTypeConfiguration<StockReser
 
         builder.Property(r => r.OrderId).IsRequired();
         builder.Property(r => r.ProductId).IsRequired();
+        builder.Property(r => r.VariantId).IsRequired();
         builder.Property(r => r.Quantity).IsRequired();
         builder.Property(r => r.Status).HasConversion<int>().IsRequired();
         builder.Property(r => r.ExpiresAt);
         builder.Property(r => r.CreatedAt).IsRequired();
 
-        builder.HasIndex(r => new { r.OrderId, r.ProductId }).IsUnique();
+        builder.HasIndex(r => new { r.OrderId, r.VariantId }).IsUnique();
         builder.HasIndex(r => new { r.Status, r.ExpiresAt });
     }
 }

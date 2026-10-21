@@ -6,11 +6,16 @@ public class FakeProductPriceLookup : IProductPriceLookup
 {
     private readonly Dictionary<Guid, ProductPriceInfo> _products = new();
 
-    public FakeProductPriceLookup Add(Guid productId, string name, decimal unitPrice, string currency = "USD", bool isAvailable = true, string? slug = null, string? primaryImageUrl = null)
+    public FakeProductPriceLookup Add(Guid productId, string name, decimal unitPrice, string currency = "USD", bool isAvailable = true, string? slug = null, string? primaryImageUrl = null, Guid? variantId = null, string? variantLabel = null, string? sku = null, string? variantImageUrl = null)
     {
-        _products[productId] = new ProductPriceInfo(productId, name, unitPrice, currency, isAvailable, slug ?? name, primaryImageUrl);
+        var key = variantId ?? productId;
+        var resolvedVariantId = isAvailable ? variantId ?? productId : (Guid?)null;
+        _products[key] = new ProductPriceInfo(productId, name, unitPrice, currency, isAvailable, slug ?? name, primaryImageUrl, resolvedVariantId, variantLabel, sku, variantImageUrl);
         return this;
     }
+
+    public FakeProductPriceLookup AddVariant(Guid productId, Guid variantId, string variantLabel, string sku, decimal unitPrice, string currency = "USD", string? name = null, string? slug = null, string? primaryImageUrl = null, string? variantImageUrl = null)
+        => Add(productId, name ?? variantLabel, unitPrice, currency, true, slug, primaryImageUrl, variantId, variantLabel, sku, variantImageUrl);
 
     public Task<ProductPriceInfo?> GetAsync(Guid productId, CancellationToken cancellationToken = default)
         => Task.FromResult(_products.TryGetValue(productId, out var info) ? info : null);

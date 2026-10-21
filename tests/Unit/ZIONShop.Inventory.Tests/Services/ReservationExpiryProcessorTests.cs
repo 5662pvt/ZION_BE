@@ -31,10 +31,10 @@ public class ReservationExpiryProcessorTests
 
         using (var seedDb = CreateDb(dbName))
         {
-            var seedItem = InventoryItem.Create(productId, "SKU-A", "Product A", 10);
+            var seedItem = InventoryItem.Create(productId, productId, "SKU-A", "Product A", null, 10);
             seedItem.Reserve(3);
             await seedDb.InventoryItems.AddAsync(seedItem);
-            await seedDb.StockReservations.AddAsync(StockReservation.Create(orderId, productId, 3, expiredAt, now.UtcDateTime.AddMinutes(-16)));
+            await seedDb.StockReservations.AddAsync(StockReservation.Create(orderId, productId, productId, 3, expiredAt, now.UtcDateTime.AddMinutes(-16)));
             await seedDb.SaveChangesAsync();
         }
 
@@ -66,10 +66,10 @@ public class ReservationExpiryProcessorTests
 
         using (var seedDb = CreateDb(dbName))
         {
-            var seedItem = InventoryItem.Create(productId, "SKU-A", "Product A", 10);
+            var seedItem = InventoryItem.Create(productId, productId, "SKU-A", "Product A", null, 10);
             seedItem.Reserve(3);
             await seedDb.InventoryItems.AddAsync(seedItem);
-            await seedDb.StockReservations.AddAsync(StockReservation.Create(orderId, productId, 3, now.UtcDateTime.AddMinutes(10), now.UtcDateTime));
+            await seedDb.StockReservations.AddAsync(StockReservation.Create(orderId, productId, productId, 3, now.UtcDateTime.AddMinutes(10), now.UtcDateTime));
             await seedDb.SaveChangesAsync();
         }
 
@@ -96,8 +96,8 @@ public class ReservationExpiryProcessorTests
 
         var items = new FakeInventoryItemRepository();
         items.Seed(
-            InventoryItem.Create(productHigh, "SKU-H", "Product High", 10),
-            InventoryItem.Create(productLow, "SKU-L", "Product Low", 10));
+            InventoryItem.Create(productHigh, productHigh, "SKU-H", "Product High", null, 10),
+            InventoryItem.Create(productLow, productLow, "SKU-L", "Product Low", null, 10));
         items.Get(productHigh)!.Reserve(2);
         items.Get(productLow)!.Reserve(3);
 
@@ -105,8 +105,8 @@ public class ReservationExpiryProcessorTests
         var reservations = new FakeStockReservationRepository();
         // orderA (productHigh) expires earlier than orderB (productLow), so GetActiveExpiredAsync (sorted
         // by ExpiresAt) hands them back high-id-first -- the processor must still release low-id-first.
-        await reservations.AddAsync(StockReservation.Create(orderA, productHigh, 2, now.UtcDateTime.AddMinutes(-2), now.UtcDateTime.AddMinutes(-20)));
-        await reservations.AddAsync(StockReservation.Create(orderB, productLow, 3, now.UtcDateTime.AddMinutes(-1), now.UtcDateTime.AddMinutes(-20)));
+        await reservations.AddAsync(StockReservation.Create(orderA, productHigh, productHigh, 2, now.UtcDateTime.AddMinutes(-2), now.UtcDateTime.AddMinutes(-20)));
+        await reservations.AddAsync(StockReservation.Create(orderB, productLow, productLow, 3, now.UtcDateTime.AddMinutes(-1), now.UtcDateTime.AddMinutes(-20)));
 
         var movements = new FakeStockMovementRepository();
         var uow = new FakeInventoryUnitOfWork(items);
@@ -117,7 +117,7 @@ public class ReservationExpiryProcessorTests
         var expiredCount = await processor.ExpireDueReservationsAsync();
 
         expiredCount.Should().Be(2);
-        recorder.Calls.Select(c => c.ProductId).Should().Equal(productLow, productHigh);
+        recorder.Calls.Select(c => c.VariantId).Should().Equal(productLow, productHigh);
         recorder.Calls.Select(c => c.Operation).Should().Equal("Release", "Release");
         uow.BeginTransactionCallCount.Should().Be(1);
         outboxEvents.OfType<InventoryReservationExpiredIntegrationEvent>().Select(e => e.OrderId).Should().BeEquivalentTo(new[] { orderA, orderB });

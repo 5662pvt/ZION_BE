@@ -38,19 +38,19 @@ public class InventoryReservedIntegrationEventHandler : IIntegrationEventHandler
 
         if (order.Status != OrderStatus.PendingStock) return; // already processed, idempotent no-op
 
-        var reservedByProduct = @event.Items.ToDictionary(i => i.ProductId, i => i.Quantity);
-        var expectedByProduct = order.Lines
-            .GroupBy(l => l.ProductId)
+        var reservedByVariant = @event.Items.ToDictionary(i => i.VariantId ?? i.ProductId, i => i.Quantity);
+        var expectedByVariant = order.Lines
+            .GroupBy(l => l.VariantId)
             .ToDictionary(g => g.Key, g => g.Sum(l => l.Quantity));
 
-        var shortProductIds = expectedByProduct
-            .Where(kv => !reservedByProduct.TryGetValue(kv.Key, out var reserved) || reserved < kv.Value)
+        var shortVariantIds = expectedByVariant
+            .Where(kv => !reservedByVariant.TryGetValue(kv.Key, out var reserved) || reserved < kv.Value)
             .Select(kv => kv.Key)
             .ToList();
 
-        if (shortProductIds.Count > 0)
+        if (shortVariantIds.Count > 0)
         {
-            var dropped = order.DropGiftLines(shortProductIds);
+            var dropped = order.DropGiftLines(shortVariantIds);
             foreach (var promotionId in dropped.Select(l => l.GiftPromotionId!.Value).Distinct())
             {
                 var promotionStillHasLines = order.Lines.Any(l => l.IsGift && l.GiftPromotionId == promotionId);

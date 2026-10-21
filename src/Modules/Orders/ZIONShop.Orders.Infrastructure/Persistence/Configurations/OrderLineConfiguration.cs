@@ -17,7 +17,10 @@ public class OrderLineConfiguration : IEntityTypeConfiguration<OrderLine>
         builder.Property(l => l.Quantity).IsRequired();
         builder.Property(l => l.IsGift).HasColumnName("is_gift").IsRequired().HasDefaultValue(false);
         builder.Property(l => l.GiftPromotionId).HasColumnName("gift_promotion_id");
+        builder.Property(l => l.VariantId).IsRequired();
+        builder.Property(l => l.VariantLabel).HasMaxLength(256);
+        builder.Property(l => l.Sku).HasMaxLength(64);
         builder.Ignore(l => l.LineTotal);
-        builder.HasIndex(l => new { l.OrderId, l.ProductId });
+        builder.HasIndex(l => new { l.OrderId, l.VariantId });
     }
 }

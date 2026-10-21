@@ -6,9 +6,9 @@ public class FakeProductPriceLookup : IProductPriceLookup
 {
     private readonly Dictionary<Guid, ProductPriceInfo> _products = new();
 
-    public FakeProductPriceLookup Add(Guid productId, string name, decimal unitPrice, string currency = "VND", bool isAvailable = true, string? slug = null, string? primaryImageUrl = null)
+    public FakeProductPriceLookup Add(Guid productId, string name, decimal unitPrice, string currency = "VND", bool isAvailable = true, string? slug = null, string? primaryImageUrl = null, Guid? variantId = null, string? variantLabel = null, string? sku = null)
     {
-        _products[productId] = new ProductPriceInfo(productId, name, unitPrice, currency, isAvailable, slug ?? name, primaryImageUrl);
+        _products[productId] = new ProductPriceInfo(productId, name, unitPrice, currency, isAvailable, slug ?? name, primaryImageUrl, variantId, variantLabel, sku);
         return this;
     }
 

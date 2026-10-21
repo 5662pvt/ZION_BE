@@ -60,9 +60,9 @@ public class FlashSalesController : ControllerBase
     [HttpPost("{id:guid}/items")]
     [AdminAudit("FlashSaleItem.Add", "FlashSale")]
     public async Task<IActionResult> AddItem(Guid id, [FromBody] AddFlashSaleItemBody body, CancellationToken ct)
-        => (await _mediator.Send(new AddFlashSaleItemCommand(id, body.ProductId, body.FlashPrice, body.AllocatedQuantity), ct)).ToActionResult("Flash sale item added");
+        => (await _mediator.Send(new AddFlashSaleItemCommand(id, body.ProductId, body.VariantId, body.FlashPrice, body.AllocatedQuantity), ct)).ToActionResult("Flash sale item added");
 }
 
 public record SearchFlashSalesRequest(int Page = 1, int PageSize = 20, string? Keyword = null);
 public record FlashSaleUpsertRequest(string Name, DateTime StartsAt, DateTime EndsAt);
-public record AddFlashSaleItemBody(Guid ProductId, decimal FlashPrice, int AllocatedQuantity);
+public record AddFlashSaleItemBody(Guid? ProductId, Guid? VariantId, decimal FlashPrice, int AllocatedQuantity);

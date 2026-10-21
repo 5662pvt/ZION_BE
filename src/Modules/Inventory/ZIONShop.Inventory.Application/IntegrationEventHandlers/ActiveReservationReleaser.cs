@@ -7,9 +7,9 @@ namespace ZIONShop.Inventory.Application.IntegrationEventHandlers;
 /// <summary>
 /// Shared "give back an active reservation" logic used by <see cref="OrderReservationReleaseRequestedIntegrationEventHandler"/>.
 /// Releases are applied with the atomic <see cref="IInventoryItemRepository.TryReleaseAsync"/> (no tracked
-/// row, no deferred write at <c>SaveChangesAsync</c> time), processing products ordered by ProductId so two
-/// concurrent multi-product operations (e.g. this release and a concurrent reserve/commit touching the same
-/// products) always take their row locks in the same order and never deadlock.
+/// row, no deferred write at <c>SaveChangesAsync</c> time), processing variants ordered by VariantId so two
+/// concurrent multi-line operations (e.g. this release and a concurrent reserve/commit touching the same
+/// variants) always take their row locks in the same order and never deadlock.
 /// </summary>
 internal static class ActiveReservationReleaser
 {
@@ -21,12 +21,12 @@ internal static class ActiveReservationReleaser
         DateTime now,
         CancellationToken cancellationToken)
     {
-        foreach (var reservation in activeReservations.OrderBy(r => r.ProductId))
+        foreach (var reservation in activeReservations.OrderBy(r => r.VariantId))
         {
-            if (await items.TryReleaseAsync(reservation.ProductId, reservation.Quantity, cancellationToken))
+            if (await items.TryReleaseAsync(reservation.VariantId, reservation.Quantity, cancellationToken))
             {
                 await movements.AddAsync(
-                    StockMovement.Create(reservation.ProductId, StockMovementType.Release, reservation.Quantity, orderId.ToString(), now),
+                    StockMovement.Create(reservation.ProductId, reservation.VariantId, StockMovementType.Release, reservation.Quantity, orderId.ToString(), now),
                     cancellationToken);
             }
 

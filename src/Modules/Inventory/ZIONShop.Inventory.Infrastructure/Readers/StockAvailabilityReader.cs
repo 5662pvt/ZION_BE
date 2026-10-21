@@ -10,6 +10,7 @@ public class StockAvailabilityReader : IStockAvailabilityReader
 
     public StockAvailabilityReader(InventoryDbContext db) => _db = db;
 
+    /// <summary>Ids here are VARIANT ids (default-variant ids == product ids, so pre-existing callers passing a product id are unaffected).</summary>
     public async Task<IReadOnlyDictionary<Guid, int>> GetAvailableAsync(IReadOnlyCollection<Guid> productIds, CancellationToken ct = default)
     {
         var ids = productIds.Distinct().ToList();
@@ -17,13 +18,13 @@ public class StockAvailabilityReader : IStockAvailabilityReader
 
         var available = await _db.InventoryItems
             .AsNoTracking()
-            .Where(i => ids.Contains(i.ProductId))
-            .Select(i => new { i.ProductId, i.Available })
+            .Where(i => ids.Contains(i.VariantId))
+            .Select(i => new { i.VariantId, i.Available })
             .ToListAsync(ct);
 
         var result = ids.ToDictionary(id => id, _ => 0);
         foreach (var item in available)
-            result[item.ProductId] = item.Available;
+            result[item.VariantId] = item.Available;
 
         return result;
     }

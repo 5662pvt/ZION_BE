@@ -12,7 +12,10 @@ public record CartDto(
 public record CartItemDto(
     Guid Id,
     Guid ProductId,
+    Guid VariantId,
     string ProductName,
+    string? VariantLabel,
+    string? Sku,
     int Quantity,
     decimal UnitPrice,
     decimal Subtotal,

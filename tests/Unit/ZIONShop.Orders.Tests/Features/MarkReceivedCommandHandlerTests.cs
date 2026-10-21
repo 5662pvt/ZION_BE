@@ -26,7 +26,7 @@ public class MarkReceivedCommandHandlerTests
         var order = Order.Place(
             userId, PaymentMethod.COD, "VND", 30000,
             new ShippingAddress(Guid.NewGuid(), "Nguyen Van A", "0900000000", "Hà Nội", "Cầu Giấy", "123 Đường ABC"),
-            new[] { (Guid.NewGuid(), "Widget", 100000m, 2) },
+            new[] { new OrderLineInput(Guid.NewGuid(), "Widget", 100000m, 2) },
             null);
         order.ConfirmReservation();
         order.Ship();
@@ -57,6 +57,35 @@ public class MarkReceivedCommandHandlerTests
         outboxMessage.Type.Should().Contain("OrderReturnReceivedIntegrationEvent");
         outboxMessage.Content.Should().Contain(order.Lines.Single().ProductId.ToString());
         outboxMessage.Content.Should().Contain("\"Quantity\":2");
+    }
+
+    [Fact]
+    public async Task Handle_Should_QueueOutboxEvent_WithLineVariantId_When_OrderLineHasAVariant()
+    {
+        var (db, orders, returns) = BuildScope();
+        var userId = Guid.NewGuid();
+        var variantId = Guid.NewGuid();
+        var order = Order.Place(
+            userId, PaymentMethod.COD, "VND", 30000,
+            new ShippingAddress(Guid.NewGuid(), "Nguyen Van A", "0900000000", "Hà Nội", "Cầu Giấy", "123 Đường ABC"),
+            new[] { new OrderLineInput(Guid.NewGuid(), "Áo thun", 100000m, 2, variantId, "Đỏ") },
+            null);
+        order.ConfirmReservation();
+        order.Ship();
+        order.Complete();
+        await orders.AddAsync(order, CancellationToken.None);
+
+        var request = ReturnRequest.Create(order.Id, userId, ReturnReason.Defective, null, order.Total, DateTime.UtcNow).Value;
+        request.Approve(DateTime.UtcNow);
+        await returns.AddAsync(request, CancellationToken.None);
+        await db.SaveChangesAsync(CancellationToken.None);
+
+        var handler = new MarkReceivedCommandHandler(returns, orders, db, TimeProvider.System);
+        var result = await handler.Handle(new MarkReceivedCommand(request.Id), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        var outboxMessage = await db.Set<OutboxMessage>().SingleAsync();
+        outboxMessage.Content.Should().Contain(variantId.ToString());
     }
 
     [Fact]
@@ -91,7 +120,7 @@ public class MarkReceivedCommandHandlerTests
         var order = Order.Place(
             userId, PaymentMethod.COD, "VND", 30000,
             new ShippingAddress(Guid.NewGuid(), "Nguyen Van A", "0900000000", "Hà Nội", "Cầu Giấy", "123 Đường ABC"),
-            new[] { (Guid.NewGuid(), "Widget", 100000m, 1) },
+            new[] { new OrderLineInput(Guid.NewGuid(), "Widget", 100000m, 1) },
             null);
         order.ConfirmReservation();
         order.Ship();

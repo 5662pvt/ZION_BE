@@ -1,6 +1,9 @@
 namespace ZIONShop.Promotions.Application.DTOs;
 
-public record GiftItemDto(Guid ProductId, int Quantity);
+public record GiftItemDto(Guid ProductId, Guid VariantId, int Quantity);
+
+/// <summary>Raw user input for a gift reward line (controller body); resolved to a concrete variant by the Create/UpdatePromotion handler before reaching the domain.</summary>
+public record GiftItemInputDto(Guid? ProductId, Guid? VariantId, int Quantity);
 
 public record PromotionSummaryDto(
     Guid Id,
@@ -50,4 +53,4 @@ public record CouponDto(Guid Id, string Code, bool IsActive, int UsedCount, Date
 
 public record CouponValidationResultDto(string Code, string PromotionName, decimal DiscountAmount, string DiscountTarget);
 
-public record GiftPreviewDto(Guid PromotionId, string PromotionName, Guid ProductId, string ProductName, string? ImageUrl, int Quantity, bool Available);
+public record GiftPreviewDto(Guid PromotionId, string PromotionName, Guid ProductId, Guid VariantId, string? VariantLabel, string ProductName, string? ImageUrl, int Quantity, bool Available);

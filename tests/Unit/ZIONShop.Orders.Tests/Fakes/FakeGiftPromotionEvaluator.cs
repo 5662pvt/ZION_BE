@@ -11,9 +11,9 @@ public class FakeGiftPromotionEvaluator : IGiftPromotionEvaluator
     public List<Guid> ReleasedOrderIds { get; } = new();
     public List<(Guid OrderId, Guid PromotionId)> ReleasedGiftCalls { get; } = new();
 
-    public FakeGiftPromotionEvaluator WithGrant(Guid promotionId, Guid productId, int quantity, string promotionName = "Quà tặng")
+    public FakeGiftPromotionEvaluator WithGrant(Guid promotionId, Guid productId, int quantity, string promotionName = "Quà tặng", Guid? variantId = null)
     {
-        _grants.Add(new GiftGrant(promotionId, promotionName, productId, quantity));
+        _grants.Add(new GiftGrant(promotionId, promotionName, productId, quantity, variantId));
         return this;
     }
 

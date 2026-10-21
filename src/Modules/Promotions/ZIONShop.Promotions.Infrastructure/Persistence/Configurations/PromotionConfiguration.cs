@@ -34,8 +34,9 @@ public class PromotionConfiguration : IEntityTypeConfiguration<Promotion>
         {
             gi.ToTable("promotion_gift_items");
             gi.WithOwner().HasForeignKey(x => x.PromotionId);
-            gi.HasKey(x => new { x.PromotionId, x.ProductId });
+            gi.HasKey(x => new { x.PromotionId, x.VariantId });
             gi.Property(x => x.ProductId).IsRequired();
+            gi.Property(x => x.VariantId).IsRequired();
             gi.Property(x => x.Quantity).IsRequired();
         });
         builder.Navigation(p => p.GiftItems).UsePropertyAccessMode(PropertyAccessMode.Field);

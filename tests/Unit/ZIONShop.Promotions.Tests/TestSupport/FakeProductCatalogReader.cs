@@ -5,10 +5,17 @@ namespace ZIONShop.Promotions.Tests.TestSupport;
 internal sealed class FakeProductCatalogReader : IProductCatalogReader
 {
     private readonly Dictionary<Guid, ProductCatalogItem> _items = new();
+    private readonly Dictionary<Guid, ProductVariantCatalogItem> _variants = new();
 
     public FakeProductCatalogReader WithProduct(Guid productId, Guid? categoryId)
     {
         _items[productId] = new ProductCatalogItem(productId, "SKU", "Product", "Published", categoryId);
+        return this;
+    }
+
+    public FakeProductCatalogReader WithVariant(Guid variantId, Guid productId, string sku = "SKU", string productName = "Product", string variantLabel = "", bool isActive = true, string productStatus = "Published")
+    {
+        _variants[variantId] = new ProductVariantCatalogItem(variantId, productId, sku, productName, variantLabel, isActive, productStatus);
         return this;
     }
 
@@ -19,8 +26,8 @@ internal sealed class FakeProductCatalogReader : IProductCatalogReader
         => Task.FromResult(_items.TryGetValue(productId, out var item) ? item : null);
 
     public Task<IReadOnlyList<ProductVariantCatalogItem>> ListVariantsAsync(CancellationToken ct = default)
-        => Task.FromResult<IReadOnlyList<ProductVariantCatalogItem>>(Array.Empty<ProductVariantCatalogItem>());
+        => Task.FromResult<IReadOnlyList<ProductVariantCatalogItem>>(_variants.Values.ToList());
 
     public Task<ProductVariantCatalogItem?> GetVariantAsync(Guid variantId, CancellationToken ct = default)
-        => Task.FromResult<ProductVariantCatalogItem?>(null);
+        => Task.FromResult(_variants.TryGetValue(variantId, out var v) ? v : null);
 }

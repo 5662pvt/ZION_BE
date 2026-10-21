@@ -6,7 +6,8 @@ public class AddFlashSaleItemCommandValidator : AbstractValidator<AddFlashSaleIt
 {
     public AddFlashSaleItemCommandValidator()
     {
-        RuleFor(x => x.ProductId).NotEmpty();
+        RuleFor(x => x).Must(x => x.ProductId.HasValue || x.VariantId.HasValue)
+            .WithMessage("Phải cung cấp 'productId' hoặc 'variantId'");
         RuleFor(x => x.FlashPrice).GreaterThan(0m);
         RuleFor(x => x.AllocatedQuantity).GreaterThan(0);
     }

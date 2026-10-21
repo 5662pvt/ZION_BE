@@ -265,6 +265,27 @@ public class GiftPromotionEvaluatorTests
     }
 
     [Fact]
+    public async Task QuoteGiftsAsync_Should_CarryVariantId_When_GiftItemTargetsASpecificVariant()
+    {
+        var (db, evaluator, _) = BuildScope();
+        var giftProductId = Guid.NewGuid();
+        var giftVariantId = Guid.NewGuid();
+        var items = new[] { new GiftItemInput(giftProductId, 1, giftVariantId) };
+        var promotion = Promotion.Create(
+            "Gift test", null, PromotionType.Gift, 0m, null, 1m,
+            DateTime.UtcNow.AddDays(-1), DateTime.UtcNow.AddDays(30), null, null,
+            PromotionScope.Order, null, null, null, items).Value;
+        promotion.Activate();
+        db.Promotions.Add(promotion);
+        await db.SaveChangesAsync();
+
+        var lines = new[] { new CouponLine(Guid.NewGuid(), 1, 100000m) };
+        var grants = await evaluator.QuoteGiftsAsync(new GiftRequest(Guid.NewGuid(), lines, 100000m));
+
+        grants.Should().ContainSingle(g => g.ProductId == giftProductId && g.VariantId == giftVariantId);
+    }
+
+    [Fact]
     public async Task ReleaseGiftAsync_Should_ReleaseOnlyThatPromotion_When_OrderHasMultipleGiftRedemptions()
     {
         var (db, evaluator, _) = BuildScope();

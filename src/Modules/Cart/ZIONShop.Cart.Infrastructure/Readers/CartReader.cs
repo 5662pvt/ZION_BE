@@ -19,7 +19,7 @@ public class CartReader : ICartReader
         if (cart is null) return null;
 
         var lines = cart.Items
-            .Select(i => new CartSnapshotLine(i.ProductId, i.ProductName, i.Quantity, i.UnitPrice))
+            .Select(i => new CartSnapshotLine(i.ProductId, i.ProductName, i.Quantity, i.UnitPrice, i.VariantId))
             .ToList();
 
         var currency = cart.Items.Select(i => i.Currency).FirstOrDefault() ?? "VND";

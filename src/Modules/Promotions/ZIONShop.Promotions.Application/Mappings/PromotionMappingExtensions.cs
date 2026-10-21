@@ -51,5 +51,5 @@ public static class PromotionMappingExtensions
 
     public static CouponDto ToDto(this CouponCode coupon) => new(coupon.Id, coupon.Code, coupon.IsActive, coupon.UsedCount, coupon.CreatedAt);
 
-    public static GiftItemDto ToDto(this PromotionGiftItem item) => new(item.ProductId, item.Quantity);
+    public static GiftItemDto ToDto(this PromotionGiftItem item) => new(item.ProductId, item.VariantId, item.Quantity);
 }

@@ -37,14 +37,15 @@ public class ProductPriceLookup : IProductPriceLookup
                 PrimaryImageUrl = p.Images.OrderBy(i => i.DisplayOrder).Select(i => i.Url).FirstOrDefault(),
                 v.Option1Value,
                 v.Option2Value,
-                Sku = v.Sku.Value
+                Sku = v.Sku.Value,
+                VariantImageUrl = v.ImageId.HasValue ? p.Images.Where(i => i.Id == v.ImageId).Select(i => i.Url).FirstOrDefault() : null
             })
             .ToListAsync(cancellationToken);
 
         foreach (var row in variantRows)
         {
             var label = string.Join(" / ", new[] { row.Option1Value, row.Option2Value }.Where(v => !string.IsNullOrWhiteSpace(v)));
-            result[row.Id] = new ProductPriceInfo(row.ProductId, row.Name, row.Price, row.Currency, row.Available, row.Slug, row.PrimaryImageUrl, row.Id, label, row.Sku);
+            result[row.Id] = new ProductPriceInfo(row.ProductId, row.Name, row.Price, row.Currency, row.Available, row.Slug, row.PrimaryImageUrl, row.Id, label, row.Sku, row.VariantImageUrl);
         }
 
         var remainingIds = productIds.Where(id => !result.ContainsKey(id)).ToList();
@@ -60,7 +61,16 @@ public class ProductPriceLookup : IProductPriceLookup
                 p.Status,
                 PrimaryImageUrl = p.Images.OrderBy(i => i.DisplayOrder).Select(i => i.Url).FirstOrDefault(),
                 ActiveVariants = p.Variants.Where(v => v.IsActive)
-                    .Select(v => new { v.Id, Price = v.Price.Amount, Currency = v.Price.Currency, v.Option1Value, v.Option2Value, Sku = v.Sku.Value })
+                    .Select(v => new
+                    {
+                        v.Id,
+                        Price = v.Price.Amount,
+                        Currency = v.Price.Currency,
+                        v.Option1Value,
+                        v.Option2Value,
+                        Sku = v.Sku.Value,
+                        VariantImageUrl = v.ImageId.HasValue ? p.Images.Where(i => i.Id == v.ImageId).Select(i => i.Url).FirstOrDefault() : null
+                    })
                     .ToList()
             })
             .ToListAsync(cancellationToken);
@@ -72,7 +82,7 @@ public class ProductPriceLookup : IProductPriceLookup
                 var v = row.ActiveVariants[0];
                 var label = string.Join(" / ", new[] { v.Option1Value, v.Option2Value }.Where(x => !string.IsNullOrWhiteSpace(x)));
                 var available = row.Status == ProductStatus.Published;
-                result[row.Id] = new ProductPriceInfo(row.Id, row.Name, v.Price, v.Currency, available, row.Slug, row.PrimaryImageUrl, v.Id, label, v.Sku);
+                result[row.Id] = new ProductPriceInfo(row.Id, row.Name, v.Price, v.Currency, available, row.Slug, row.PrimaryImageUrl, v.Id, label, v.Sku, v.VariantImageUrl);
             }
             else
             {

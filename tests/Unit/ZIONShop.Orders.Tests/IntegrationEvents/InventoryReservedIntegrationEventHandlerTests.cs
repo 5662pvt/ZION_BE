@@ -28,7 +28,7 @@ public class InventoryReservedIntegrationEventHandlerTests
         var order = Order.Place(
             Guid.NewGuid(), paymentMethod, "VND", 30000,
             new ShippingAddress(Guid.NewGuid(), "Nguyen Van A", "0900000000", "Hà Nội", "Cầu Giấy", "123 Đường ABC"),
-            new[] { (Guid.NewGuid(), "Widget", 100000m, 1) },
+            new[] { new OrderLineInput(Guid.NewGuid(), "Widget", 100000m, 1) },
             null);
         await orders.AddAsync(order, CancellationToken.None);
         await db.SaveChangesAsync(CancellationToken.None);
@@ -119,7 +119,7 @@ public class InventoryReservedIntegrationEventHandlerTests
         var order = Order.Place(
             Guid.NewGuid(), PaymentMethod.COD, "VND", 30000,
             new ShippingAddress(Guid.NewGuid(), "Nguyen Van A", "0900000000", "Hà Nội", "Cầu Giấy", "123 Đường ABC"),
-            new[] { (productId, "Widget", 100000m, 1) },
+            new[] { new OrderLineInput(productId, "Widget", 100000m, 1) },
             null);
         order.AddGiftLine(giftProduct1, "Gift 1", 1, promotionId);
         order.AddGiftLine(giftProduct2, "Gift 2", 1, promotionId);
@@ -152,7 +152,7 @@ public class InventoryReservedIntegrationEventHandlerTests
         var order = Order.Place(
             Guid.NewGuid(), PaymentMethod.COD, "VND", 30000,
             new ShippingAddress(Guid.NewGuid(), "Nguyen Van A", "0900000000", "Hà Nội", "Cầu Giấy", "123 Đường ABC"),
-            new[] { (productId, "Widget", 100000m, 1) },
+            new[] { new OrderLineInput(productId, "Widget", 100000m, 1) },
             null);
         order.AddGiftLine(giftProductId, "Gift", 1, promotionId);
         await orders.AddAsync(order, CancellationToken.None);
@@ -168,5 +168,37 @@ public class InventoryReservedIntegrationEventHandlerTests
         var reloaded = await orders.GetByIdAsync(order.Id);
         reloaded!.Lines.Should().NotContain(l => l.IsGift);
         giftEvaluator.ReleasedGiftCalls.Should().ContainSingle(c => c.OrderId == order.Id && c.PromotionId == promotionId);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Should_NotDropGift_When_OnlyASiblingVariantOfTheSameProductIsShort()
+    {
+        var (db, orders) = BuildScope();
+        var productId = Guid.NewGuid();
+        var purchasedVariantId = Guid.NewGuid();
+        var giftVariantId = Guid.NewGuid();
+        var promotionId = Guid.NewGuid();
+
+        // Purchased and gift lines are DIFFERENT variants of the SAME product -- dropping must key off VariantId, not ProductId.
+        var order = Order.Place(
+            Guid.NewGuid(), PaymentMethod.COD, "VND", 30000,
+            new ShippingAddress(Guid.NewGuid(), "Nguyen Van A", "0900000000", "Hà Nội", "Cầu Giấy", "123 Đường ABC"),
+            new[] { new OrderLineInput(productId, "Áo thun", 100000m, 1, purchasedVariantId, "Đỏ") },
+            null);
+        order.AddGiftLine(productId, "Áo thun", 1, promotionId, giftVariantId, "Xanh");
+        await orders.AddAsync(order, CancellationToken.None);
+        await db.SaveChangesAsync(CancellationToken.None);
+
+        var giftEvaluator = new FakeGiftPromotionEvaluator();
+        var handler = new InventoryReservedIntegrationEventHandler(orders, db, giftEvaluator);
+        // Only the gift variant was actually reserved; the purchased variant came up short, but that must not touch the gift line.
+        var @event = new InventoryReservedIntegrationEvent(
+            order.Id, new[] { new ReservedItem(productId, 1, giftVariantId) }, DateTime.UtcNow.AddMinutes(15));
+
+        await handler.HandleAsync(@event);
+
+        var reloaded = await orders.GetByIdAsync(order.Id);
+        reloaded!.Lines.Should().Contain(l => l.IsGift && l.VariantId == giftVariantId);
+        giftEvaluator.ReleasedGiftCalls.Should().BeEmpty();
     }
 }

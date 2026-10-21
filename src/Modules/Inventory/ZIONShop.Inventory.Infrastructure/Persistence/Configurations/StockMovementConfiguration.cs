@@ -12,12 +12,13 @@ public class StockMovementConfiguration : IEntityTypeConfiguration<StockMovement
         builder.HasKey(m => m.Id);
 
         builder.Property(m => m.ProductId).IsRequired();
+        builder.Property(m => m.VariantId).IsRequired();
         builder.Property(m => m.Type).HasConversion<int>().IsRequired();
         builder.Property(m => m.Quantity).IsRequired();
         builder.Property(m => m.Reference).HasMaxLength(256);
         builder.Property(m => m.CreatedAt).IsRequired();
         builder.Property(m => m.CreatedBy).HasMaxLength(128);
 
-        builder.HasIndex(m => new { m.ProductId, m.CreatedAt });
+        builder.HasIndex(m => new { m.VariantId, m.CreatedAt });
     }
 }

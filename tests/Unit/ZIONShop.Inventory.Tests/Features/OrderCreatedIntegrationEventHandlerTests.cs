@@ -39,8 +39,8 @@ public class OrderCreatedIntegrationEventHandlerTests
         var productB = Guid.NewGuid();
         var harness = CreateHarness(new FakeTimeProvider(DateTimeOffset.UtcNow));
         harness.Items.Seed(
-            InventoryItem.Create(productA, "SKU-A", "Product A", 10),
-            InventoryItem.Create(productB, "SKU-B", "Product B", 10));
+            InventoryItem.Create(productA, productA, "SKU-A", "Product A", null, 10),
+            InventoryItem.Create(productB, productB, "SKU-B", "Product B", null, 10));
 
         var orderId = Guid.NewGuid();
         var @event = new OrderCreatedIntegrationEvent(
@@ -63,8 +63,8 @@ public class OrderCreatedIntegrationEventHandlerTests
         var productB = Guid.NewGuid();
         var harness = CreateHarness(new FakeTimeProvider(DateTimeOffset.UtcNow));
         harness.Items.Seed(
-            InventoryItem.Create(productA, "SKU-A", "Product A", 10),
-            InventoryItem.Create(productB, "SKU-B", "Product B", 1)); // not enough for qty 3
+            InventoryItem.Create(productA, productA, "SKU-A", "Product A", null, 10),
+            InventoryItem.Create(productB, productB, "SKU-B", "Product B", null, 1)); // not enough for qty 3
 
         var orderId = Guid.NewGuid();
         var @event = new OrderCreatedIntegrationEvent(
@@ -91,8 +91,8 @@ public class OrderCreatedIntegrationEventHandlerTests
         var productB = Guid.NewGuid();
         var harness = CreateHarness(new FakeTimeProvider(DateTimeOffset.UtcNow));
         harness.Items.Seed(
-            InventoryItem.Create(productA, "SKU-A", "Product A", 10),
-            InventoryItem.Create(productB, "SKU-B", "Product B", 10));
+            InventoryItem.Create(productA, productA, "SKU-A", "Product A", null, 10),
+            InventoryItem.Create(productB, productB, "SKU-B", "Product B", null, 10));
         harness.Items.ForceReserveFailure.Add(productB); // simulate productB being out of stock
 
         var orderId = Guid.NewGuid();
@@ -118,8 +118,8 @@ public class OrderCreatedIntegrationEventHandlerTests
         var productHigh = Guid.Parse("ffffffff-ffff-ffff-ffff-ffffffffffff");
         var harness = CreateHarness(new FakeTimeProvider(DateTimeOffset.UtcNow));
         harness.Items.Seed(
-            InventoryItem.Create(productHigh, "SKU-H", "Product High", 10),
-            InventoryItem.Create(productLow, "SKU-L", "Product Low", 10));
+            InventoryItem.Create(productHigh, productHigh, "SKU-H", "Product High", null, 10),
+            InventoryItem.Create(productLow, productLow, "SKU-L", "Product Low", null, 10));
 
         var orderId = Guid.NewGuid();
         // Lines deliberately submitted high-id-first; the handler must still process low-id-first.
@@ -139,7 +139,7 @@ public class OrderCreatedIntegrationEventHandlerTests
     {
         var productA = Guid.NewGuid();
         var harness = CreateHarness(new FakeTimeProvider(DateTimeOffset.UtcNow));
-        harness.Items.Seed(InventoryItem.Create(productA, "SKU-A", "Product A", 10));
+        harness.Items.Seed(InventoryItem.Create(productA, productA, "SKU-A", "Product A", null, 10));
 
         var orderId = Guid.NewGuid();
         var @event = new OrderCreatedIntegrationEvent(
@@ -159,7 +159,7 @@ public class OrderCreatedIntegrationEventHandlerTests
     {
         var productA = Guid.NewGuid();
         var harness = CreateHarness(new FakeTimeProvider(DateTimeOffset.UtcNow));
-        harness.Items.Seed(InventoryItem.Create(productA, "SKU-A", "Product A", 10));
+        harness.Items.Seed(InventoryItem.Create(productA, productA, "SKU-A", "Product A", null, 10));
 
         var orderId = Guid.NewGuid();
         var @event = new OrderCreatedIntegrationEvent(orderId, Guid.NewGuid(), 10m, new[] { new OrderLine(productA, 1, 10m) }, "COD", "VND");
@@ -175,7 +175,7 @@ public class OrderCreatedIntegrationEventHandlerTests
         var productA = Guid.NewGuid();
         var now = DateTimeOffset.UtcNow;
         var harness = CreateHarness(new FakeTimeProvider(now));
-        harness.Items.Seed(InventoryItem.Create(productA, "SKU-A", "Product A", 10));
+        harness.Items.Seed(InventoryItem.Create(productA, productA, "SKU-A", "Product A", null, 10));
 
         var orderId = Guid.NewGuid();
         var @event = new OrderCreatedIntegrationEvent(orderId, Guid.NewGuid(), 10m, new[] { new OrderLine(productA, 1, 10m) }, "Online", "VND");
@@ -192,8 +192,8 @@ public class OrderCreatedIntegrationEventHandlerTests
         var giftProduct = Guid.NewGuid();
         var harness = CreateHarness(new FakeTimeProvider(DateTimeOffset.UtcNow));
         harness.Items.Seed(
-            InventoryItem.Create(productA, "SKU-A", "Product A", 10),
-            InventoryItem.Create(giftProduct, "SKU-G", "Gift Product", 10));
+            InventoryItem.Create(productA, productA, "SKU-A", "Product A", null, 10),
+            InventoryItem.Create(giftProduct, giftProduct, "SKU-G", "Gift Product", null, 10));
 
         var orderId = Guid.NewGuid();
         var @event = new OrderCreatedIntegrationEvent(
@@ -219,8 +219,8 @@ public class OrderCreatedIntegrationEventHandlerTests
         var giftProduct = Guid.NewGuid();
         var harness = CreateHarness(new FakeTimeProvider(DateTimeOffset.UtcNow));
         harness.Items.Seed(
-            InventoryItem.Create(productA, "SKU-A", "Product A", 10),
-            InventoryItem.Create(giftProduct, "SKU-G", "Gift Product", 3)); // not enough for gift qty 5
+            InventoryItem.Create(productA, productA, "SKU-A", "Product A", null, 10),
+            InventoryItem.Create(giftProduct, giftProduct, "SKU-G", "Gift Product", null, 3)); // not enough for gift qty 5
 
         var orderId = Guid.NewGuid();
         var @event = new OrderCreatedIntegrationEvent(
@@ -244,7 +244,7 @@ public class OrderCreatedIntegrationEventHandlerTests
     {
         var productA = Guid.NewGuid();
         var harness = CreateHarness(new FakeTimeProvider(DateTimeOffset.UtcNow));
-        harness.Items.Seed(InventoryItem.Create(productA, "SKU-A", "Product A", 10));
+        harness.Items.Seed(InventoryItem.Create(productA, productA, "SKU-A", "Product A", null, 10));
 
         var orderId = Guid.NewGuid();
         var @event = new OrderCreatedIntegrationEvent(
@@ -266,7 +266,7 @@ public class OrderCreatedIntegrationEventHandlerTests
     {
         var productA = Guid.NewGuid();
         var harness = CreateHarness(new FakeTimeProvider(DateTimeOffset.UtcNow));
-        harness.Items.Seed(InventoryItem.Create(productA, "SKU-A", "Product A", 3)); // not enough for paid qty 5
+        harness.Items.Seed(InventoryItem.Create(productA, productA, "SKU-A", "Product A", null, 3)); // not enough for paid qty 5
 
         var orderId = Guid.NewGuid();
         var @event = new OrderCreatedIntegrationEvent(

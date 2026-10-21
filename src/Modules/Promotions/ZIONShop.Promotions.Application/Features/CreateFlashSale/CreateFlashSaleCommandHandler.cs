@@ -26,6 +26,6 @@ public class CreateFlashSaleCommandHandler : IRequestHandler<CreateFlashSaleComm
         await _flashSales.AddAsync(flashSale, cancellationToken);
         await _uow.SaveChangesAsync(cancellationToken);
 
-        return Result.Success(flashSale.ToDto(Array.Empty<FlashSaleItem>()));
+        return Result.Success(flashSale.ToDto(Array.Empty<FlashSaleItemDto>()));
     }
 }

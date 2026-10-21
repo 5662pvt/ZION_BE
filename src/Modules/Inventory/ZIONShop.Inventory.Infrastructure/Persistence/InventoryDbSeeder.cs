@@ -10,17 +10,19 @@ public static class InventoryDbSeeder
 
     public static async Task SeedAsync(InventoryDbContext db, IProductCatalogReader catalog, CancellationToken cancellationToken = default)
     {
-        var products = await catalog.ListAsync(cancellationToken);
-        if (products.Count == 0) return;
+        var variants = await catalog.ListVariantsAsync(cancellationToken);
+        if (variants.Count == 0) return;
 
-        var existingProductIds = await db.InventoryItems.Select(i => i.ProductId).ToListAsync(cancellationToken);
-        var existing = existingProductIds.ToHashSet();
+        var existingVariantIds = await db.InventoryItems.Select(i => i.VariantId).ToListAsync(cancellationToken);
+        var existing = existingVariantIds.ToHashSet();
 
-        var missing = products.Where(p => !existing.Contains(p.ProductId)).ToList();
+        var missing = variants.Where(v => !existing.Contains(v.VariantId)).ToList();
         if (missing.Count == 0) return;
 
-        foreach (var product in missing)
-            await db.InventoryItems.AddAsync(InventoryItem.Create(product.ProductId, product.Sku, product.Name, DefaultSeedOnHand), cancellationToken);
+        foreach (var variant in missing)
+            await db.InventoryItems.AddAsync(
+                InventoryItem.Create(variant.ProductId, variant.VariantId, variant.Sku, variant.ProductName, variant.VariantLabel, DefaultSeedOnHand),
+                cancellationToken);
 
         await db.SaveChangesAsync(cancellationToken);
     }

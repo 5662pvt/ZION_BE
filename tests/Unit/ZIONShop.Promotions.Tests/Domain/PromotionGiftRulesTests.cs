@@ -187,6 +187,41 @@ public class PromotionGiftRulesTests
     }
 
     [Fact]
+    public void Create_Should_Succeed_When_SameProductHasTwoDistinctGiftVariants()
+    {
+        var productId = Guid.NewGuid();
+        var variantA = Guid.NewGuid();
+        var variantB = Guid.NewGuid();
+        var items = new[] { new GiftItemInput(productId, 1, variantA), new GiftItemInput(productId, 1, variantB) };
+
+        var result = Promotion.Create(
+            "Gift", null, PromotionType.Gift, 0m, null, 100000m,
+            DateTime.UtcNow.AddDays(-1), DateTime.UtcNow.AddDays(30), null, null,
+            PromotionScope.Order, null, null, null, items);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value.GiftItems.Should().HaveCount(2);
+        result.Value.GiftItems.Should().ContainSingle(g => g.VariantId == variantA);
+        result.Value.GiftItems.Should().ContainSingle(g => g.VariantId == variantB);
+    }
+
+    [Fact]
+    public void Create_Should_Fail_When_SameVariantRepeated_Even_If_WrappedUnderDifferentInput()
+    {
+        var productId = Guid.NewGuid();
+        var variantId = Guid.NewGuid();
+        var items = new[] { new GiftItemInput(productId, 1, variantId), new GiftItemInput(productId, 2, variantId) };
+
+        var result = Promotion.Create(
+            "Gift", null, PromotionType.Gift, 0m, null, 100000m,
+            DateTime.UtcNow.AddDays(-1), DateTime.UtcNow.AddDays(30), null, null,
+            PromotionScope.Order, null, null, null, items);
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Code.Should().Be("Promotions.GiftItemsDuplicateProduct");
+    }
+
+    [Fact]
     public void Update_Should_Fail_When_UsageLimitBelowUsedCount()
     {
         var promotion = ActivePromotion();
