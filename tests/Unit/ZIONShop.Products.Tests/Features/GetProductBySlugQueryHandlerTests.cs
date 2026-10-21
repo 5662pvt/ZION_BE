@@ -28,6 +28,7 @@ public class GetProductBySlugQueryHandlerTests
         }
 
         public Task<bool> SkuExistsAsync(string sku, Guid? excludeProductId = null, CancellationToken cancellationToken = default) => _inner.SkuExistsAsync(sku, excludeProductId, cancellationToken);
+        public Task<IReadOnlyCollection<string>> GetConflictingSkusAsync(IReadOnlyCollection<string> skus, Guid? excludeProductId = null, CancellationToken cancellationToken = default) => _inner.GetConflictingSkusAsync(skus, excludeProductId, cancellationToken);
         public Task<bool> SlugExistsAsync(string slug, CancellationToken cancellationToken = default) => _inner.SlugExistsAsync(slug, cancellationToken);
         public Task AddAsync(Product product, CancellationToken cancellationToken = default) => _inner.AddAsync(product, cancellationToken);
         public void Update(Product product) => _inner.Update(product);

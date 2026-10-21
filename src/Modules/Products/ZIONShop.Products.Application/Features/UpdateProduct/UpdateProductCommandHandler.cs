@@ -39,7 +39,8 @@ public class UpdateProductCommandHandler : IRequestHandler<UpdateProductCommand,
             if (category is null) return Result.Failure<ProductDto>(ProductsErrors.CategoryNotFound);
         }
 
-        var updateResult = product.Update(request.Name, request.Description, Money.Create(request.Price, request.Currency), request.CategoryId, request.Brand);
+        var price = request.Price.HasValue ? Money.Create(request.Price.Value, request.Currency!) : null;
+        var updateResult = product.Update(request.Name, request.Description, price, request.CategoryId, request.Brand);
         if (updateResult.IsFailure) return Result.Failure<ProductDto>(updateResult.Error);
 
         _products.Update(product);

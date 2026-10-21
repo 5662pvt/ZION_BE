@@ -158,7 +158,7 @@ public class ProductsController : ControllerBase
 
 public record SearchProductsRequest(int Page = 1, int PageSize = 20, string? Keyword = null, Guid? CategoryId = null, decimal? MinPrice = null, decimal? MaxPrice = null, string? Sort = null);
 public record AdminSearchProductsRequest(int Page = 1, int PageSize = 20, string? Keyword = null, Guid? CategoryId = null, string? Status = null);
-public record UpdateProductBody(string Name, string? Description, decimal Price, string Currency, Guid? CategoryId, string? Brand);
+public record UpdateProductBody(string Name, string? Description, decimal? Price, string? Currency, Guid? CategoryId, string? Brand);
 public record ReorderProductImagesBody(IReadOnlyList<Guid> ImageIds);
 public record SetVariantsOptionBody(string Name, IReadOnlyList<string> Values);
 public record SetVariantsVariantBody(Guid? Id, string? Option1Value, string? Option2Value, string Sku, decimal Price, string Currency, bool IsActive, Guid? ImageId);

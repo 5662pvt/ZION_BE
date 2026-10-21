@@ -93,6 +93,41 @@ public class SetVariantsCommandHandlerTests
     }
 
     [Fact]
+    public async Task Handle_Should_ReuseOmittedVariantsSku_When_RegeneratingMatrixWithANewRowUsingIt()
+    {
+        var (db, products, categories, product) = await SeedAsync();
+        var handler = new SetVariantsCommandHandler(products, categories, db, new FakeDistributedCacheService());
+
+        var firstCmd = new SetVariantsCommand(
+            product.Id,
+            new[] { new SetVariantsOptionInput("Size", new[] { "S", "M" }) },
+            new[]
+            {
+                new SetVariantsVariantInput(null, "S", null, "SKU-REGEN-S", 50m, "VND", true, null),
+                new SetVariantsVariantInput(null, "M", null, "SKU-REGEN-M", 60m, "VND", true, null)
+            });
+        (await handler.Handle(firstCmd, CancellationToken.None)).IsSuccess.Should().BeTrue();
+
+        // Regenerate the matrix: omit "S" and introduce a new "L" row that reuses SKU-REGEN-S. Must return
+        // 200 (reusing the omitted row), not fail with a duplicate-key error from the DB.
+        var secondCmd = new SetVariantsCommand(
+            product.Id,
+            new[] { new SetVariantsOptionInput("Size", new[] { "M", "L" }) },
+            new[]
+            {
+                new SetVariantsVariantInput(null, "L", null, "SKU-REGEN-S", 70m, "VND", true, null),
+                new SetVariantsVariantInput(null, "M", null, "SKU-REGEN-M", 60m, "VND", true, null)
+            });
+        var result = await handler.Handle(secondCmd, CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        // Original default variant (SKU-SV1, deactivated by the first call) + the 2 reused/updated ones.
+        result.Value.Variants.Should().HaveCount(3);
+        result.Value.Variants.Where(v => v.IsActive).Should().HaveCount(2);
+        result.Value.Variants.Should().ContainSingle(v => v.Sku == "SKU-REGEN-S" && v.Label == "L");
+    }
+
+    [Fact]
     public async Task Handle_Should_AllowReusingProductsOwnExistingSku_When_UpdatingSameVariantInPlace()
     {
         var (db, products, categories, product) = await SeedAsync();

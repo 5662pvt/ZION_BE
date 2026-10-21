@@ -20,6 +20,17 @@ public class ProductRepository : IProductRepository
     public Task<bool> SkuExistsAsync(string sku, Guid? excludeProductId = null, CancellationToken cancellationToken = default) =>
         _db.ProductVariants.AnyAsync(v => v.Sku.Value == sku && (excludeProductId == null || v.ProductId != excludeProductId), cancellationToken);
 
+    public async Task<IReadOnlyCollection<string>> GetConflictingSkusAsync(IReadOnlyCollection<string> skus, Guid? excludeProductId = null, CancellationToken cancellationToken = default)
+    {
+        if (skus.Count == 0) return Array.Empty<string>();
+
+        return await _db.ProductVariants.AsNoTracking()
+            .Where(v => skus.Contains(v.Sku.Value) && (excludeProductId == null || v.ProductId != excludeProductId))
+            .Select(v => v.Sku.Value)
+            .Distinct()
+            .ToListAsync(cancellationToken);
+    }
+
     public Task<bool> SlugExistsAsync(string slug, CancellationToken cancellationToken = default) =>
         _db.Products.AnyAsync(p => p.Slug == slug, cancellationToken);
 

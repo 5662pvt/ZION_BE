@@ -119,6 +119,38 @@ public class ProductPriceLookupTests
     }
 
     [Fact]
+    public async Task GetAsync_Should_ResolveByProductId_When_DefaultVariantWasDeactivatedAndExactlyOneActiveVariantRemains()
+    {
+        using var db = NewDb();
+        var product = Product.Create("Legacy", "legacy", Sku.Create("SKU-LEGACY2"), Money.Create(100m, "USD"), null, null, null);
+        product.Publish();
+        await db.Products.AddAsync(product);
+        await db.SaveChangesAsync();
+
+        // Convert the legacy product to options: the default variant (Id == ProductId) is omitted from the
+        // payload, so SetVariants deactivates it, leaving a single NEW active variant under a different Id.
+        var variantIdsBefore = product.Variants.Select(v => v.Id).ToHashSet();
+        product.SetVariants(
+            new[] { new ProductOptionInput("Size", new[] { "M" }) },
+            new[] { new ProductVariantInput(null, "M", null, "SKU-LEGACY2-M", 120m, "USD", true, null) });
+        // EF's change tracker can't be trusted to classify a brand-new owned entity (client-generated Guid
+        // key) as Added rather than Modified on an already-tracked aggregate -- same caveat SetVariantsCommandHandler
+        // documents -- so register it explicitly, as the handler does via IProductRepository.AddVariant.
+        foreach (var variant in product.Variants.Where(v => !variantIdsBefore.Contains(v.Id)))
+            db.ProductVariants.Add(variant);
+        await db.SaveChangesAsync();
+
+        var lookup = new ProductPriceLookup(db);
+
+        var info = await lookup.GetAsync(product.Id, CancellationToken.None);
+
+        info.Should().NotBeNull();
+        info!.IsAvailable.Should().BeTrue();
+        info.VariantId.Should().NotBe(product.Id);
+        info.UnitPrice.Should().Be(120m);
+    }
+
+    [Fact]
     public async Task GetAsync_Should_BeUnavailable_When_ProductIdHasMultipleActiveVariants()
     {
         using var db = NewDb();

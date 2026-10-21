@@ -67,19 +67,25 @@ public class Product : AggregateRoot
         AddDomainEvent(new ProductCreatedDomainEvent(Id, sku, Name));
     }
 
-    public Result Update(string name, string? description, Money price, Guid? categoryId, string? brand)
+    /// <summary>price == null leaves the current price untouched (name/description/category/brand always
+    /// apply, even for a product with options); a non-null price is only accepted when the product still has
+    /// a single default variant with no options (otherwise <see cref="ProductsErrors.LegacyPriceUpdateNotAllowed"/> — use SetVariants instead).</summary>
+    public Result Update(string name, string? description, Money? price, Guid? categoryId, string? brand)
     {
-        if (!HasSingleDefaultVariantWithNoOptions())
-            return Result.Failure(ProductsErrors.LegacyPriceUpdateNotAllowed);
+        if (price is not null)
+        {
+            if (!HasSingleDefaultVariantWithNoOptions())
+                return Result.Failure(ProductsErrors.LegacyPriceUpdateNotAllowed);
+
+            var variant = _variants.First(v => v.IsActive);
+            variant.UpdatePrice(price);
+            RecalculateMinMaxPrice();
+        }
 
         Name = name.Trim();
         Description = description;
         CategoryId = categoryId;
         Brand = brand?.Trim();
-
-        var variant = _variants.First(v => v.IsActive);
-        variant.UpdatePrice(price);
-        RecalculateMinMaxPrice();
 
         return Result.Success();
     }
@@ -146,6 +152,10 @@ public class Product : AggregateRoot
         var hasActiveVariant = false;
         var resolved = new List<(ProductVariant? Existing, Sku Sku, Money Price, string? Option1Value, string? Option2Value, Guid? ImageId, bool IsActive, int DisplayOrder)>();
 
+        // Inputs that explicitly reference an existing variant by Id are the only ones guaranteed to "stay"
+        // after this call; anything else gets deactivated below, freeing up its SKU for reuse.
+        var explicitIdsInPayload = variantInputs.Where(v => v.Id.HasValue).Select(v => v.Id!.Value).ToHashSet();
+
         for (var i = 0; i < variantInputs.Count; i++)
         {
             var input = variantInputs[i];
@@ -198,6 +208,22 @@ public class Product : AggregateRoot
             catch (ArgumentException) { return Result.Failure(ProductsErrors.InvalidVariantPrice); }
 
             var existing = input.Id.HasValue ? _variants.FirstOrDefault(v => v.Id == input.Id.Value) : null;
+
+            // No explicit Id: if this SKU already belongs to one of this product's own variants (active or
+            // already-inactive), reuse that row instead of creating a new one with a now-duplicate SKU. The
+            // only case that is NOT a safe reuse is when the SKU's current owner is itself explicitly kept by
+            // a different input in this same payload — that is a genuine conflict, not a free SKU.
+            if (existing is null)
+            {
+                var skuOwner = _variants.FirstOrDefault(v => v.Sku.Value.Equals(skuVo.Value, StringComparison.OrdinalIgnoreCase));
+                if (skuOwner is not null)
+                {
+                    if (explicitIdsInPayload.Contains(skuOwner.Id))
+                        return Result.Failure(ProductsErrors.DuplicateVariantSku);
+                    existing = skuOwner;
+                }
+            }
+
             if (existing is not null)
                 matchedIds.Add(existing.Id);
 

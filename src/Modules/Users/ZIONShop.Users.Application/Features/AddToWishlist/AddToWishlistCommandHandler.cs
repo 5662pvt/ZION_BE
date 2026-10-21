@@ -30,8 +30,8 @@ public class AddToWishlistCommandHandler : IRequestHandler<AddToWishlistCommand,
         if (existing is not null)
             return Result.Success(new WishlistToggleDto(request.ProductId, true));
 
-        var product = await _prices.GetAsync(request.ProductId, cancellationToken);
-        if (product is null || !product.IsAvailable)
+        var summaries = await _prices.GetProductSummaryAsync(new[] { request.ProductId }, cancellationToken);
+        if (!summaries.TryGetValue(request.ProductId, out var summary) || !summary.IsPublished)
             return Result.Failure<WishlistToggleDto>(UsersErrors.ProductNotFound);
 
         var count = await _wishlist.CountAsync(request.AuthUserId, cancellationToken);

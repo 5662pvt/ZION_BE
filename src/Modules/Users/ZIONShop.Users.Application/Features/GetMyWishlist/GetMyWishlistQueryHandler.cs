@@ -13,9 +13,9 @@ public class GetMyWishlistQueryHandler : IRequestHandler<GetMyWishlistQuery, Res
 {
     private readonly IWishlistRepository _wishlist;
     private readonly IProductPriceLookup _prices;
-    private readonly IStockAvailabilityReader _stock;
+    private readonly IProductStockSummaryReader _stock;
 
-    public GetMyWishlistQueryHandler(IWishlistRepository wishlist, IProductPriceLookup prices, IStockAvailabilityReader stock)
+    public GetMyWishlistQueryHandler(IWishlistRepository wishlist, IProductPriceLookup prices, IProductStockSummaryReader stock)
     {
         _wishlist = wishlist;
         _prices = prices;
@@ -36,11 +36,15 @@ public class GetMyWishlistQueryHandler : IRequestHandler<GetMyWishlistQuery, Res
             .ToListAsync(cancellationToken);
 
         var productIds = allItems.Select(w => w.ProductId).Distinct().ToList();
-        var priceInfos = await _prices.GetManyAsync(productIds, cancellationToken);
-        var available = await _stock.GetAvailableAsync(productIds, cancellationToken);
+        // Product-level summary (not GetManyAsync's variant-keyed price lookup) and product-level stock
+        // (summed across every variant) -- a multi-variant product has no single "the" variant, so looking
+        // either of these up by product id against the variant-keyed APIs always reported it unavailable/out
+        // of stock, even when perfectly purchasable.
+        var summaries = await _prices.GetProductSummaryAsync(productIds, cancellationToken);
+        var available = await _stock.GetAvailableByProductAsync(productIds, cancellationToken);
 
         var visibleItems = allItems
-            .Where(w => priceInfos.TryGetValue(w.ProductId, out var info) && info.IsAvailable)
+            .Where(w => summaries.TryGetValue(w.ProductId, out var info) && info.IsPublished)
             .ToList();
 
         var total = visibleItems.Count;
@@ -49,9 +53,9 @@ public class GetMyWishlistQueryHandler : IRequestHandler<GetMyWishlistQuery, Res
             .Take(pageSize)
             .Select(w =>
             {
-                var info = priceInfos[w.ProductId];
+                var info = summaries[w.ProductId];
                 var inStock = available.TryGetValue(w.ProductId, out var qty) && qty > 0;
-                return new WishlistItemDto(w.ProductId, info.Name, info.Slug, info.UnitPrice, info.Currency, info.PrimaryImageUrl, inStock, w.CreatedAt);
+                return new WishlistItemDto(w.ProductId, info.Name, info.Slug, info.MinPrice, info.Currency, info.PrimaryImageUrl, inStock, w.CreatedAt, info.MinPrice, info.MaxPrice, info.VariantCount);
             })
             .ToList();
 

@@ -8,7 +8,7 @@ public record UpdateProductCommand(
     Guid Id,
     string Name,
     string? Description,
-    decimal Price,
-    string Currency,
+    decimal? Price,
+    string? Currency,
     Guid? CategoryId,
     string? Brand) : IRequest<Result<ProductDto>>;

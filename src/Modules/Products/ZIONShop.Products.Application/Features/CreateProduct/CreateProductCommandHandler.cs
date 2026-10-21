@@ -1,5 +1,6 @@
 using MediatR;
 using ZIONShop.Products.Application.DTOs;
+using ZIONShop.Products.Application.Exceptions;
 using ZIONShop.Products.Application.Interfaces;
 using ZIONShop.Products.Application.Mappings;
 using ZIONShop.Products.Domain.Entities;
@@ -44,11 +45,9 @@ public class CreateProductCommandHandler : IRequestHandler<CreateProductCommand,
                 foreach (var img in request.Images)
                     product.AddImage(img.Url, img.Alt, img.DisplayOrder);
 
-            foreach (var variant in request.Variants!)
-            {
-                if (await _products.SkuExistsAsync(variant.Sku.Trim().ToUpperInvariant(), null, cancellationToken))
-                    return Result.Failure<ProductDto>(ProductsErrors.SkuAlreadyExists);
-            }
+            var requestedSkus = request.Variants!.Select(v => v.Sku.Trim().ToUpperInvariant()).ToList();
+            if ((await _products.GetConflictingSkusAsync(requestedSkus, null, cancellationToken)).Count > 0)
+                return Result.Failure<ProductDto>(ProductsErrors.SkuAlreadyExists);
 
             var optionInputs = (request.Options ?? Array.Empty<CreateProductOptionInput>())
                 .Select(o => new ProductOptionInput(o.Name, o.Values))
@@ -82,7 +81,15 @@ public class CreateProductCommandHandler : IRequestHandler<CreateProductCommand,
         }
 
         await _products.AddAsync(product, cancellationToken);
-        await _uow.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await _uow.SaveChangesAsync(cancellationToken);
+        }
+        catch (DuplicateVariantSkuException)
+        {
+            // Defensive backstop: a concurrent request slipped a conflicting SKU past the check above.
+            return Result.Failure<ProductDto>(ProductsErrors.SkuAlreadyExists);
+        }
 
         return Result.Success(product.ToDto(category?.Name, includeInactiveVariants: true));
     }

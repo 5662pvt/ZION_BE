@@ -2,6 +2,7 @@ using MediatR;
 using ZIONShop.Caching;
 using ZIONShop.Products.Application.Caching;
 using ZIONShop.Products.Application.DTOs;
+using ZIONShop.Products.Application.Exceptions;
 using ZIONShop.Products.Application.Interfaces;
 using ZIONShop.Products.Application.Mappings;
 using ZIONShop.Products.Domain.Entities;
@@ -31,11 +32,9 @@ public class SetVariantsCommandHandler : IRequestHandler<SetVariantsCommand, Res
         var product = await _products.GetByIdAsync(request.ProductId, cancellationToken);
         if (product is null) return Result.Failure<ProductDto>(ProductsErrors.ProductNotFound);
 
-        foreach (var variant in request.Variants)
-        {
-            if (await _products.SkuExistsAsync(variant.Sku.Trim().ToUpperInvariant(), request.ProductId, cancellationToken))
-                return Result.Failure<ProductDto>(ProductsErrors.SkuAlreadyExists);
-        }
+        var requestedSkus = request.Variants.Select(v => v.Sku.Trim().ToUpperInvariant()).ToList();
+        if ((await _products.GetConflictingSkusAsync(requestedSkus, request.ProductId, cancellationToken)).Count > 0)
+            return Result.Failure<ProductDto>(ProductsErrors.SkuAlreadyExists);
 
         var optionInputs = request.Options.Select(o => new ProductOptionInput(o.Name, o.Values)).ToList();
         var variantInputs = request.Variants
@@ -54,7 +53,15 @@ public class SetVariantsCommandHandler : IRequestHandler<SetVariantsCommand, Res
         foreach (var variant in product.Variants.Where(v => !variantIdsBefore.Contains(v.Id)))
             _products.AddVariant(variant);
 
-        await _uow.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await _uow.SaveChangesAsync(cancellationToken);
+        }
+        catch (DuplicateVariantSkuException)
+        {
+            // Defensive backstop: a concurrent request slipped a conflicting SKU past the check above.
+            return Result.Failure<ProductDto>(ProductsErrors.SkuAlreadyExists);
+        }
 
         await _cache.RemoveManyAsync(ProductCacheKeys.DetailById(product.Id), ProductCacheKeys.DetailBySlug(product.Slug));
 

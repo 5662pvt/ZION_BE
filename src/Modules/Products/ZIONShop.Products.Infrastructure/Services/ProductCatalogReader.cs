@@ -48,6 +48,30 @@ public class ProductCatalogReader : IProductCatalogReader
         return row is null ? null : ToVariantCatalogItem(row);
     }
 
+    public async Task<IReadOnlyList<ProductVariantCatalogItem>> ListVariantsByProductAsync(Guid productId, CancellationToken ct = default)
+    {
+        var rows = await _db.ProductVariants.AsNoTracking()
+            .Where(v => v.ProductId == productId)
+            .Join(_db.Products.AsNoTracking(), v => v.ProductId, p => p.Id, (v, p) => new VariantRow(
+                v.Id, v.ProductId, v.Sku.Value, p.Name, v.Option1Value, v.Option2Value, v.IsActive, p.Status.ToString()))
+            .ToListAsync(ct);
+
+        return rows.Select(ToVariantCatalogItem).ToList();
+    }
+
+    public async Task<IReadOnlyList<ProductVariantCatalogItem>> GetVariantsAsync(IReadOnlyCollection<Guid> variantIds, CancellationToken ct = default)
+    {
+        if (variantIds.Count == 0) return Array.Empty<ProductVariantCatalogItem>();
+
+        var rows = await _db.ProductVariants.AsNoTracking()
+            .Where(v => variantIds.Contains(v.Id))
+            .Join(_db.Products.AsNoTracking(), v => v.ProductId, p => p.Id, (v, p) => new VariantRow(
+                v.Id, v.ProductId, v.Sku.Value, p.Name, v.Option1Value, v.Option2Value, v.IsActive, p.Status.ToString()))
+            .ToListAsync(ct);
+
+        return rows.Select(ToVariantCatalogItem).ToList();
+    }
+
     private static ProductVariantCatalogItem ToVariantCatalogItem(VariantRow row)
     {
         var label = string.Join(" / ", new[] { row.Option1Value, row.Option2Value }.Where(v => !string.IsNullOrWhiteSpace(v)));

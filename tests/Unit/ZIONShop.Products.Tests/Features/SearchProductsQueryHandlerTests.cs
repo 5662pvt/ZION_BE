@@ -83,4 +83,34 @@ public class SearchProductsQueryHandlerTests
         item.VariantCount.Should().Be(2);
         item.Sku.Should().Be("SKU-VS-S");
     }
+
+    [Fact]
+    public async Task Handle_Should_NotMatchKeyword_When_OnlyAnInactiveVariantSkuContainsIt()
+    {
+        var (db, products, categories) = await SeedAsync();
+
+        var variantProduct = Product.CreateDraft("Inactive Variant Widget", "inactive-variant-widget", null, null, null);
+        variantProduct.SetVariants(
+            new[] { new ProductOptionInput("Size", new[] { "S" }) },
+            new[] { new ProductVariantInput(null, "S", null, "SKU-GHOST-001", 5m, "USD", true, null) });
+        variantProduct.MarkCreated();
+        variantProduct.Publish();
+        await db.Products.AddAsync(variantProduct);
+        await db.SaveChangesAsync();
+
+        // Deactivate the only variant by omitting it from a new (empty-options) SetVariants call.
+        var variantIdsBefore = variantProduct.Variants.Select(v => v.Id).ToHashSet();
+        variantProduct.SetVariants(
+            Array.Empty<ProductOptionInput>(),
+            new[] { new ProductVariantInput(null, null, null, "SKU-ACTIVE-001", 6m, "USD", true, null) });
+        foreach (var variant in variantProduct.Variants.Where(v => !variantIdsBefore.Contains(v.Id)))
+            db.ProductVariants.Add(variant);
+        await db.SaveChangesAsync();
+
+        var handler = new SearchProductsQueryHandler(products, categories);
+        var result = await handler.Handle(new SearchProductsQuery(1, 100, "SKU-GHOST-001", null, null, null, "name"), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Items.Should().NotContain(i => i.Id == variantProduct.Id);
+    }
 }

@@ -32,6 +32,7 @@ public class ProductPriceLookup : IProductPriceLookup
                 p.Name,
                 Price = v.Price.Amount,
                 Currency = v.Price.Currency,
+                v.IsActive,
                 Available = p.Status == ProductStatus.Published && v.IsActive,
                 p.Slug,
                 PrimaryImageUrl = p.Images.OrderBy(i => i.DisplayOrder).Select(i => i.Url).FirstOrDefault(),
@@ -44,6 +45,14 @@ public class ProductPriceLookup : IProductPriceLookup
 
         foreach (var row in variantRows)
         {
+            // A legacy product's default variant has Id == ProductId (see Product.InitializeDefaultVariant).
+            // If that variant was later deactivated (e.g. the matrix editor omitted it), an inactive row here
+            // means the caller is really asking by PRODUCT id, not variant id — fall through to the product
+            // path below so it can resolve against whatever active variant(s) remain, instead of reporting
+            // this dead variant as unavailable.
+            if (!row.IsActive && row.Id == row.ProductId)
+                continue;
+
             var label = string.Join(" / ", new[] { row.Option1Value, row.Option2Value }.Where(v => !string.IsNullOrWhiteSpace(v)));
             result[row.Id] = new ProductPriceInfo(row.ProductId, row.Name, row.Price, row.Currency, row.Available, row.Slug, row.PrimaryImageUrl, row.Id, label, row.Sku, row.VariantImageUrl);
         }
@@ -106,14 +115,16 @@ public class ProductPriceLookup : IProductPriceLookup
                 p.Name,
                 p.Slug,
                 p.MinPrice,
+                p.MaxPrice,
                 p.Status,
                 PrimaryImageUrl = p.Images.OrderBy(i => i.DisplayOrder).Select(i => i.Url).FirstOrDefault(),
-                Currency = p.Variants.Where(v => v.IsActive).OrderBy(v => v.Price.Amount).Select(v => v.Price.Currency).FirstOrDefault()
+                Currency = p.Variants.Where(v => v.IsActive).OrderBy(v => v.Price.Amount).Select(v => v.Price.Currency).FirstOrDefault(),
+                VariantCount = p.Variants.Count(v => v.IsActive)
             })
             .ToListAsync(cancellationToken);
 
         return rows.ToDictionary(
             r => r.Id,
-            r => new ProductSummaryInfo(r.Id, r.Name, r.Slug, r.MinPrice, r.Currency ?? "VND", r.PrimaryImageUrl, r.Status == ProductStatus.Published));
+            r => new ProductSummaryInfo(r.Id, r.Name, r.Slug, r.MinPrice, r.Currency ?? "VND", r.PrimaryImageUrl, r.Status == ProductStatus.Published, r.MaxPrice, r.VariantCount));
     }
 }

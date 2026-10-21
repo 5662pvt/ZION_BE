@@ -177,6 +177,66 @@ public class ProductVariantsTests
     }
 
     [Fact]
+    public void SetVariants_Should_ReuseOmittedVariant_When_NewRowReusesItsSku()
+    {
+        var product = Product.CreateDraft("P", "p", null, null, null);
+        var options = new[] { new ProductOptionInput("Size", new[] { "S", "M" }) };
+        var initial = new[]
+        {
+            new ProductVariantInput(null, "S", null, "SKU-S", 10m, "USD", true, null),
+            new ProductVariantInput(null, "M", null, "SKU-M", 11m, "USD", true, null)
+        };
+        product.SetVariants(options, initial).IsSuccess.Should().BeTrue();
+        var sVariantId = product.Variants.Single(v => v.Option1Value == "S").Id;
+
+        // Regenerate the matrix: omit "S" (its SKU-S would normally be orphaned/deactivated) and introduce a
+        // brand-new "L" row that reuses SKU-S. Must not create a second row with a duplicate SKU.
+        var options2 = new[] { new ProductOptionInput("Size", new[] { "M", "L" }) };
+        var second = new[]
+        {
+            new ProductVariantInput(null, "L", null, "SKU-S", 13m, "USD", true, null),
+            new ProductVariantInput(null, "M", null, "SKU-M", 11m, "USD", true, null)
+        };
+        var result = product.SetVariants(options2, second);
+
+        result.IsSuccess.Should().BeTrue();
+        product.Variants.Should().HaveCount(2);
+        var reused = product.Variants.Single(v => v.Id == sVariantId);
+        reused.Option1Value.Should().Be("L");
+        reused.Price.Amount.Should().Be(13m);
+        reused.IsActive.Should().BeTrue();
+    }
+
+    [Fact]
+    public void SetVariants_Should_Fail_When_NewRowReusesCurrentSkuOfAVariantKeptExplicitlyUnderARenamedSku()
+    {
+        var product = Product.CreateDraft("P", "p", null, null, null);
+        var options = new[] { new ProductOptionInput("Size", new[] { "S", "M" }) };
+        var initial = new[]
+        {
+            new ProductVariantInput(null, "S", null, "SKU-S", 10m, "USD", true, null),
+            new ProductVariantInput(null, "M", null, "SKU-M", 11m, "USD", true, null)
+        };
+        product.SetVariants(options, initial).IsSuccess.Should().BeTrue();
+        var sVariantId = product.Variants.Single(v => v.Option1Value == "S").Id;
+
+        // "S" is explicitly kept (by Id) but renamed to SKU-S-NEW in the same call; a different, new row
+        // cannot simultaneously claim the vacated "SKU-S" text — the two inputs would resolve to the same
+        // variant row depending on processing order, which SetVariants conservatively rejects instead.
+        var options2 = new[] { new ProductOptionInput("Size", new[] { "S", "M", "L" }) };
+        var second = new[]
+        {
+            new ProductVariantInput(sVariantId, "S", null, "SKU-S-NEW", 10m, "USD", true, null),
+            new ProductVariantInput(null, "M", null, "SKU-M", 11m, "USD", true, null),
+            new ProductVariantInput(null, "L", null, "SKU-S", 13m, "USD", true, null)
+        };
+        var result = product.SetVariants(options2, second);
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Code.Should().Be("Products.DuplicateVariantSku");
+    }
+
+    [Fact]
     public void Publish_Should_Succeed_When_ActiveVariantExists()
     {
         var product = CreateLegacy();
@@ -216,6 +276,23 @@ public class ProductVariantsTests
 
         result.IsFailure.Should().BeTrue();
         result.Error.Code.Should().Be("Products.LegacyPriceUpdateNotAllowed");
+    }
+
+    [Fact]
+    public void Update_Should_UpdateNameOnly_When_ProductHasOptionsAndPriceIsNull()
+    {
+        var product = Product.CreateDraft("P", "p", null, null, null);
+        var options = new[] { new ProductOptionInput("Size", new[] { "S" }) };
+        var variants = new[] { new ProductVariantInput(null, "S", null, "SKU-X", 10m, "USD", true, null) };
+        product.SetVariants(options, variants);
+
+        var result = product.Update("New Name", "new desc", null, null, "New Brand");
+
+        result.IsSuccess.Should().BeTrue();
+        product.Name.Should().Be("New Name");
+        product.Description.Should().Be("new desc");
+        product.Brand.Should().Be("New Brand");
+        product.Variants.Single().Price.Amount.Should().Be(10m);
     }
 
     [Fact]

@@ -29,7 +29,7 @@ public class SearchProductsQueryHandler : IRequestHandler<SearchProductsQuery, R
         if (!string.IsNullOrWhiteSpace(request.Keyword))
         {
             var kw = request.Keyword.Trim();
-            query = query.Where(p => EF.Functions.Like(p.Name, $"%{kw}%") || p.Variants.Any(v => EF.Functions.Like(v.Sku.Value, $"%{kw}%")));
+            query = query.Where(p => EF.Functions.Like(p.Name, $"%{kw}%") || p.Variants.Any(v => v.IsActive && EF.Functions.Like(v.Sku.Value, $"%{kw}%")));
         }
 
         if (request.CategoryId.HasValue)

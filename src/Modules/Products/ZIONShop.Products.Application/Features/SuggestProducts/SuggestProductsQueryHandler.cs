@@ -31,7 +31,7 @@ public class SuggestProductsQueryHandler : IRequestHandler<SuggestProductsQuery,
             .Where(p => p.Status == ProductStatus.Published)
             .Where(p =>
                 EF.Functions.Like(p.Name.ToUpper(), $"%{kw}%") ||
-                p.Variants.Any(v => EF.Functions.Like(v.Sku.Value.ToUpper(), $"%{kw}%")) ||
+                p.Variants.Any(v => v.IsActive && EF.Functions.Like(v.Sku.Value.ToUpper(), $"%{kw}%")) ||
                 (p.Brand != null && EF.Functions.Like(p.Brand.ToUpper(), $"%{kw}%")))
             .OrderByDescending(p => EF.Functions.Like(p.Name.ToUpper(), $"{kw}%"))
             .ThenBy(p => p.Name)

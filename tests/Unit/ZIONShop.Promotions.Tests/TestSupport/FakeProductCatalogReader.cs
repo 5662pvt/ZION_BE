@@ -30,4 +30,10 @@ internal sealed class FakeProductCatalogReader : IProductCatalogReader
 
     public Task<ProductVariantCatalogItem?> GetVariantAsync(Guid variantId, CancellationToken ct = default)
         => Task.FromResult(_variants.TryGetValue(variantId, out var v) ? v : null);
+
+    public Task<IReadOnlyList<ProductVariantCatalogItem>> ListVariantsByProductAsync(Guid productId, CancellationToken ct = default)
+        => Task.FromResult<IReadOnlyList<ProductVariantCatalogItem>>(_variants.Values.Where(v => v.ProductId == productId).ToList());
+
+    public Task<IReadOnlyList<ProductVariantCatalogItem>> GetVariantsAsync(IReadOnlyCollection<Guid> variantIds, CancellationToken ct = default)
+        => Task.FromResult<IReadOnlyList<ProductVariantCatalogItem>>(_variants.Values.Where(v => variantIds.Contains(v.VariantId)).ToList());
 }

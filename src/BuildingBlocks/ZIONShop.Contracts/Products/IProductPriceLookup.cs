@@ -13,7 +13,16 @@ public record ProductPriceInfo(
     string? Sku = null,
     string? VariantImageUrl = null);
 
-public record ProductSummaryInfo(Guid ProductId, string Name, string Slug, decimal MinPrice, string Currency, string? PrimaryImageUrl, bool IsPublished);
+public record ProductSummaryInfo(
+    Guid ProductId,
+    string Name,
+    string Slug,
+    decimal MinPrice,
+    string Currency,
+    string? PrimaryImageUrl,
+    bool IsPublished,
+    decimal MaxPrice = 0m,
+    int VariantCount = 0);
 
 public interface IProductPriceLookup
 {

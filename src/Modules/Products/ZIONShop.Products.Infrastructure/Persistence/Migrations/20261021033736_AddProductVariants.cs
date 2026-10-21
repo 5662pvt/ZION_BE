@@ -120,6 +120,12 @@ namespace ZIONShop.Products.Infrastructure.Persistence.Migrations
         }
 
         /// <inheritdoc />
+        /// <remarks>NOT SAFELY REVERSIBLE once any product has used options/multiple variants: the restore
+        /// below picks the variant with Id == ProductId (the legacy default-variant convention), which no
+        /// longer exists once SetVariants replaced/deactivated it, and an empty "" Sku/Price/Currency on
+        /// Products violates the old IX_Products_Sku unique index being recreated here for any product that
+        /// never had such a row. Only safe to run against a database where no product has ever called
+        /// SetVariants.</remarks>
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.RenameColumn(

@@ -38,4 +38,32 @@ public class UpdateProductCommandHandlerTests
         cache.Contains($"zion:products:v2:detail:id:{product.Id}").Should().BeFalse();
         cache.Contains($"zion:products:v2:detail:slug:{product.Slug}").Should().BeFalse();
     }
+
+    [Fact]
+    public async Task Handle_Should_UpdateNameWithoutTouchingPrice_When_ProductHasOptionsAndPriceOmitted()
+    {
+        var options = new DbContextOptionsBuilder<ProductsDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
+            .Options;
+        var db = new ProductsDbContext(options);
+        var products = new ProductRepository(db);
+        var categories = new CategoryRepository(db);
+
+        var product = Product.CreateDraft("Shirt", "shirt", null, null, null);
+        product.SetVariants(
+            new[] { new ProductOptionInput("Size", new[] { "S" }) },
+            new[] { new ProductVariantInput(null, "S", null, "SKU-UPD2", 10m, "VND", true, null) });
+        product.MarkCreated();
+        await db.Products.AddAsync(product);
+        await db.SaveChangesAsync();
+
+        var cache = new FakeDistributedCacheService();
+        var handler = new UpdateProductCommandHandler(products, categories, db, cache);
+
+        var result = await handler.Handle(new UpdateProductCommand(product.Id, "Renamed Shirt", "new desc", null, null, null, "Brand"), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Name.Should().Be("Renamed Shirt");
+        result.Value.Price.Should().Be(10m);
+    }
 }
