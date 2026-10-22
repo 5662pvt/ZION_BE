@@ -111,7 +111,7 @@ public class LoyaltyPointsService : ILoyaltyPointsService, ILoyaltyMutationServi
             }
             catch (DbUpdateConcurrencyException)
             {
-                _uow.ClearChangeTracker();
+                _uow.ResetBusinessChanges();
             }
         }
 
@@ -147,7 +147,7 @@ public class LoyaltyPointsService : ILoyaltyPointsService, ILoyaltyMutationServi
             }
             catch (DbUpdateConcurrencyException)
             {
-                _uow.ClearChangeTracker();
+                _uow.ResetBusinessChanges();
             }
         }
     }
@@ -183,12 +183,12 @@ public class LoyaltyPointsService : ILoyaltyPointsService, ILoyaltyMutationServi
             }
             catch (DbUpdateConcurrencyException)
             {
-                _uow.ClearChangeTracker();
+                _uow.ResetBusinessChanges();
             }
             catch (DbUpdateException)
             {
                 // Unique-index race on (UserId, Source, SourceRef): a concurrent delivery already earned this.
-                _uow.ClearChangeTracker();
+                _uow.ResetBusinessChanges();
                 return 0;
             }
         }
@@ -228,12 +228,12 @@ public class LoyaltyPointsService : ILoyaltyPointsService, ILoyaltyMutationServi
             }
             catch (DbUpdateConcurrencyException)
             {
-                _uow.ClearChangeTracker();
+                _uow.ResetBusinessChanges();
             }
             catch (DbUpdateException)
             {
                 // Marker unique-index race: a concurrent revoke beat us to it.
-                _uow.ClearChangeTracker();
+                _uow.ResetBusinessChanges();
                 return;
             }
         }
@@ -266,7 +266,7 @@ public class LoyaltyPointsService : ILoyaltyPointsService, ILoyaltyMutationServi
             }
             catch (DbUpdateConcurrencyException)
             {
-                _uow.ClearChangeTracker();
+                _uow.ResetBusinessChanges();
             }
         }
     }
@@ -312,7 +312,7 @@ public class LoyaltyPointsService : ILoyaltyPointsService, ILoyaltyMutationServi
             }
             catch (DbUpdateConcurrencyException)
             {
-                _uow.ClearChangeTracker();
+                _uow.ResetBusinessChanges();
             }
         }
 
@@ -343,7 +343,7 @@ public class LoyaltyPointsService : ILoyaltyPointsService, ILoyaltyMutationServi
             }
             catch (DbUpdateConcurrencyException)
             {
-                _uow.ClearChangeTracker();
+                _uow.ResetBusinessChanges();
             }
         }
 
