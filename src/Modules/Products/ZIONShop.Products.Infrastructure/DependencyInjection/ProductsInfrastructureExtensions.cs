@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using ZIONShop.Contracts.Media;
 using ZIONShop.Contracts.Products;
 using ZIONShop.Products.Application.Interfaces;
 using ZIONShop.Products.Application.Options;
@@ -57,6 +58,8 @@ public static class ProductsInfrastructureExtensions
                 return ActivatorUtilities.CreateInstance<LocalImageStorage>(sp);
             });
         }
+
+        services.AddScoped<IMediaStorage, ProductsMediaStorageAdapter>();
 
         return services;
     }

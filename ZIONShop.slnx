@@ -43,6 +43,11 @@
     <Project Path="src/Modules/Loyalty/ZIONShop.Loyalty.Domain/ZIONShop.Loyalty.Domain.csproj" />
     <Project Path="src/Modules/Loyalty/ZIONShop.Loyalty.Infrastructure/ZIONShop.Loyalty.Infrastructure.csproj" />
   </Folder>
+  <Folder Name="/src/Modules/Chat/">
+    <Project Path="src/Modules/Chat/ZIONShop.Chat.Application/ZIONShop.Chat.Application.csproj" />
+    <Project Path="src/Modules/Chat/ZIONShop.Chat.Domain/ZIONShop.Chat.Domain.csproj" />
+    <Project Path="src/Modules/Chat/ZIONShop.Chat.Infrastructure/ZIONShop.Chat.Infrastructure.csproj" />
+  </Folder>
   <Folder Name="/src/Modules/Notifications/">
     <Project Path="src/Modules/Notifications/ZIONShop.Notifications.Application/ZIONShop.Notifications.Application.csproj" />
     <Project Path="src/Modules/Notifications/ZIONShop.Notifications.Domain/ZIONShop.Notifications.Domain.csproj" />
@@ -86,6 +91,7 @@
     <Project Path="tests/Unit/ZIONShop.EventBus.Tests/ZIONShop.EventBus.Tests.csproj" />
     <Project Path="tests/Unit/ZIONShop.Inventory.Tests/ZIONShop.Inventory.Tests.csproj" />
     <Project Path="tests/Unit/ZIONShop.Loyalty.Tests/ZIONShop.Loyalty.Tests.csproj" />
+    <Project Path="tests/Unit/ZIONShop.Chat.Tests/ZIONShop.Chat.Tests.csproj" />
     <Project Path="tests/Unit/ZIONShop.Notifications.Tests/ZIONShop.Notifications.Tests.csproj" />
     <Project Path="tests/Unit/ZIONShop.Orders.Tests/ZIONShop.Orders.Tests.csproj" />
     <Project Path="tests/Unit/ZIONShop.Payments.Tests/ZIONShop.Payments.Tests.csproj" />

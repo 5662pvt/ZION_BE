@@ -8,4 +8,6 @@ public class RateLimitingOptions
     public int CheckoutPermitLimit { get; set; } = 10;
     public int SearchPermitLimit { get; set; } = 60;
     public int WindowSeconds { get; set; } = 60;
+    public int ChatPermitLimit { get; set; } = 30;
+    public int ChatWindowSeconds { get; set; } = 60;
 }

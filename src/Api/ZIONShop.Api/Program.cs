@@ -60,6 +60,8 @@ using ZIONShop.Admin.Application.DependencyInjection;
 using ZIONShop.Admin.Infrastructure.DependencyInjection;
 using ZIONShop.Loyalty.Application.DependencyInjection;
 using ZIONShop.Loyalty.Infrastructure.DependencyInjection;
+using ZIONShop.Chat.Application.DependencyInjection;
+using ZIONShop.Chat.Infrastructure.DependencyInjection;
 using MediatR;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -149,6 +151,7 @@ catch { /* Redis optional in local dev; relay/publish fail open */ }
 builder.Services.AddSignalR();
 builder.Services.AddSingleton<IUserIdProvider, ClaimsUserIdProvider>();
 builder.Services.AddHostedService<NotificationRelayHostedService>();
+builder.Services.AddHostedService<RealtimeEventRelayHostedService>();
 
 // MediatR pipeline behaviors (registered against shared assemblies)
 builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>));
@@ -174,7 +177,8 @@ builder.Services
     .AddNotificationsApplication().AddNotificationsInfrastructure(builder.Configuration)
     .AddReviewsApplication().AddReviewsInfrastructure(builder.Configuration)
     .AddAdminApplication().AddAdminInfrastructure(builder.Configuration)
-    .AddLoyaltyApplication().AddLoyaltyInfrastructure(builder.Configuration);
+    .AddLoyaltyApplication().AddLoyaltyInfrastructure(builder.Configuration)
+    .AddChatApplication().AddChatInfrastructure(builder.Configuration);
 
 // Global exception handler
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
@@ -240,6 +244,22 @@ builder.Services.AddRateLimiter(opts =>
         });
     });
 
+    opts.AddPolicy("chat", httpContext =>
+    {
+        var limits = httpContext.RequestServices.GetRequiredService<IOptions<RateLimitingOptions>>().Value;
+        var userId = httpContext.User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value
+            ?? httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        var key = userId is not null
+            ? $"user:{userId}"
+            : $"ip:{httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown"}";
+        return RateLimitPartition.GetFixedWindowLimiter(key, _ => new FixedWindowRateLimiterOptions
+        {
+            Window = TimeSpan.FromSeconds(limits.ChatWindowSeconds),
+            PermitLimit = limits.ChatPermitLimit,
+            QueueLimit = 0
+        });
+    });
+
     opts.OnRejected = async (context, token) =>
     {
         var retryAfterSeconds = 60;
@@ -293,6 +313,7 @@ app.UseRateLimiter();
 
 app.MapControllers();
 app.MapHub<NotificationsHub>("/hubs/notifications");
+app.MapHub<ChatHub>("/hubs/chat");
 
 app.MapHealthChecks("/health/live", new HealthCheckOptions
 {

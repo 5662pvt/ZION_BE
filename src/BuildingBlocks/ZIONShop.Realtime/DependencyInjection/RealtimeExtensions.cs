@@ -30,6 +30,7 @@ public static class RealtimeExtensions
             return ConnectionMultiplexer.Connect(options);
         });
         services.AddSingleton<INotificationPush, RedisNotificationPublisher>();
+        services.AddSingleton<IRealtimeEventPublisher, RedisRealtimeEventPublisher>();
 
         return services;
     }

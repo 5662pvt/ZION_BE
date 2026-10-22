@@ -6,6 +6,8 @@ using ZIONShop.Admin.Application.DependencyInjection;
 using ZIONShop.Admin.Infrastructure.DependencyInjection;
 using ZIONShop.Loyalty.Application.DependencyInjection;
 using ZIONShop.Loyalty.Infrastructure.DependencyInjection;
+using ZIONShop.Chat.Application.DependencyInjection;
+using ZIONShop.Chat.Infrastructure.DependencyInjection;
 using ZIONShop.Auth.Application.DependencyInjection;
 using ZIONShop.Auth.DependencyInjection;
 using ZIONShop.Auth.Infrastructure.DependencyInjection;
@@ -103,7 +105,8 @@ builder.Services
     .AddNotificationsApplication().AddNotificationsInfrastructure(builder.Configuration)
     .AddReviewsApplication().AddReviewsInfrastructure(builder.Configuration)
     .AddAdminApplication().AddAdminInfrastructure(builder.Configuration)
-    .AddLoyaltyApplication().AddLoyaltyInfrastructure(builder.Configuration);
+    .AddLoyaltyApplication().AddLoyaltyInfrastructure(builder.Configuration)
+    .AddChatApplication().AddChatInfrastructure(builder.Configuration);
 
 // Health checks -- same checks/tags as the API (src/Api/ZIONShop.Api/Program.cs), reused from the
 // shared ZIONShop.HealthChecks building block so both hosts report readiness identically.
