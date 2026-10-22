@@ -32,6 +32,10 @@
     <ProjectReference Include="..\..\..\src\Modules\Inventory\ZIONShop.Inventory.Domain\ZIONShop.Inventory.Domain.csproj" />
     <ProjectReference Include="..\..\..\src\Modules\Inventory\ZIONShop.Inventory.Application\ZIONShop.Inventory.Application.csproj" />
     <ProjectReference Include="..\..\..\src\Modules\Inventory\ZIONShop.Inventory.Infrastructure\ZIONShop.Inventory.Infrastructure.csproj" />
+    <!-- Loyalty -->
+    <ProjectReference Include="..\..\..\src\Modules\Loyalty\ZIONShop.Loyalty.Domain\ZIONShop.Loyalty.Domain.csproj" />
+    <ProjectReference Include="..\..\..\src\Modules\Loyalty\ZIONShop.Loyalty.Application\ZIONShop.Loyalty.Application.csproj" />
+    <ProjectReference Include="..\..\..\src\Modules\Loyalty\ZIONShop.Loyalty.Infrastructure\ZIONShop.Loyalty.Infrastructure.csproj" />
     <!-- Notifications -->
     <ProjectReference Include="..\..\..\src\Modules\Notifications\ZIONShop.Notifications.Domain\ZIONShop.Notifications.Domain.csproj" />
     <ProjectReference Include="..\..\..\src\Modules\Notifications\ZIONShop.Notifications.Application\ZIONShop.Notifications.Application.csproj" />

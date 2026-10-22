@@ -6,6 +6,8 @@ using Microsoft.Extensions.Hosting;
 using ZIONShop.EventBus.Outbox;
 using ZIONShop.Inventory.Infrastructure.BackgroundServices;
 using ZIONShop.Inventory.Infrastructure.Persistence;
+using ZIONShop.Loyalty.Infrastructure.BackgroundServices;
+using ZIONShop.Loyalty.Infrastructure.Persistence;
 using ZIONShop.Orders.Infrastructure.BackgroundServices;
 using ZIONShop.Orders.Infrastructure.Persistence;
 using ZIONShop.Payments.Infrastructure.Persistence;
@@ -31,9 +33,11 @@ public class WorkerHostTests : IDisposable
         typeof(OutboxPublisherService<PromotionsDbContext>),
         typeof(OutboxPublisherService<OrdersDbContext>),
         typeof(OutboxPublisherService<PaymentsDbContext>),
+        typeof(OutboxPublisherService<LoyaltyDbContext>),
         typeof(ReservationExpiryBackgroundService),
         typeof(StaleReservationReleaseBackgroundService),
         typeof(IdempotencyKeyCleanupBackgroundService),
+        typeof(LoyaltyExpiryBackgroundService),
     };
 
     private readonly WebApplicationFactory<Program> _factory;

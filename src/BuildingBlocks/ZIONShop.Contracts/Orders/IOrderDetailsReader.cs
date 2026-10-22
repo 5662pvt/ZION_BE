@@ -4,7 +4,8 @@ public sealed record OrderDetailsLine(string ProductName, int Quantity, decimal 
 
 public sealed record OrderDetails(Guid OrderId, Guid UserId, string Code, string Status, string PaymentMethod,
     decimal Subtotal, decimal DiscountAmount, string? CouponCode, string? DiscountTarget, decimal ShippingFee, decimal Total, string Currency,
-    string RecipientName, string PhoneNumber, string AddressLine, string? CancelReason, DateTime CreatedAt, IReadOnlyList<OrderDetailsLine> Lines);
+    string RecipientName, string PhoneNumber, string AddressLine, string? CancelReason, DateTime CreatedAt, IReadOnlyList<OrderDetailsLine> Lines,
+    int PointsUsed = 0, decimal PointsDiscount = 0m);
 
 public interface IOrderDetailsReader
 {

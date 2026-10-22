@@ -48,5 +48,7 @@
     <ProjectReference Include="..\..\Modules\Reviews\ZIONShop.Reviews.Infrastructure\ZIONShop.Reviews.Infrastructure.csproj" />
     <ProjectReference Include="..\..\Modules\Admin\ZIONShop.Admin.Application\ZIONShop.Admin.Application.csproj" />
     <ProjectReference Include="..\..\Modules\Admin\ZIONShop.Admin.Infrastructure\ZIONShop.Admin.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\Modules\Loyalty\ZIONShop.Loyalty.Application\ZIONShop.Loyalty.Application.csproj" />
+    <ProjectReference Include="..\..\Modules\Loyalty\ZIONShop.Loyalty.Infrastructure\ZIONShop.Loyalty.Infrastructure.csproj" />
   </ItemGroup>
 </Project>

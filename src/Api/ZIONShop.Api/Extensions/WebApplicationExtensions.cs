@@ -4,6 +4,7 @@ using ZIONShop.Auth.Infrastructure.Persistence;
 using ZIONShop.Cart.Infrastructure.Persistence;
 using ZIONShop.Contracts.Products;
 using ZIONShop.Inventory.Infrastructure.Persistence;
+using ZIONShop.Loyalty.Infrastructure.Persistence;
 using ZIONShop.Notifications.Infrastructure.Persistence;
 using ZIONShop.Orders.Infrastructure.Persistence;
 using ZIONShop.Payments.Infrastructure.Persistence;
@@ -51,6 +52,8 @@ public static class WebApplicationExtensions
             await sp.GetRequiredService<ReviewsDbContext>().Database.MigrateAsync();
 
             await sp.GetRequiredService<AdminDbContext>().Database.MigrateAsync();
+
+            await sp.GetRequiredService<LoyaltyDbContext>().Database.MigrateAsync();
         }
         catch (Exception ex)
         {

@@ -58,6 +58,8 @@ using ZIONShop.Reviews.Application.DependencyInjection;
 using ZIONShop.Reviews.Infrastructure.DependencyInjection;
 using ZIONShop.Admin.Application.DependencyInjection;
 using ZIONShop.Admin.Infrastructure.DependencyInjection;
+using ZIONShop.Loyalty.Application.DependencyInjection;
+using ZIONShop.Loyalty.Infrastructure.DependencyInjection;
 using MediatR;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -171,7 +173,8 @@ builder.Services
     .AddPromotionsApplication().AddPromotionsInfrastructure(builder.Configuration)
     .AddNotificationsApplication().AddNotificationsInfrastructure(builder.Configuration)
     .AddReviewsApplication().AddReviewsInfrastructure(builder.Configuration)
-    .AddAdminApplication().AddAdminInfrastructure(builder.Configuration);
+    .AddAdminApplication().AddAdminInfrastructure(builder.Configuration)
+    .AddLoyaltyApplication().AddLoyaltyInfrastructure(builder.Configuration);
 
 // Global exception handler
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
