@@ -1,4 +1,5 @@
 using MediatR;
+using Microsoft.EntityFrameworkCore;
 using ZIONShop.Chat.Application.DTOs;
 using ZIONShop.Chat.Application.Interfaces;
 using ZIONShop.Chat.Application.Mappings;
@@ -12,6 +13,8 @@ namespace ZIONShop.Chat.Application.Features.MarkConversationReadByStaff;
 
 public class MarkConversationReadByStaffCommandHandler : IRequestHandler<MarkConversationReadByStaffCommand, Result<ConversationDto>>
 {
+    private const int MaxSaveAttempts = 3;
+
     private readonly IConversationRepository _conversations;
     private readonly IChatUnitOfWork _uow;
     private readonly IRealtimeEventPublisher _realtime;
@@ -30,8 +33,23 @@ public class MarkConversationReadByStaffCommandHandler : IRequestHandler<MarkCon
         var conversation = await _conversations.GetByIdAsync(request.ConversationId, cancellationToken);
         if (conversation is null) return Result.Failure<ConversationDto>(ChatErrors.ConversationNotFound);
 
-        conversation.MarkReadBy(ChatSenderRole.Staff, _time.GetUtcNow().UtcDateTime);
-        await _uow.SaveChangesAsync(cancellationToken);
+        var now = _time.GetUtcNow().UtcDateTime;
+
+        for (var attempt = 1; attempt <= MaxSaveAttempts; attempt++)
+        {
+            conversation.MarkReadBy(ChatSenderRole.Staff, now);
+            try
+            {
+                await _uow.SaveChangesAsync(cancellationToken);
+                break;
+            }
+            catch (DbUpdateConcurrencyException) when (attempt < MaxSaveAttempts)
+            {
+                _uow.Detach(conversation);
+                conversation = await _conversations.GetByIdAsync(request.ConversationId, cancellationToken)
+                    ?? throw new InvalidOperationException("Conversation disappeared during a concurrent retry.");
+            }
+        }
 
         var dto = conversation.ToDto();
 

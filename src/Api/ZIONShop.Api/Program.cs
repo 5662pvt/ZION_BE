@@ -1,6 +1,7 @@
 using Asp.Versioning;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.OpenApi.Models;
@@ -295,10 +296,30 @@ app.UseCors();
 
 var uploadsRoot = app.Services.GetRequiredService<IUploadsRootProvider>().RootPath;
 Directory.CreateDirectory(uploadsRoot);
+
+// Restricted to the formats LocalImageStorage ever writes (detected from magic bytes, never from the
+// client's filename) -- an uploaded file can never be served under an extension that maps to a
+// script-executable content type (e.g. .svg, .html), closing the stored-XSS vector of a spoofed
+// Content-Type + filename on upload.
+var uploadsContentTypeProvider = new FileExtensionContentTypeProvider();
+uploadsContentTypeProvider.Mappings.Clear();
+uploadsContentTypeProvider.Mappings[".jpg"] = "image/jpeg";
+uploadsContentTypeProvider.Mappings[".jpeg"] = "image/jpeg";
+uploadsContentTypeProvider.Mappings[".png"] = "image/png";
+uploadsContentTypeProvider.Mappings[".webp"] = "image/webp";
+uploadsContentTypeProvider.Mappings[".gif"] = "image/gif";
+
 app.UseStaticFiles(new StaticFileOptions
 {
     FileProvider = new PhysicalFileProvider(uploadsRoot),
-    RequestPath = $"/{ImageStorageOptions.UploadsFolderName}"
+    RequestPath = $"/{ImageStorageOptions.UploadsFolderName}",
+    ContentTypeProvider = uploadsContentTypeProvider,
+    ServeUnknownFileTypes = false,
+    OnPrepareResponse = ctx =>
+    {
+        ctx.Context.Response.Headers["X-Content-Type-Options"] = "nosniff";
+        ctx.Context.Response.Headers["Content-Security-Policy"] = "default-src 'none'; img-src 'self'";
+    }
 });
 
 if (app.Environment.IsDevelopment())

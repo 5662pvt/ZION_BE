@@ -1,4 +1,5 @@
 using MediatR;
+using Microsoft.EntityFrameworkCore;
 using ZIONShop.Chat.Application.Interfaces;
 using ZIONShop.Chat.Application.Mappings;
 using ZIONShop.Chat.Application.Services;
@@ -13,6 +14,8 @@ namespace ZIONShop.Chat.Application.Features.SendMyMessage;
 
 public class SendMyMessageCommandHandler : IRequestHandler<SendMyMessageCommand, Result<ChatMessageDto>>
 {
+    private const int MaxSaveAttempts = 3;
+
     private readonly ConversationProvisioningService _provisioning;
     private readonly IChatMessageRepository _messages;
     private readonly IChatUnitOfWork _uow;
@@ -75,7 +78,23 @@ public class SendMyMessageCommandHandler : IRequestHandler<SendMyMessageCommand,
             request.ProductId, request.OrderId, cardJson, previewText, now);
 
         await _messages.AddAsync(message, cancellationToken);
-        await _uow.SaveChangesAsync(cancellationToken);
+
+        for (var attempt = 1; attempt <= MaxSaveAttempts; attempt++)
+        {
+            try
+            {
+                await _uow.SaveChangesAsync(cancellationToken);
+                break;
+            }
+            catch (DbUpdateConcurrencyException) when (attempt < MaxSaveAttempts)
+            {
+                // Another concurrent send/mark-read on this conversation beat us to it -- re-fetch fresh
+                // state and re-apply only the counter/preview update; the ChatMessage row stays as-is.
+                _uow.Detach(conversation);
+                conversation = await _provisioning.GetOrCreateAsync(request.UserId, cancellationToken);
+                conversation.ApplyMessageSummary(ChatSenderRole.Customer, previewText, now);
+            }
+        }
 
         var dto = message.ToDto(conversation.CustomerName);
 

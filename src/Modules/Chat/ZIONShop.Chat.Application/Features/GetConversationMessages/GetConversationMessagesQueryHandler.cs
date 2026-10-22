@@ -30,8 +30,17 @@ public class GetConversationMessagesQueryHandler : IRequestHandler<GetConversati
         var limit = request.Limit is < 1 or > MaxLimit ? DefaultLimit : request.Limit;
 
         var query = _messages.Query().Where(m => m.ConversationId == conversation.Id);
-        if (request.Before.HasValue) query = query.Where(m => m.CreatedAt < request.Before.Value);
-        query = query.OrderByDescending(m => m.CreatedAt);
+        if (request.Before.HasValue && request.BeforeId.HasValue)
+        {
+            var before = request.Before.Value;
+            var beforeId = request.BeforeId.Value;
+            query = query.Where(m => m.CreatedAt < before || (m.CreatedAt == before && m.Id < beforeId));
+        }
+        else if (request.Before.HasValue)
+        {
+            query = query.Where(m => m.CreatedAt < request.Before.Value);
+        }
+        query = query.OrderByDescending(m => m.CreatedAt).ThenByDescending(m => m.Id);
 
         var page = await query.Take(limit + 1).ToListAsync(cancellationToken);
         var hasMore = page.Count > limit;

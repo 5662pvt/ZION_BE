@@ -1,3 +1,4 @@
+using ZIONShop.Chat.Application.Exceptions;
 using ZIONShop.Chat.Application.Interfaces;
 using ZIONShop.Chat.Domain.Entities;
 using ZIONShop.Chat.Domain.Repositories;
@@ -32,7 +33,19 @@ public class ConversationProvisioningService
 
         var conversation = Conversation.Create(customerId, name, email, _time.GetUtcNow().UtcDateTime);
         await _conversations.AddAsync(conversation, ct);
-        await _uow.SaveChangesAsync(ct);
-        return conversation;
+
+        try
+        {
+            await _uow.SaveChangesAsync(ct);
+            return conversation;
+        }
+        catch (DuplicateConversationException)
+        {
+            // Two concurrent first requests from the same customer raced to create the conversation --
+            // the loser detaches its half-inserted entity and returns the winner's row instead of 500ing.
+            _uow.Detach(conversation);
+            return await _conversations.GetByCustomerIdAsync(customerId, ct)
+                ?? throw new InvalidOperationException("Conversation unique-violation but no row found for customer.");
+        }
     }
 }

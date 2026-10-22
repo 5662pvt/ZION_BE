@@ -11,7 +11,8 @@ namespace ZIONShop.Products.Infrastructure.Storage;
 
 public class CloudinaryImageStorage : IImageStorage
 {
-    private const string Folder = "zionshop/products";
+    private const string FolderPrefix = "zionshop";
+    private const int SignatureHeaderLength = 12;
 
     private readonly Cloudinary _cloudinary;
     private readonly ILogger<CloudinaryImageStorage> _logger;
@@ -23,14 +24,38 @@ public class CloudinaryImageStorage : IImageStorage
         _logger = logger;
     }
 
-    public async Task<Result<StoredImage>> UploadAsync(Stream content, string fileName, string contentType, CancellationToken ct)
+    public async Task<Result<StoredImage>> UploadAsync(Stream content, string fileName, string contentType, CancellationToken ct, string folder = "products")
     {
+        if (!ImageSignature.IsValidFolderName(folder))
+            return Result.Failure<StoredImage>(ProductsErrors.InvalidImageUpload);
+
+        MemoryStream? buffered = null;
         try
         {
+            // The upload's real format is detected from its magic bytes -- never trusted from the
+            // client-supplied Content-Type or filename extension.
+            var source = content;
+            if (!content.CanSeek)
+            {
+                buffered = new MemoryStream();
+                await content.CopyToAsync(buffered, ct);
+                buffered.Position = 0;
+                source = buffered;
+            }
+
+            var header = new byte[SignatureHeaderLength];
+            var read = await source.ReadAsync(header, 0, header.Length, ct);
+            source.Position = 0;
+
+            var detectedType = ImageSignature.Detect(header.AsSpan(0, read));
+            if (detectedType is null)
+                return Result.Failure<StoredImage>(ProductsErrors.InvalidImageUpload);
+
+            var ext = ImageSignature.ExtensionFor(detectedType);
             var uploadParams = new ImageUploadParams
             {
-                File = new FileDescription(fileName, content),
-                Folder = Folder
+                File = new FileDescription($"{Guid.NewGuid():N}{ext}", source),
+                Folder = $"{FolderPrefix}/{folder}"
             };
 
             var result = await _cloudinary.UploadAsync(uploadParams);
@@ -46,6 +71,10 @@ public class CloudinaryImageStorage : IImageStorage
         {
             _logger.LogError(ex, "Cloudinary upload threw an exception");
             return Result.Failure<StoredImage>(ProductsErrors.InvalidImageUpload);
+        }
+        finally
+        {
+            buffered?.Dispose();
         }
     }
 

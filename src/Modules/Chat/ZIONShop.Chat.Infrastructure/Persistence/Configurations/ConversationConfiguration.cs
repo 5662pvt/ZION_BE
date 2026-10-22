@@ -25,5 +25,15 @@ public class ConversationConfiguration : IEntityTypeConfiguration<Conversation>
         builder.Property(c => c.StaffUnread).IsRequired();
         builder.Property(c => c.CustomerLastReadAt);
         builder.Property(c => c.StaffLastReadAt);
+
+        // PostgreSQL optimistic concurrency via the system xmin column, same pattern as
+        // Payments.Infrastructure.Persistence.Configurations.PaymentConfiguration -- two concurrent
+        // AddMessage/MarkReadBy saves on the same conversation now conflict instead of silently
+        // overwriting each other's unread-counter increment.
+        builder.Property<uint>("xmin")
+            .HasColumnName("xmin")
+            .HasColumnType("xid")
+            .ValueGeneratedOnAddOrUpdate()
+            .IsRowVersion();
     }
 }

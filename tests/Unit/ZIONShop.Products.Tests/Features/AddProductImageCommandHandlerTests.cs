@@ -15,7 +15,7 @@ public class AddProductImageCommandHandlerTests
 {
     private class FakeImageStorage : IImageStorage
     {
-        public Task<Result<StoredImage>> UploadAsync(Stream content, string fileName, string contentType, CancellationToken ct)
+        public Task<Result<StoredImage>> UploadAsync(Stream content, string fileName, string contentType, CancellationToken ct, string folder = "products")
             => Task.FromResult(Result.Success(new StoredImage("https://cdn.test/image.png", "zionshop/products/image")));
 
         public Task DeleteAsync(string publicId, CancellationToken ct) => Task.CompletedTask;

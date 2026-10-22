@@ -71,8 +71,8 @@ namespace ZIONShop.Chat.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("ConversationId", "CreatedAt")
-                        .IsDescending(false, true);
+                    b.HasIndex("ConversationId", "CreatedAt", "Id")
+                        .IsDescending(false, true, true);
 
                     b.ToTable("ChatMessages", "chat");
                 });
@@ -123,6 +123,12 @@ namespace ZIONShop.Chat.Infrastructure.Persistence.Migrations
 
                     b.Property<int>("StaffUnread")
                         .HasColumnType("integer");
+
+                    b.Property<uint>("xmin")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
 
                     b.HasKey("Id");
 

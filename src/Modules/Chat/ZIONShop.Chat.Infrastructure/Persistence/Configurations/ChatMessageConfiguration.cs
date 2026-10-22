@@ -23,6 +23,7 @@ public class ChatMessageConfiguration : IEntityTypeConfiguration<ChatMessage>
         builder.Property(m => m.CardJson).HasColumnType("jsonb");
         builder.Property(m => m.CreatedAt).IsRequired();
 
-        builder.HasIndex(m => new { m.ConversationId, m.CreatedAt }).IsDescending(false, true);
+        // Covers the (CreatedAt, Id) keyset pagination tie-break used by GetMyMessages/GetConversationMessages.
+        builder.HasIndex(m => new { m.ConversationId, m.CreatedAt, m.Id }).IsDescending(false, true, true);
     }
 }

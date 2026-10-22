@@ -39,7 +39,7 @@ public class AdminChatController : ControllerBase
 
     [HttpGet("conversations/{id:guid}/messages")]
     public async Task<IActionResult> GetConversationMessages(Guid id, [FromQuery] ChatMessagesRequest req, CancellationToken ct)
-        => (await _mediator.Send(new GetConversationMessagesQuery(id, req.Before, req.Limit), ct)).ToActionResult();
+        => (await _mediator.Send(new GetConversationMessagesQuery(id, req.Before, req.BeforeId, req.Limit), ct)).ToActionResult();
 
     [HttpPost("conversations/{id:guid}/messages")]
     [EnableRateLimiting("chat")]

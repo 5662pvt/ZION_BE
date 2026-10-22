@@ -32,7 +32,7 @@ public class ChatController : ControllerBase
 
     [HttpGet("me/messages")]
     public async Task<IActionResult> GetMyMessages([FromQuery] ChatMessagesRequest req, CancellationToken ct)
-        => (await _mediator.Send(new GetMyMessagesQuery(_currentUser.UserId!.Value, req.Before, req.Limit), ct)).ToActionResult();
+        => (await _mediator.Send(new GetMyMessagesQuery(_currentUser.UserId!.Value, req.Before, req.BeforeId, req.Limit), ct)).ToActionResult();
 
     [HttpPost("me/messages")]
     [EnableRateLimiting("chat")]
@@ -58,5 +58,5 @@ public class ChatController : ControllerBase
         => (await _mediator.Send(new MarkMyConversationReadCommand(_currentUser.UserId!.Value), ct)).ToActionResult();
 }
 
-public record ChatMessagesRequest(DateTime? Before = null, int Limit = 30);
+public record ChatMessagesRequest(DateTime? Before = null, Guid? BeforeId = null, int Limit = 30);
 public record SendChatMessageBody(string Type, string? Text, Guid? ProductId, Guid? OrderId);

@@ -69,6 +69,22 @@ public class SendMyImageCommandHandlerTests
     }
 
     [Fact]
+    public async Task Handle_Should_Fail_When_UploadedBytesAreNotARealImage_DespiteClaimedPngContentType()
+    {
+        // The handler itself only checks the client-supplied Content-Type header; the real magic-byte
+        // sniffing (SVG/HTML bytes rejected regardless of the claimed Content-Type/filename) happens one
+        // layer down, in LocalImageStorage/CloudinaryImageStorage via IMediaStorage.UploadImageAsync.
+        // This verifies the handler maps that storage-layer rejection to ChatErrors.InvalidImage.
+        var (handler, deps) = BuildHandler();
+        deps.Media.ShouldFail = true;
+
+        var result = await handler.Handle(Build(contentType: "image/png"), default);
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Should().Be(ChatErrors.InvalidImage);
+    }
+
+    [Fact]
     public async Task Handle_Should_CreateImageMessage_When_Valid()
     {
         var (handler, deps) = BuildHandler();

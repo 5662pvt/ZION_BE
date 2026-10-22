@@ -18,7 +18,7 @@ public class RemoveProductImageCommandHandlerTests
     {
         public int DeleteCallCount { get; private set; }
 
-        public Task<Result<StoredImage>> UploadAsync(Stream content, string fileName, string contentType, CancellationToken ct)
+        public Task<Result<StoredImage>> UploadAsync(Stream content, string fileName, string contentType, CancellationToken ct, string folder = "products")
             => Task.FromResult(Result.Success(new StoredImage("https://cdn.test/image.png", "public-id-1")));
 
         public Task DeleteAsync(string publicId, CancellationToken ct)

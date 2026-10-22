@@ -1,4 +1,5 @@
 using MediatR;
+using Microsoft.EntityFrameworkCore;
 using ZIONShop.Chat.Application.DTOs;
 using ZIONShop.Chat.Application.Interfaces;
 using ZIONShop.Chat.Application.Mappings;
@@ -17,6 +18,7 @@ public class SendStaffImageCommandHandler : IRequestHandler<SendStaffImageComman
     private const long MaxImageBytes = 5 * 1024 * 1024;
     private static readonly string[] AllowedContentTypes = { "image/jpeg", "image/png", "image/webp" };
     private const string Folder = "chat";
+    private const int MaxSaveAttempts = 3;
 
     private readonly IConversationRepository _conversations;
     private readonly IChatMessageRepository _messages;
@@ -68,7 +70,24 @@ public class SendStaffImageCommandHandler : IRequestHandler<SendStaffImageComman
             productId: null, orderId: null, cardJson: null, previewText, now);
 
         await _messages.AddAsync(message, cancellationToken);
-        await _uow.SaveChangesAsync(cancellationToken);
+
+        for (var attempt = 1; attempt <= MaxSaveAttempts; attempt++)
+        {
+            try
+            {
+                await _uow.SaveChangesAsync(cancellationToken);
+                break;
+            }
+            catch (DbUpdateConcurrencyException) when (attempt < MaxSaveAttempts)
+            {
+                // Another concurrent send/mark-read on this conversation beat us to it -- re-fetch fresh
+                // state and re-apply only the counter/preview update; the ChatMessage row stays as-is.
+                _uow.Detach(conversation);
+                conversation = await _conversations.GetByIdAsync(request.ConversationId, cancellationToken)
+                    ?? throw new InvalidOperationException("Conversation disappeared during a concurrent retry.");
+                conversation.ApplyMessageSummary(ChatSenderRole.Staff, previewText, now);
+            }
+        }
 
         var dto = message.ToDto(conversation.CustomerName);
 

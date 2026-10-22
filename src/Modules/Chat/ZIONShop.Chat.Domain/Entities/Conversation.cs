@@ -53,15 +53,22 @@ public class Conversation : BaseEntity
         DateTime now)
     {
         var message = ChatMessage.Create(Id, senderId, senderRole, type, text, imageUrl, imagePublicId, productId, orderId, cardJson, now);
+        ApplyMessageSummary(senderRole, previewText, now);
+        return message;
+    }
 
+    /// <summary>Updates the denormalized summary/unread counters only, without creating a message row --
+    /// used to re-apply the counter update on a freshly re-fetched <see cref="Conversation"/> instance
+    /// after an optimistic-concurrency conflict on <see cref="LastMessageAt"/>'s row, without re-inserting
+    /// the <see cref="ChatMessage"/> that <see cref="AddMessage"/> already created for the first attempt.</summary>
+    public void ApplyMessageSummary(ChatSenderRole senderRole, string previewText, DateTime now)
+    {
         LastMessageAt = now;
         LastMessagePreview = previewText;
         LastMessageSender = senderRole;
 
         if (senderRole == ChatSenderRole.Customer) StaffUnread++;
         else CustomerUnread++;
-
-        return message;
     }
 
     public void MarkReadBy(ChatSenderRole side, DateTime now)
