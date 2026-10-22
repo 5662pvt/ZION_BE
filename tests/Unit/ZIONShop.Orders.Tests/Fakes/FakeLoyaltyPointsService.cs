@@ -7,7 +7,7 @@ public class FakeLoyaltyPointsService : ILoyaltyPointsService
     private LoyaltyRedemption? _nextRedemption;
     private LoyaltyError? _nextError;
 
-    public List<(Guid UserId, Guid OrderId, decimal EligibleAmount)> ReserveCalls { get; } = new();
+    public List<(Guid UserId, Guid OrderId, decimal EligibleAmount, string? OrderCode)> ReserveCalls { get; } = new();
     public List<Guid> ReleasedOrderIds { get; } = new();
 
     public FakeLoyaltyPointsService WithRedemption(int points, decimal discountAmount)
@@ -26,9 +26,9 @@ public class FakeLoyaltyPointsService : ILoyaltyPointsService
 
     public Task<int> QuoteAsync(Guid userId, decimal eligibleAmount, CancellationToken ct = default) => Task.FromResult(0);
 
-    public Task<(LoyaltyRedemption? Redemption, LoyaltyError? Error)> ReserveAsync(Guid userId, Guid orderId, decimal eligibleAmount, CancellationToken ct = default)
+    public Task<(LoyaltyRedemption? Redemption, LoyaltyError? Error)> ReserveAsync(Guid userId, Guid orderId, decimal eligibleAmount, string? orderCode = null, CancellationToken ct = default)
     {
-        ReserveCalls.Add((userId, orderId, eligibleAmount));
+        ReserveCalls.Add((userId, orderId, eligibleAmount, orderCode));
         if (_nextError is not null) return Task.FromResult<(LoyaltyRedemption?, LoyaltyError?)>((null, _nextError));
         if (_nextRedemption is not null)
             return Task.FromResult<(LoyaltyRedemption?, LoyaltyError?)>((_nextRedemption with { OrderId = orderId }, null));

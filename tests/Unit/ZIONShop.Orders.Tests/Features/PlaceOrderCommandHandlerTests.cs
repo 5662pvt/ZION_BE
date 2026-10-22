@@ -969,7 +969,7 @@ public class PlaceOrderCommandHandlerTests
         var result = await handler.Handle(new PlaceOrderCommand(userId, addressId, "COD", null, "SALE10", UsePoints: true), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
-        loyalty.ReserveCalls.Should().ContainSingle(c => c.UserId == userId && c.OrderId == result.Value.Order.Id && c.EligibleAmount == 180000m); // 200000 - 20000 Items discount
+        loyalty.ReserveCalls.Should().ContainSingle(c => c.UserId == userId && c.OrderId == result.Value.Order.Id && c.EligibleAmount == 180000m && c.OrderCode == result.Value.Order.Code); // 200000 - 20000 Items discount
         result.Value.Order.Subtotal.Should().Be(200000m);
         result.Value.Order.DiscountAmount.Should().Be(20000m);
         result.Value.Order.Total.Should().Be(209000m); // 200000 - 20000 - 1000 + 30000

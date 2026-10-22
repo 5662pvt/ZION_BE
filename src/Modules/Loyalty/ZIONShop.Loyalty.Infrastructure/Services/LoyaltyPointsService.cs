@@ -68,7 +68,7 @@ public class LoyaltyPointsService : ILoyaltyPointsService, ILoyaltyMutationServi
         return ComputeUsable(balance, eligibleAmount);
     }
 
-    public async Task<(LoyaltyRedemption? Redemption, LoyaltyError? Error)> ReserveAsync(Guid userId, Guid orderId, decimal eligibleAmount, CancellationToken ct = default)
+    public async Task<(LoyaltyRedemption? Redemption, LoyaltyError? Error)> ReserveAsync(Guid userId, Guid orderId, decimal eligibleAmount, string? orderCode = null, CancellationToken ct = default)
     {
         var existing = await _reservations.GetByOrderIdAsync(orderId, ct);
         if (existing is not null)
@@ -100,7 +100,7 @@ public class LoyaltyPointsService : ILoyaltyPointsService, ILoyaltyMutationServi
             var reservation = PointReservation.Create(orderId, userId, allocated, allocated, allocations, now);
             await _reservations.AddAsync(reservation, ct);
 
-            var code = await GetOrderCodeAsync(orderId, ct);
+            var code = orderCode ?? await GetOrderCodeAsync(orderId, ct);
             var transaction = PointTransaction.Create(userId, PointTransactionType.Spend, -allocated, account.Balance, orderId, $"Dùng Xu cho đơn #{code}", now);
             await _transactions.AddAsync(transaction, ct);
 

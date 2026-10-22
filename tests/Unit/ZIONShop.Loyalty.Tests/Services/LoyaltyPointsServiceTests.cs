@@ -192,6 +192,23 @@ public class LoyaltyPointsServiceTests
     }
 
     [Fact]
+    public async Task ReserveAsync_Should_UsePassedOrderCodeInSpendDescription_When_OrderCodeGiven()
+    {
+        var dbName = Guid.NewGuid().ToString("N");
+        var userId = Guid.NewGuid();
+        var orderId = Guid.NewGuid();
+        var now = DateTimeOffset.UtcNow;
+        using var db = CreateDb(dbName);
+        var service = CreateService(db, now);
+        await service.EarnAsync(userId, 100, PointLotSource.AdminAdjust, Guid.NewGuid().ToString(), null, null, "seed");
+
+        await service.ReserveAsync(userId, orderId, 1000m, "ZS261022ON8H");
+
+        var transaction = db.PointTransactions.Single(t => t.OrderId == orderId);
+        transaction.Description.Should().Be("Dùng Xu cho đơn #ZS261022ON8H");
+    }
+
+    [Fact]
     public async Task ReserveAsync_Should_ReturnSameRedemption_When_CalledTwiceForSameOrder()
     {
         var dbName = Guid.NewGuid().ToString("N");

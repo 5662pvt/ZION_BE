@@ -200,7 +200,7 @@ public class PlaceOrderCommandHandler : IRequestHandler<PlaceOrderCommand, Resul
             if (request.UsePoints)
             {
                 var eligible = order.Subtotal - (order.DiscountTarget == "Items" ? order.DiscountAmount : 0m);
-                var (redemption, pointsError) = await _loyalty.ReserveAsync(request.UserId, order.Id, eligible, cancellationToken);
+                var (redemption, pointsError) = await _loyalty.ReserveAsync(request.UserId, order.Id, eligible, order.Code, cancellationToken);
                 if (pointsError is not null)
                 {
                     // Points reservation is attempted after coupon/flash but before gifts, so only those two

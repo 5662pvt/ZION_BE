@@ -12,8 +12,10 @@ public interface ILoyaltyPointsService
     Task<int> QuoteAsync(Guid userId, decimal eligibleAmount, CancellationToken ct = default);
 
     /// <summary>Reserves min(balance, cap) points for the order. Idempotent per orderId (returns the existing reservation).
-    /// Returns (null, null) when 0 points are usable (nothing reserved).</summary>
-    Task<(LoyaltyRedemption? Redemption, LoyaltyError? Error)> ReserveAsync(Guid userId, Guid orderId, decimal eligibleAmount, CancellationToken ct = default);
+    /// Returns (null, null) when 0 points are usable (nothing reserved). Pass <paramref name="orderCode"/> when the
+    /// caller already has it (e.g. the order was just created) so the Spend transaction description shows the real
+    /// order code instead of looking it up (which would fail before the order is persisted).</summary>
+    Task<(LoyaltyRedemption? Redemption, LoyaltyError? Error)> ReserveAsync(Guid userId, Guid orderId, decimal eligibleAmount, string? orderCode = null, CancellationToken ct = default);
 
     /// <summary>Idempotent; no-op if nothing reserved or already released/committed-and-refunded.</summary>
     Task ReleaseAsync(Guid orderId, CancellationToken ct = default);

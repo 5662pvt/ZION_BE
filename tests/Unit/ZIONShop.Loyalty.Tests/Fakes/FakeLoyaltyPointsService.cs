@@ -10,7 +10,7 @@ internal sealed class FakeLoyaltyPointsService : ILoyaltyPointsService
 
     public Task<int> QuoteAsync(Guid userId, decimal eligibleAmount, CancellationToken ct = default) => Task.FromResult(0);
 
-    public Task<(LoyaltyRedemption? Redemption, LoyaltyError? Error)> ReserveAsync(Guid userId, Guid orderId, decimal eligibleAmount, CancellationToken ct = default) =>
+    public Task<(LoyaltyRedemption? Redemption, LoyaltyError? Error)> ReserveAsync(Guid userId, Guid orderId, decimal eligibleAmount, string? orderCode = null, CancellationToken ct = default) =>
         Task.FromResult<(LoyaltyRedemption?, LoyaltyError?)>((null, null));
 
     public Task ReleaseAsync(Guid orderId, CancellationToken ct = default)
