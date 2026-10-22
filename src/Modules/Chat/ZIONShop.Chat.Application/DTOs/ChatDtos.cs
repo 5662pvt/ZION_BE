@@ -28,8 +28,7 @@ public record ChatMessageDto(
     string? ImageUrl,
     ChatProductCardDto? Product,
     ChatOrderCardDto? Order,
-    DateTime CreatedAt,
-    string? StaffEmail = null);
+    DateTime CreatedAt);
 
 public record ChatMessagePageDto(IReadOnlyList<ChatMessageDto> Items, bool HasMore);
 

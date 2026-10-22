@@ -9,6 +9,7 @@ using ZIONShop.Loyalty.Infrastructure.Persistence;
 using ZIONShop.Orders.Infrastructure.BackgroundServices;
 using ZIONShop.Orders.Infrastructure.Persistence;
 using ZIONShop.Payments.Infrastructure.Persistence;
+using ZIONShop.Products.Infrastructure.Persistence;
 using ZIONShop.Promotions.Infrastructure.BackgroundServices;
 using ZIONShop.Promotions.Infrastructure.Persistence;
 using ZIONShop.Reviews.Infrastructure.Persistence;
@@ -33,6 +34,7 @@ public class BackgroundProcessingTests
     private static readonly Type[] GatedHostedServiceTypes =
     {
         typeof(OutboxPublisherService<InventoryDbContext>),
+        typeof(OutboxPublisherService<ProductsDbContext>),
         typeof(OutboxPublisherService<PromotionsDbContext>),
         typeof(OutboxPublisherService<OrdersDbContext>),
         typeof(OutboxPublisherService<PaymentsDbContext>),

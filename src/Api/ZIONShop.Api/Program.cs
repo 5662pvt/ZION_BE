@@ -307,7 +307,6 @@ uploadsContentTypeProvider.Mappings[".jpg"] = "image/jpeg";
 uploadsContentTypeProvider.Mappings[".jpeg"] = "image/jpeg";
 uploadsContentTypeProvider.Mappings[".png"] = "image/png";
 uploadsContentTypeProvider.Mappings[".webp"] = "image/webp";
-uploadsContentTypeProvider.Mappings[".gif"] = "image/gif";
 
 app.UseStaticFiles(new StaticFileOptions
 {

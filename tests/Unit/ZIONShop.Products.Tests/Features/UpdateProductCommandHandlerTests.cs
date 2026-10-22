@@ -1,5 +1,6 @@
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
+using ZIONShop.Contracts.Products;
 using ZIONShop.Products.Application.Features.UpdateProduct;
 using ZIONShop.Products.Domain.Entities;
 using ZIONShop.Products.Domain.ValueObjects;
@@ -65,5 +66,36 @@ public class UpdateProductCommandHandlerTests
         result.IsSuccess.Should().BeTrue();
         result.Value.Name.Should().Be("Renamed Shirt");
         result.Value.Price.Should().Be(10m);
+    }
+
+    [Fact]
+    public async Task Handle_Should_AddExactlyOneProductUpdatedOutboxEvent_When_UpdateSucceeds()
+    {
+        var options = new DbContextOptionsBuilder<ProductsDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
+            .Options;
+        var db = new ProductsDbContext(options);
+        var products = new ProductRepository(db);
+        var categories = new CategoryRepository(db);
+
+        var product = Product.CreateDraft("Shirt", "shirt", null, null, null);
+        product.SetVariants(
+            new[] { new ProductOptionInput("Size", new[] { "S" }) },
+            new[] { new ProductVariantInput(null, "S", null, "SKU-UPD3", 10m, "VND", true, null) });
+        product.MarkCreated();
+        await db.Products.AddAsync(product);
+        await db.SaveChangesAsync();
+
+        var fakeUow = new FakeProductsUnitOfWork();
+        var handler = new UpdateProductCommandHandler(products, categories, fakeUow, new FakeDistributedCacheService());
+
+        var result = await handler.Handle(new UpdateProductCommand(product.Id, "Renamed Shirt", "new desc", null, null, null, "Brand"), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        fakeUow.OutboxEvents.Should().ContainSingle();
+        var evt = fakeUow.OutboxEvents.Single().Should().BeOfType<ProductUpdatedIntegrationEvent>().Subject;
+        evt.ProductId.Should().Be(product.Id);
+        evt.Name.Should().Be("Renamed Shirt");
+        evt.Variants.Should().ContainSingle(v => v.Sku == "SKU-UPD3" && v.Label == "S");
     }
 }

@@ -3,6 +3,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using ZIONShop.Contracts.Inventory;
 using ZIONShop.Contracts.Orders;
+using ZIONShop.Contracts.Products;
 using ZIONShop.EventBus.DependencyInjection;
 using ZIONShop.EventBus.Inbox;
 using ZIONShop.EventBus.Outbox;
@@ -43,6 +44,7 @@ public static class InventoryInfrastructureExtensions
         services.AddIntegrationEventHandler<OrderCancelledIntegrationEvent, OrderCancelledIntegrationEventHandler, InventoryDbContext>();
         services.AddIntegrationEventHandler<OrderReservationReleaseRequestedIntegrationEvent, OrderReservationReleaseRequestedIntegrationEventHandler, InventoryDbContext>();
         services.AddIntegrationEventHandler<OrderReturnReceivedIntegrationEvent, OrderReturnReceivedIntegrationEventHandler, InventoryDbContext>();
+        services.AddIntegrationEventHandler<ProductUpdatedIntegrationEvent, ProductUpdatedIntegrationEventHandler, InventoryDbContext>();
 
         return services;
     }

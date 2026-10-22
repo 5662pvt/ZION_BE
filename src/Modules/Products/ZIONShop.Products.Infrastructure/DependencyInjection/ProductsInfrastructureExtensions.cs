@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using ZIONShop.Contracts.Media;
 using ZIONShop.Contracts.Products;
+using ZIONShop.EventBus.Outbox;
 using ZIONShop.Products.Application.Interfaces;
 using ZIONShop.Products.Application.Options;
 using ZIONShop.Products.Domain.Repositories;
@@ -29,6 +30,8 @@ public static class ProductsInfrastructureExtensions
         services.AddScoped<IProductPriceLookup, ProductPriceLookup>();
         services.AddScoped<IProductCatalogReader, ProductCatalogReader>();
         services.AddScoped<ICategoryLookup, CategoryLookup>();
+
+        services.AddOutbox<ProductsDbContext>(configuration);
 
         var cloudinarySection = configuration.GetSection(CloudinaryOptions.SectionName);
         services.Configure<CloudinaryOptions>(cloudinarySection);

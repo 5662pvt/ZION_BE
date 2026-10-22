@@ -1,5 +1,6 @@
 using MediatR;
 using ZIONShop.Caching;
+using ZIONShop.Contracts.Products;
 using ZIONShop.Products.Application.Caching;
 using ZIONShop.Products.Application.DTOs;
 using ZIONShop.Products.Application.Interfaces;
@@ -44,6 +45,10 @@ public class UpdateProductCommandHandler : IRequestHandler<UpdateProductCommand,
         if (updateResult.IsFailure) return Result.Failure<ProductDto>(updateResult.Error);
 
         _products.Update(product);
+        _uow.AddOutboxEvent(new ProductUpdatedIntegrationEvent(
+            product.Id,
+            product.Name,
+            product.Variants.Select(v => new ProductVariantSnapshot(v.Id, v.Sku.Value, v.Label)).ToList()));
         await _uow.SaveChangesAsync(cancellationToken);
 
         await _cache.RemoveManyAsync(ProductCacheKeys.DetailById(product.Id), ProductCacheKeys.DetailBySlug(product.Slug));

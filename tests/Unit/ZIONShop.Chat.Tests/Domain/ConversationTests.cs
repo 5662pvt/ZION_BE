@@ -71,6 +71,45 @@ public class ConversationTests
     }
 
     [Fact]
+    public void IsAlreadyReadBy_Should_BeTrue_When_NoMessagesYet()
+    {
+        var conversation = CreateConversation();
+
+        conversation.IsAlreadyReadBy(ChatSenderRole.Customer).Should().BeTrue();
+        conversation.IsAlreadyReadBy(ChatSenderRole.Staff).Should().BeTrue();
+    }
+
+    [Fact]
+    public void IsAlreadyReadBy_Should_BeFalse_When_UnreadMessageExists()
+    {
+        var conversation = CreateConversation();
+        conversation.AddMessage(Guid.NewGuid(), ChatSenderRole.Staff, ChatMessageType.Text, "hi", null, null, null, null, null, "hi", DateTime.UtcNow);
+
+        conversation.IsAlreadyReadBy(ChatSenderRole.Customer).Should().BeFalse();
+    }
+
+    [Fact]
+    public void IsAlreadyReadBy_Should_BeTrue_When_AlreadyReadUpToLastMessage()
+    {
+        var conversation = CreateConversation();
+        conversation.AddMessage(Guid.NewGuid(), ChatSenderRole.Staff, ChatMessageType.Text, "hi", null, null, null, null, null, "hi", DateTime.UtcNow);
+        conversation.MarkReadBy(ChatSenderRole.Customer, DateTime.UtcNow);
+
+        conversation.IsAlreadyReadBy(ChatSenderRole.Customer).Should().BeTrue();
+    }
+
+    [Fact]
+    public void IsAlreadyReadBy_Should_BeFalse_When_NewMessageArrivedAfterLastRead()
+    {
+        var conversation = CreateConversation();
+        conversation.AddMessage(Guid.NewGuid(), ChatSenderRole.Staff, ChatMessageType.Text, "hi", null, null, null, null, null, "hi", DateTime.UtcNow);
+        conversation.MarkReadBy(ChatSenderRole.Customer, DateTime.UtcNow);
+        conversation.AddMessage(Guid.NewGuid(), ChatSenderRole.Staff, ChatMessageType.Text, "again", null, null, null, null, null, "again", DateTime.UtcNow.AddMinutes(1));
+
+        conversation.IsAlreadyReadBy(ChatSenderRole.Customer).Should().BeFalse();
+    }
+
+    [Fact]
     public void MarkReadBy_Should_NotAffectTheOtherSidesCounters()
     {
         var conversation = CreateConversation();

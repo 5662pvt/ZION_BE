@@ -14,5 +14,6 @@
     <ProjectReference Include="..\ZIONShop.Products.Application\ZIONShop.Products.Application.csproj" />
     <ProjectReference Include="..\ZIONShop.Products.Domain\ZIONShop.Products.Domain.csproj" />
     <ProjectReference Include="..\..\..\BuildingBlocks\ZIONShop.Contracts\ZIONShop.Contracts.csproj" />
+    <ProjectReference Include="..\..\..\BuildingBlocks\ZIONShop.EventBus\ZIONShop.EventBus.csproj" />
   </ItemGroup>
 </Project>

@@ -29,7 +29,7 @@ public static class ChatMappingExtensions
 
     /// <summary>Hydrates Product/Order cards from the JSON snapshot stored at send time -- no call back
     /// to Contracts readers is needed to list historical messages.</summary>
-    public static ChatMessageDto ToDto(this ChatMessage message, string customerName, string? staffEmail = null)
+    public static ChatMessageDto ToDto(this ChatMessage message, string customerName)
     {
         ChatProductCardDto? product = null;
         ChatOrderCardDto? order = null;
@@ -53,7 +53,6 @@ public static class ChatMappingExtensions
             message.ImageUrl,
             product,
             order,
-            message.CreatedAt,
-            message.SenderRole == ChatSenderRole.Staff ? staffEmail : null);
+            message.CreatedAt);
     }
 }

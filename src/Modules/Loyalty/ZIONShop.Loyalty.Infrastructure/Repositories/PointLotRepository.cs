@@ -36,6 +36,11 @@ public class PointLotRepository : IPointLotRepository
             .Take(batchSize)
             .ToListAsync(cancellationToken);
 
+    public Task<int> GetExpiredRemainingSumAsync(Guid userId, DateTime now, CancellationToken cancellationToken = default) =>
+        _db.PointLots
+            .Where(l => l.UserId == userId && l.Remaining > 0 && l.ExpiresAt <= now)
+            .SumAsync(l => l.Remaining, cancellationToken);
+
     public async Task AddAsync(PointLot lot, CancellationToken cancellationToken = default) =>
         await _db.PointLots.AddAsync(lot, cancellationToken);
 

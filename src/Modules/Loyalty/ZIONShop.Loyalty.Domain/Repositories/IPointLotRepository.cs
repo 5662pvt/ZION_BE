@@ -18,6 +18,10 @@ public interface IPointLotRepository
     /// <summary>Batch of lots with Remaining &gt; 0 whose ExpiresAt has passed, for the expiry scan.</summary>
     Task<List<PointLot>> GetExpiredBatchAsync(DateTime now, int batchSize, CancellationToken cancellationToken = default);
 
+    /// <summary>Sum of Remaining across a user's lots with Remaining &gt; 0 whose ExpiresAt has passed but the
+    /// expiry scan hasn't zeroed out yet -- used to compute an effective (not-yet-caught-up) balance for GET paths.</summary>
+    Task<int> GetExpiredRemainingSumAsync(Guid userId, DateTime now, CancellationToken cancellationToken = default);
+
     Task AddAsync(PointLot lot, CancellationToken cancellationToken = default);
 
     void Update(PointLot lot);

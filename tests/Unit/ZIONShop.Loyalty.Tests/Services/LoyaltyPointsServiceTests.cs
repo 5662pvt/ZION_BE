@@ -227,6 +227,32 @@ public class LoyaltyPointsServiceTests
     }
 
     [Fact]
+    public async Task ReserveAsync_Should_ReturnNothing_When_EffectiveBalanceIsZeroDueToExpiredLot()
+    {
+        var dbName = Guid.NewGuid().ToString("N");
+        var userId = Guid.NewGuid();
+        var orderId = Guid.NewGuid();
+        var now = DateTimeOffset.UtcNow;
+        using var db = CreateDb(dbName);
+
+        // Lot already past ExpiresAt, but the hourly expiry scan hasn't zeroed it out yet -- account.Balance
+        // still counts it, so the guard must use the same effective balance QuoteAsync/GetBalanceAsync show.
+        var expiredLot = PointLot.Create(userId, PointLotSource.AdminAdjust, Guid.NewGuid().ToString(), 100, now.UtcDateTime.AddDays(-1), now.UtcDateTime.AddMinutes(-1));
+        db.PointLots.Add(expiredLot);
+        var account = PointAccount.Create(userId);
+        account.Increase(100);
+        db.PointAccounts.Add(account);
+        await db.SaveChangesAsync();
+
+        var service = CreateService(db, now);
+
+        var (redemption, error) = await service.ReserveAsync(userId, orderId, 1000m);
+
+        redemption.Should().BeNull();
+        error.Should().BeNull();
+    }
+
+    [Fact]
     public async Task ReleaseAsync_Should_GiveBackPointsToLiveLot_When_LotStillFarFromExpiry()
     {
         var dbName = Guid.NewGuid().ToString("N");
@@ -327,6 +353,30 @@ public class LoyaltyPointsServiceTests
     }
 
     [Fact]
+    public async Task AdminAdjustAsync_Should_Fail_When_NegativeDeltaExceedsEffectiveBalanceDueToExpiredLot()
+    {
+        var dbName = Guid.NewGuid().ToString("N");
+        var userId = Guid.NewGuid();
+        var now = DateTimeOffset.UtcNow;
+        using var db = CreateDb(dbName);
+
+        // account.Balance is 100, but it's all sitting in an expired-unprocessed lot -- effective balance is 0.
+        var expiredLot = PointLot.Create(userId, PointLotSource.AdminAdjust, Guid.NewGuid().ToString(), 100, now.UtcDateTime.AddDays(-1), now.UtcDateTime.AddMinutes(-1));
+        db.PointLots.Add(expiredLot);
+        var account = PointAccount.Create(userId);
+        account.Increase(100);
+        db.PointAccounts.Add(account);
+        await db.SaveChangesAsync();
+
+        var service = CreateService(db, now);
+
+        var result = await service.AdminAdjustAsync(userId, -50, "test", Guid.NewGuid());
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Code.Should().Be("Loyalty.InsufficientPoints");
+    }
+
+    [Fact]
     public async Task AdminAdjustAsync_Should_IncreaseBalance_When_PositiveDelta()
     {
         var dbName = Guid.NewGuid().ToString("N");
@@ -355,6 +405,48 @@ public class LoyaltyPointsServiceTests
 
         result.IsSuccess.Should().BeTrue();
         (await service.GetBalanceAsync(userId)).Should().Be(400);
+    }
+
+    [Fact]
+    public async Task GetBalanceAsync_Should_ExcludeExpiredLot_When_ExpiryScanHasNotRunYet()
+    {
+        var dbName = Guid.NewGuid().ToString("N");
+        var userId = Guid.NewGuid();
+        var now = DateTimeOffset.UtcNow;
+        using var db = CreateDb(dbName);
+
+        // Lot already past ExpiresAt, but the hourly expiry scan hasn't zeroed it out (or decreased the
+        // account balance) yet -- Balance on the account row still counts it.
+        var expiredLot = PointLot.Create(userId, PointLotSource.AdminAdjust, Guid.NewGuid().ToString(), 100, now.UtcDateTime.AddDays(-1), now.UtcDateTime.AddMinutes(-1));
+        db.PointLots.Add(expiredLot);
+        var account = PointAccount.Create(userId);
+        account.Increase(100);
+        db.PointAccounts.Add(account);
+        await db.SaveChangesAsync();
+
+        var service = CreateService(db, now);
+
+        (await service.GetBalanceAsync(userId)).Should().Be(0);
+    }
+
+    [Fact]
+    public async Task QuoteAsync_Should_ExcludeExpiredLot_When_ExpiryScanHasNotRunYet()
+    {
+        var dbName = Guid.NewGuid().ToString("N");
+        var userId = Guid.NewGuid();
+        var now = DateTimeOffset.UtcNow;
+        using var db = CreateDb(dbName);
+
+        var expiredLot = PointLot.Create(userId, PointLotSource.AdminAdjust, Guid.NewGuid().ToString(), 100, now.UtcDateTime.AddDays(-1), now.UtcDateTime.AddMinutes(-1));
+        db.PointLots.Add(expiredLot);
+        var account = PointAccount.Create(userId);
+        account.Increase(100);
+        db.PointAccounts.Add(account);
+        await db.SaveChangesAsync();
+
+        var service = CreateService(db, now);
+
+        (await service.QuoteAsync(userId, 1000m)).Should().Be(0);
     }
 
     [Fact]

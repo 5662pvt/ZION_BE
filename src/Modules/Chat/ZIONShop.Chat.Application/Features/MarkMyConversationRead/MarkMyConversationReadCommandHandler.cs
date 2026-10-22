@@ -30,6 +30,9 @@ public class MarkMyConversationReadCommandHandler : IRequestHandler<MarkMyConver
     public async Task<Result<ConversationDto>> Handle(MarkMyConversationReadCommand request, CancellationToken cancellationToken)
     {
         var conversation = await _provisioning.GetOrCreateAsync(request.UserId, cancellationToken);
+        if (conversation.IsAlreadyReadBy(ChatSenderRole.Customer))
+            return Result.Success(conversation.ToDto());
+
         var now = _time.GetUtcNow().UtcDateTime;
 
         for (var attempt = 1; attempt <= MaxSaveAttempts; attempt++)

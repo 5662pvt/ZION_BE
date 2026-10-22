@@ -59,7 +59,8 @@ public class LoyaltyPointsService : ILoyaltyPointsService, ILoyaltyMutationServi
     public async Task<int> GetBalanceAsync(Guid userId, CancellationToken ct = default)
     {
         var account = await _accounts.GetByUserIdAsync(userId, ct);
-        return account?.Balance ?? 0;
+        var now = _timeProvider.GetUtcNow().UtcDateTime;
+        return await GetEffectiveBalanceAsync(userId, account?.Balance ?? 0, now, ct);
     }
 
     public async Task<int> QuoteAsync(Guid userId, decimal eligibleAmount, CancellationToken ct = default)
@@ -84,10 +85,11 @@ public class LoyaltyPointsService : ILoyaltyPointsService, ILoyaltyMutationServi
         for (var attempt = 1; attempt <= MaxAttempts; attempt++)
         {
             var account = await _accounts.GetByUserIdAsync(userId, ct);
-            var points = ComputeUsable(account?.Balance ?? 0, eligibleAmount);
+            var now = _timeProvider.GetUtcNow().UtcDateTime;
+            var effectiveBalance = await GetEffectiveBalanceAsync(userId, account?.Balance ?? 0, now, ct);
+            var points = ComputeUsable(effectiveBalance, eligibleAmount);
             if (points <= 0) return (null, null);
 
-            var now = _timeProvider.GetUtcNow().UtcDateTime;
             var activeLots = await _lots.GetActiveForUserAsync(userId, now, ct);
             var (allocations, allocated) = AllocateFifo(activeLots, points);
             if (allocated <= 0) return (null, null);
@@ -291,7 +293,8 @@ public class LoyaltyPointsService : ILoyaltyPointsService, ILoyaltyMutationServi
             else
             {
                 var amount = -delta;
-                if (account.Balance < amount) return Result.Failure(LoyaltyErrors.InsufficientPoints);
+                var effectiveBalance = await GetEffectiveBalanceAsync(userId, account.Balance, now, ct);
+                if (effectiveBalance < amount) return Result.Failure(LoyaltyErrors.InsufficientPoints);
 
                 var activeLots = await _lots.GetActiveForUserAsync(userId, now, ct);
                 var (allocations, deducted) = AllocateFifo(activeLots, amount);
@@ -366,6 +369,12 @@ public class LoyaltyPointsService : ILoyaltyPointsService, ILoyaltyMutationServi
                 await _lots.AddAsync(restoreLot, ct);
             }
         }
+    }
+
+    private async Task<int> GetEffectiveBalanceAsync(Guid userId, int balance, DateTime now, CancellationToken ct)
+    {
+        var expiredUnprocessed = await _lots.GetExpiredRemainingSumAsync(userId, now, ct);
+        return Math.Max(0, balance - expiredUnprocessed);
     }
 
     private int ComputeUsable(int balance, decimal eligibleAmount)

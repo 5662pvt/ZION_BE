@@ -40,6 +40,8 @@ public class GetCustomerLoyaltyQueryHandler : IRequestHandler<GetCustomerLoyalty
         var account = await _accounts.GetByUserIdAsync(request.UserId, cancellationToken);
         var expiringSoon = await _lots.GetExpiringSoonAsync(request.UserId, now, now + ExpiringSoonWindow, cancellationToken);
         var activeLots = await _lots.GetActiveForUserAsync(request.UserId, now, cancellationToken);
+        var expiredUnprocessed = await _lots.GetExpiredRemainingSumAsync(request.UserId, now, cancellationToken);
+        var effectiveBalance = Math.Max(0, (account?.Balance ?? 0) - expiredUnprocessed);
 
         var recentTransactions = _transactions.Query()
             .Where(t => t.UserId == request.UserId)
@@ -50,7 +52,7 @@ public class GetCustomerLoyaltyQueryHandler : IRequestHandler<GetCustomerLoyalty
 
         var options = _options.Value;
         var summary = new LoyaltySummaryDto(
-            account?.Balance ?? 0,
+            effectiveBalance,
             expiringSoon.Sum(l => l.Remaining),
             expiringSoon.Count > 0 ? expiringSoon.Min(l => l.ExpiresAt) : null,
             options.MaxRedeemPercent,

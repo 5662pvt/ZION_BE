@@ -1,5 +1,6 @@
 using MediatR;
 using ZIONShop.Caching;
+using ZIONShop.Contracts.Products;
 using ZIONShop.Products.Application.Caching;
 using ZIONShop.Products.Application.DTOs;
 using ZIONShop.Products.Application.Exceptions;
@@ -52,6 +53,11 @@ public class SetVariantsCommandHandler : IRequestHandler<SetVariantsCommand, Res
         // registered explicitly, same as AddImage.
         foreach (var variant in product.Variants.Where(v => !variantIdsBefore.Contains(v.Id)))
             _products.AddVariant(variant);
+
+        _uow.AddOutboxEvent(new ProductUpdatedIntegrationEvent(
+            product.Id,
+            product.Name,
+            product.Variants.Select(v => new ProductVariantSnapshot(v.Id, v.Sku.Value, v.Label)).ToList()));
 
         try
         {

@@ -56,4 +56,74 @@ public class MarkReadCommandHandlerTests
         result.Value.StaffUnread.Should().Be(0);
         realtime.UserPublishes.Should().ContainSingle(p => p.UserId == customerId && p.Event == "chat:read");
     }
+
+    [Fact]
+    public async Task MarkMyConversationRead_Should_NotPublish_When_NothingNewToRead()
+    {
+        var db = ChatTestDb.Create();
+        var conversations = new ConversationRepository(db);
+        var contacts = new FakeUserContactReader();
+        var realtime = new FakeRealtimeEventPublisher();
+        var time = new FakeTimeProvider(DateTimeOffset.UtcNow);
+        var provisioning = new ConversationProvisioningService(conversations, contacts, db, time);
+
+        var userId = Guid.NewGuid();
+        var conversation = Conversation.Create(userId, "Nguyen Van A", "a@test.local", DateTime.UtcNow);
+        db.Conversations.Add(conversation);
+        await db.SaveChangesAsync();
+
+        var handler = new MarkMyConversationReadCommandHandler(provisioning, db, realtime, time);
+        var result = await handler.Handle(new MarkMyConversationReadCommand(userId), default);
+
+        result.IsSuccess.Should().BeTrue();
+        realtime.StaffPublishes.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task MarkMyConversationRead_Should_NotPublishAgain_When_CalledTwiceInARow()
+    {
+        var db = ChatTestDb.Create();
+        var conversations = new ConversationRepository(db);
+        var contacts = new FakeUserContactReader();
+        var realtime = new FakeRealtimeEventPublisher();
+        var now = DateTimeOffset.UtcNow;
+        var time = new FakeTimeProvider(now);
+        var provisioning = new ConversationProvisioningService(conversations, contacts, db, time);
+
+        var userId = Guid.NewGuid();
+        var conversation = Conversation.Create(userId, "Nguyen Van A", "a@test.local", now.UtcDateTime.AddMinutes(-2));
+        conversation.AddMessage(Guid.NewGuid(), ChatSenderRole.Staff, ChatMessageType.Text, "hi", null, null, null, null, null, "hi", now.UtcDateTime.AddMinutes(-1));
+        db.Conversations.Add(conversation);
+        await db.SaveChangesAsync();
+
+        var handler = new MarkMyConversationReadCommandHandler(provisioning, db, realtime, time);
+        await handler.Handle(new MarkMyConversationReadCommand(userId), default);
+        var second = await handler.Handle(new MarkMyConversationReadCommand(userId), default);
+
+        second.IsSuccess.Should().BeTrue();
+        realtime.StaffPublishes.Should().ContainSingle(p => p.Event == "chat:read");
+    }
+
+    [Fact]
+    public async Task MarkConversationReadByStaff_Should_NotPublishAgain_When_CalledTwiceInARow()
+    {
+        var db = ChatTestDb.Create();
+        var conversations = new ConversationRepository(db);
+        var realtime = new FakeRealtimeEventPublisher();
+        var now = DateTimeOffset.UtcNow;
+        var time = new FakeTimeProvider(now);
+
+        var customerId = Guid.NewGuid();
+        var conversation = Conversation.Create(customerId, "Nguyen Van A", "a@test.local", now.UtcDateTime.AddMinutes(-2));
+        conversation.AddMessage(customerId, ChatSenderRole.Customer, ChatMessageType.Text, "hi", null, null, null, null, null, "hi", now.UtcDateTime.AddMinutes(-1));
+        db.Conversations.Add(conversation);
+        await db.SaveChangesAsync();
+
+        var handler = new MarkConversationReadByStaffCommandHandler(conversations, db, realtime, time);
+        await handler.Handle(new MarkConversationReadByStaffCommand(conversation.Id), default);
+        var second = await handler.Handle(new MarkConversationReadByStaffCommand(conversation.Id), default);
+
+        second.IsSuccess.Should().BeTrue();
+        realtime.UserPublishes.Should().ContainSingle(p => p.UserId == customerId && p.Event == "chat:read");
+    }
 }

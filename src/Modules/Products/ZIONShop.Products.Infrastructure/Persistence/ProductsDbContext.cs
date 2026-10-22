@@ -1,5 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
+using ZIONShop.EventBus.Abstractions;
+using ZIONShop.EventBus.Outbox;
 using ZIONShop.Products.Application.Exceptions;
 using ZIONShop.Products.Application.Interfaces;
 using ZIONShop.Products.Domain.Entities;
@@ -14,7 +16,12 @@ public class ProductsDbContext : DbContext, IProductsUnitOfWork
     /// (confirmed against the AddProductVariants migration's CreateIndex call).</summary>
     private const string SkuUniqueIndexName = "IX_ProductVariants_Sku";
 
-    public ProductsDbContext(DbContextOptions<ProductsDbContext> options) : base(options) { }
+    private readonly Outbox<ProductsDbContext> _outbox;
+
+    public ProductsDbContext(DbContextOptions<ProductsDbContext> options) : base(options)
+    {
+        _outbox = new Outbox<ProductsDbContext>(this);
+    }
 
     public DbSet<Product> Products => Set<Product>();
     public DbSet<Category> Categories => Set<Category>();
@@ -25,7 +32,10 @@ public class ProductsDbContext : DbContext, IProductsUnitOfWork
     {
         modelBuilder.HasDefaultSchema(Schema);
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(ProductsDbContext).Assembly);
+        modelBuilder.AddOutbox(Schema);
     }
+
+    public void AddOutboxEvent(IntegrationEvent @event) => _outbox.Add(@event);
 
     /// <summary>Translates a unique-violation on the variant SKU index into an Application-level exception
     /// (<see cref="DuplicateVariantSkuException"/>) so handlers never reference Npgsql — a defensive backstop

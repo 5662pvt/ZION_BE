@@ -30,10 +30,12 @@ public class GetMyLoyaltySummaryQueryHandler : IRequestHandler<GetMyLoyaltySumma
 
         var account = await _accounts.GetByUserIdAsync(request.UserId, cancellationToken);
         var expiringSoon = await _lots.GetExpiringSoonAsync(request.UserId, now, now + ExpiringSoonWindow, cancellationToken);
+        var expiredUnprocessed = await _lots.GetExpiredRemainingSumAsync(request.UserId, now, cancellationToken);
+        var effectiveBalance = Math.Max(0, (account?.Balance ?? 0) - expiredUnprocessed);
 
         var options = _options.Value;
         var dto = new LoyaltySummaryDto(
-            account?.Balance ?? 0,
+            effectiveBalance,
             expiringSoon.Sum(l => l.Remaining),
             expiringSoon.Count > 0 ? expiringSoon.Min(l => l.ExpiresAt) : null,
             options.MaxRedeemPercent,

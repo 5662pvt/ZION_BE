@@ -1,5 +1,6 @@
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
+using ZIONShop.Contracts.Products;
 using ZIONShop.Products.Application.Features.SetVariants;
 using ZIONShop.Products.Domain.Entities;
 using ZIONShop.Products.Domain.ValueObjects;
@@ -144,5 +145,32 @@ public class SetVariantsCommandHandlerTests
         var result = await handler.Handle(cmd, CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Handle_Should_AddExactlyOneProductUpdatedOutboxEvent_When_VariantsChange()
+    {
+        var (db, products, categories, product) = await SeedAsync();
+        var fakeUow = new FakeProductsUnitOfWork();
+        var handler = new SetVariantsCommandHandler(products, categories, fakeUow, new FakeDistributedCacheService());
+
+        var cmd = new SetVariantsCommand(
+            product.Id,
+            new[] { new SetVariantsOptionInput("Size", new[] { "S", "M" }) },
+            new[]
+            {
+                new SetVariantsVariantInput(null, "S", null, "SKU-OUTBOX-S", 50m, "VND", true, null),
+                new SetVariantsVariantInput(null, "M", null, "SKU-OUTBOX-M", 60m, "VND", true, null)
+            });
+
+        var result = await handler.Handle(cmd, CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        fakeUow.OutboxEvents.Should().ContainSingle();
+        var evt = fakeUow.OutboxEvents.Single().Should().BeOfType<ProductUpdatedIntegrationEvent>().Subject;
+        evt.ProductId.Should().Be(product.Id);
+        evt.Name.Should().Be(product.Name);
+        evt.Variants.Should().ContainSingle(v => v.Sku == "SKU-OUTBOX-S" && v.Label == "S");
+        evt.Variants.Should().ContainSingle(v => v.Sku == "SKU-OUTBOX-M" && v.Label == "M");
     }
 }

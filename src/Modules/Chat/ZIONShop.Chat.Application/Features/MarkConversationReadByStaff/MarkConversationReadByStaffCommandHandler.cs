@@ -33,6 +33,9 @@ public class MarkConversationReadByStaffCommandHandler : IRequestHandler<MarkCon
         var conversation = await _conversations.GetByIdAsync(request.ConversationId, cancellationToken);
         if (conversation is null) return Result.Failure<ConversationDto>(ChatErrors.ConversationNotFound);
 
+        if (conversation.IsAlreadyReadBy(ChatSenderRole.Staff))
+            return Result.Success(conversation.ToDto());
+
         var now = _time.GetUtcNow().UtcDateTime;
 
         for (var attempt = 1; attempt <= MaxSaveAttempts; attempt++)

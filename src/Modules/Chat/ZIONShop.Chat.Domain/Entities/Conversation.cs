@@ -71,6 +71,17 @@ public class Conversation : BaseEntity
         else CustomerUnread++;
     }
 
+    /// <summary>True when <paramref name="side"/> has nothing new to read -- either no message exists yet,
+    /// or they already read up to (or past) the last message. Callers use this to skip the SaveChanges +
+    /// realtime "chat:read" publish for a no-op mark-as-read call.</summary>
+    public bool IsAlreadyReadBy(ChatSenderRole side)
+    {
+        var hasMessages = LastMessageAt > CreatedAt;
+        return side == ChatSenderRole.Customer
+            ? CustomerUnread == 0 && (!hasMessages || (CustomerLastReadAt.HasValue && CustomerLastReadAt.Value >= LastMessageAt))
+            : StaffUnread == 0 && (!hasMessages || (StaffLastReadAt.HasValue && StaffLastReadAt.Value >= LastMessageAt));
+    }
+
     public void MarkReadBy(ChatSenderRole side, DateTime now)
     {
         if (side == ChatSenderRole.Customer)

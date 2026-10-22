@@ -83,4 +83,23 @@ public class InventoryItem : AggregateRoot
         OnHand = newOnHand;
         return Result.Success();
     }
+
+    /// <summary>Refreshes the denormalized product-name snapshot; returns false (no-op) when unchanged.</summary>
+    public bool RenameProduct(string productName)
+    {
+        if (ProductName == productName) return false;
+        ProductName = productName;
+        return true;
+    }
+
+    /// <summary>Refreshes the denormalized SKU/variant-label snapshot; returns false (no-op) when unchanged.</summary>
+    public bool RenameVariant(string sku, string? variantLabel)
+    {
+        var normalizedLabel = string.IsNullOrWhiteSpace(variantLabel) ? null : variantLabel;
+        if (Sku == sku && VariantLabel == normalizedLabel) return false;
+
+        Sku = sku;
+        VariantLabel = normalizedLabel;
+        return true;
+    }
 }
