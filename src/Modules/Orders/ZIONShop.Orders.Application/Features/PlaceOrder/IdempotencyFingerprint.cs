@@ -9,13 +9,14 @@ namespace ZIONShop.Orders.Application.Features.PlaceOrder;
 /// </summary>
 public static class IdempotencyFingerprint
 {
-    public static string Compute(Guid addressId, string paymentMethod, string? note, string? couponCode)
+    public static string Compute(Guid addressId, string paymentMethod, string? note, string? couponCode, bool usePoints = false)
     {
         var normalized = string.Join('|',
             addressId.ToString().ToLowerInvariant(),
             (paymentMethod ?? string.Empty).ToLowerInvariant(),
             (note ?? string.Empty).Trim(),
-            (couponCode ?? string.Empty).Trim().ToUpperInvariant());
+            (couponCode ?? string.Empty).Trim().ToUpperInvariant(),
+            usePoints.ToString());
 
         var hash = SHA256.HashData(Encoding.UTF8.GetBytes(normalized));
         return Convert.ToHexString(hash);

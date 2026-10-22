@@ -3,11 +3,13 @@ using Moq;
 using ZIONShop.Contracts.Auth;
 using ZIONShop.Contracts.Orders;
 using ZIONShop.Contracts.Products;
+using ZIONShop.Contracts.Reviews;
 using ZIONShop.Reviews.Application.Features.CreateReview;
 using ZIONShop.Reviews.Application.Services;
 using ZIONShop.Reviews.Domain.Entities;
 using ZIONShop.Reviews.Infrastructure.Persistence;
 using ZIONShop.Reviews.Infrastructure.Repositories;
+using ZIONShop.Reviews.Tests.Fakes;
 
 namespace ZIONShop.Reviews.Tests.Features;
 
@@ -125,5 +127,40 @@ public class CreateReviewCommandHandlerTests
         var result = await handler.Handle(cmd, CancellationToken.None);
 
         result.Value.AuthorName.Should().Be("Nguyen Van A");
+    }
+
+    [Fact]
+    public async Task Handle_Should_AddExactlyOneReviewCreatedOutboxEvent_When_ReviewIsCreated()
+    {
+        var (db, reviews, updater) = BuildScope();
+        var userId = Guid.NewGuid();
+        var orderId = Guid.NewGuid();
+        var fakeUow = new FakeReviewsUnitOfWork();
+
+        var purchaseVerifier = new Mock<IPurchaseVerifier>();
+        purchaseVerifier.Setup(x => x.GetCompletedOrderIdAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(orderId);
+
+        var contactReader = new Mock<IUserContactReader>();
+        contactReader.Setup(x => x.GetAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new UserContact(userId, "nguyen@example.com", null));
+
+        var catalogReader = new Mock<IProductCatalogReader>();
+        catalogReader.Setup(x => x.GetAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(PublishedProduct);
+
+        var handler = new CreateReviewCommandHandler(reviews, fakeUow, updater, purchaseVerifier.Object, contactReader.Object, catalogReader.Object);
+        var cmd = new CreateReviewCommand(userId, PublishedProduct.ProductId, 5, "Great", "Really great product, highly recommend it.");
+
+        var result = await handler.Handle(cmd, CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        fakeUow.OutboxEvents.Should().ContainSingle();
+        var evt = fakeUow.OutboxEvents.Single().Should().BeOfType<ReviewCreatedIntegrationEvent>().Subject;
+        evt.ReviewId.Should().Be(result.Value.Id);
+        evt.UserId.Should().Be(userId);
+        evt.ProductId.Should().Be(PublishedProduct.ProductId);
+        evt.OrderId.Should().Be(orderId);
+        evt.Rating.Should().Be(5);
     }
 }

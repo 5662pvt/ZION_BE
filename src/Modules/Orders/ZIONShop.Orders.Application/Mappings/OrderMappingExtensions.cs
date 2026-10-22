@@ -32,7 +32,9 @@ public static class OrderMappingExtensions
             .OrderBy(h => h.At)
             .Select(h => new OrderStatusHistoryDto(h.Status.ToString(), h.At, h.Note))
             .ToList(),
-        returnRequest);
+        returnRequest,
+        order.PointsUsed,
+        order.PointsDiscount);
 
     public static OrderSummaryDto ToSummaryDto(this Order order) => new(
         order.Id, order.Code, order.Status.ToString(), order.Total, order.Currency, order.CreatedDate, order.Lines.Count);

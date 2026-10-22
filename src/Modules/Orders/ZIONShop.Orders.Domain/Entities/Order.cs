@@ -25,7 +25,9 @@ public class Order : AggregateRoot
     public string? CouponCode { get; private set; }
     public decimal DiscountAmount { get; private set; }
     public string? DiscountTarget { get; private set; }
-    public decimal Total => Subtotal - DiscountAmount + ShippingFee;
+    public int PointsUsed { get; private set; }
+    public decimal PointsDiscount { get; private set; }
+    public decimal Total => Subtotal - DiscountAmount - PointsDiscount + ShippingFee;
     public string? Note { get; private set; }
     public string? CancelReason { get; private set; }
     public ShippingAddress ShippingAddress { get; private set; } = default!;
@@ -77,6 +79,14 @@ public class Order : AggregateRoot
         CouponCode = code;
         DiscountAmount = Math.Clamp(discountAmount, 0m, Subtotal);
         DiscountTarget = discountTarget is "Items" or "Shipping" ? discountTarget : "Items";
+    }
+
+    public void ApplyPoints(int points, decimal discount)
+    {
+        var itemsDiscount = DiscountTarget == "Items" ? DiscountAmount : 0m;
+        var cap = Math.Max(0m, Subtotal - itemsDiscount);
+        PointsUsed = Math.Max(0, points);
+        PointsDiscount = Math.Clamp(discount, 0m, cap);
     }
 
     /// <summary>Adds a free gift line granted by a Gift promotion. Does not affect Subtotal/discount (purchased-line only).</summary>

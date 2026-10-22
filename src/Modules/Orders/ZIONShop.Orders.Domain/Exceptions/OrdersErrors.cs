@@ -29,6 +29,9 @@ public static class OrdersErrors
     public static Error InvalidCoupon(string message) =>
         Error.Validation("Orders.InvalidCoupon", message);
 
+    public static Error PointsUnavailable(string message) =>
+        Error.Conflict("Orders.PointsUnavailable", message);
+
     public static Error InsufficientStock(string productNames) =>
         Error.Conflict("Orders.InsufficientStock", $"Không đủ hàng cho: {productNames}. Vui lòng cập nhật giỏ hàng.");
 }

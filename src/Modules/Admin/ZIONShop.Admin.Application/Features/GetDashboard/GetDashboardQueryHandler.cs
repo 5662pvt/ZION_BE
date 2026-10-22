@@ -64,7 +64,7 @@ public class GetDashboardQueryHandler : IRequestHandler<GetDashboardQuery, Resul
         var awaitingShipment = await _orders.CountAwaitingShipmentAsync(cancellationToken);
         var lowStockProducts = await _inventory.CountLowStockAsync(cancellationToken);
 
-        decimal OrderTotal(CompletedOrderRow o) => o.Subtotal - o.DiscountAmount + o.ShippingFee;
+        decimal OrderTotal(CompletedOrderRow o) => o.Subtotal - o.DiscountAmount - o.PointsDiscount + o.ShippingFee;
 
         var revenue = current.Sum(OrderTotal);
         var previousRevenue = previous.Sum(OrderTotal);

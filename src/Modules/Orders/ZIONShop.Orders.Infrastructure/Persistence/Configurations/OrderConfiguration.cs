@@ -27,6 +27,8 @@ public class OrderConfiguration : IEntityTypeConfiguration<Order>
         builder.Property(o => o.CouponCode).HasMaxLength(30);
         builder.Property(o => o.DiscountAmount).HasColumnType("decimal(18,2)").IsRequired().HasDefaultValue(0m);
         builder.Property(o => o.DiscountTarget).HasColumnName("discount_target").HasMaxLength(16);
+        builder.Property(o => o.PointsUsed).IsRequired().HasDefaultValue(0);
+        builder.Property(o => o.PointsDiscount).HasColumnType("decimal(18,2)").IsRequired().HasDefaultValue(0m);
         builder.Ignore(o => o.Total);
         builder.Property(o => o.Note).HasMaxLength(1000);
         builder.Property(o => o.CancelReason).HasMaxLength(500);

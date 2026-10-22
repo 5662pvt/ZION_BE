@@ -38,7 +38,8 @@ public class OrderReportReader : IOrderReportReader
             o.PaymentMethod.ToString(),
             o.CouponCode,
             o.DiscountTarget,
-            o.Lines.Select(l => new ReportOrderLine(l.ProductId, l.ProductName, l.Quantity, l.UnitPrice, l.IsGift, l.GiftPromotionId)).ToList())
+            o.Lines.Select(l => new ReportOrderLine(l.ProductId, l.ProductName, l.Quantity, l.UnitPrice, l.IsGift, l.GiftPromotionId)).ToList(),
+            o.PointsDiscount)
         ).ToList();
     }
 

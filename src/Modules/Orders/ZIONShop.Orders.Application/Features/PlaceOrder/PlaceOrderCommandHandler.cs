@@ -3,6 +3,7 @@ using MediatR;
 using Microsoft.Extensions.Options;
 using ZIONShop.Contracts.Cart;
 using ZIONShop.Contracts.Inventory;
+using ZIONShop.Contracts.Loyalty;
 using ZIONShop.Contracts.Orders;
 using ZIONShop.Contracts.Products;
 using ZIONShop.Contracts.Promotions;
@@ -40,6 +41,7 @@ public class PlaceOrderCommandHandler : IRequestHandler<PlaceOrderCommand, Resul
     private readonly IIdempotencyLock _idempotencyLock;
     private readonly TimeProvider _timeProvider;
     private readonly CheckoutOptions _checkout;
+    private readonly ILoyaltyPointsService _loyalty;
 
     public PlaceOrderCommandHandler(
         IOrderRepository orders,
@@ -55,7 +57,8 @@ public class PlaceOrderCommandHandler : IRequestHandler<PlaceOrderCommand, Resul
         IOrderIdempotencyKeyRepository idempotencyKeys,
         IIdempotencyLock idempotencyLock,
         TimeProvider timeProvider,
-        IOptions<CheckoutOptions> checkout)
+        IOptions<CheckoutOptions> checkout,
+        ILoyaltyPointsService loyalty)
     {
         _orders = orders;
         _uow = uow;
@@ -71,6 +74,7 @@ public class PlaceOrderCommandHandler : IRequestHandler<PlaceOrderCommand, Resul
         _idempotencyLock = idempotencyLock;
         _timeProvider = timeProvider;
         _checkout = checkout.Value;
+        _loyalty = loyalty;
     }
 
     public async Task<Result<PlaceOrderResult>> Handle(PlaceOrderCommand request, CancellationToken cancellationToken)
@@ -94,7 +98,7 @@ public class PlaceOrderCommandHandler : IRequestHandler<PlaceOrderCommand, Resul
             if (idempotencyLock is null)
                 return Result.Failure<PlaceOrderResult>(OrdersErrors.IdempotencyKeyInProgress);
 
-            fingerprint = IdempotencyFingerprint.Compute(request.AddressId, request.PaymentMethod, request.Note, request.CouponCode);
+            fingerprint = IdempotencyFingerprint.Compute(request.AddressId, request.PaymentMethod, request.Note, request.CouponCode, request.UsePoints);
 
             var existingKey = await _idempotencyKeys.GetAsync(request.UserId, request.IdempotencyKey!, cancellationToken);
             var replay = await TryReplayAsync(existingKey, fingerprint, cancellationToken);
@@ -150,6 +154,7 @@ public class PlaceOrderCommandHandler : IRequestHandler<PlaceOrderCommand, Resul
 
         var hasCoupon = !string.IsNullOrWhiteSpace(request.CouponCode);
         var hasGifts = false;
+        var hasPoints = false;
 
         // From here on, any non-success exit (validation failure or exception) must release every
         // reservation already made above (flash; coupon/gifts once attempted) -- otherwise the quota
@@ -190,6 +195,28 @@ public class PlaceOrderCommandHandler : IRequestHandler<PlaceOrderCommand, Resul
                 }
 
                 order.ApplyCoupon(quote!.Code, quote.DiscountAmount, quote.DiscountTarget);
+            }
+
+            if (request.UsePoints)
+            {
+                var eligible = order.Subtotal - (order.DiscountTarget == "Items" ? order.DiscountAmount : 0m);
+                var (redemption, pointsError) = await _loyalty.ReserveAsync(request.UserId, order.Id, eligible, cancellationToken);
+                if (pointsError is not null)
+                {
+                    // Points reservation is attempted after coupon/flash but before gifts, so only those two
+                    // (not gifts, which haven't been attempted yet) need releasing here.
+                    if (hasCoupon)
+                        await _promotions.ReleaseAsync(orderId, cancellationToken);
+                    if (hasFlashSale)
+                        await _flashSales.ReleaseAsync(orderId, cancellationToken);
+                    return Result.Failure<PlaceOrderResult>(OrdersErrors.PointsUnavailable(pointsError.Message));
+                }
+
+                if (redemption is not null)
+                {
+                    hasPoints = true;
+                    order.ApplyPoints(redemption.Points, redemption.DiscountAmount);
+                }
             }
 
             var giftLines = lines.Select(l => new CouponLine(l.ProductId, l.Quantity, l.UnitPrice * l.Quantity)).ToList();
@@ -267,6 +294,8 @@ public class PlaceOrderCommandHandler : IRequestHandler<PlaceOrderCommand, Resul
                 await _giftPromotions.ReleaseGiftsAsync(orderId, cancellationToken);
             if (hasFlashSale)
                 await _flashSales.ReleaseAsync(orderId, cancellationToken);
+            if (hasPoints)
+                await _loyalty.ReleaseAsync(orderId, cancellationToken);
 
             var winner = await _idempotencyKeys.GetAsync(request.UserId, request.IdempotencyKey!, cancellationToken);
             var replay = await TryReplayAsync(winner, fingerprint!, cancellationToken);
@@ -280,6 +309,8 @@ public class PlaceOrderCommandHandler : IRequestHandler<PlaceOrderCommand, Resul
                 await _giftPromotions.ReleaseGiftsAsync(orderId, cancellationToken);
             if (hasFlashSale)
                 await _flashSales.ReleaseAsync(orderId, cancellationToken);
+            if (hasPoints)
+                await _loyalty.ReleaseAsync(orderId, cancellationToken);
             throw;
         }
     }

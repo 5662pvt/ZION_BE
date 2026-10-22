@@ -40,6 +40,8 @@ public class OrderDetailsReader : IOrderDetailsReader
             $"{order.ShippingAddress.StreetAddress}, {order.ShippingAddress.Ward}, {order.ShippingAddress.Province}",
             order.CancelReason,
             order.CreatedDate,
-            lines);
+            lines,
+            order.PointsUsed,
+            order.PointsDiscount);
     }
 }

@@ -2,6 +2,7 @@ using MediatR;
 using ZIONShop.Contracts.Auth;
 using ZIONShop.Contracts.Orders;
 using ZIONShop.Contracts.Products;
+using ZIONShop.Contracts.Reviews;
 using ZIONShop.Reviews.Application.DTOs;
 using ZIONShop.Reviews.Application.Interfaces;
 using ZIONShop.Reviews.Application.Mappings;
@@ -59,6 +60,7 @@ public class CreateReviewCommandHandler : IRequestHandler<CreateReviewCommand, R
         var review = Review.Create(request.ProductId, request.UserId, orderId.Value, request.Rating, request.Title, content, authorName, product.Name);
 
         await _reviews.AddAsync(review, cancellationToken);
+        _uow.AddOutboxEvent(new ReviewCreatedIntegrationEvent(review.Id, review.UserId, review.ProductId, review.OrderId, review.Rating));
         await _summaryUpdater.ApplyAsync(review.ProductId, review.Id, review.Rating, cancellationToken);
 
         return Result.Success(review.ToDto());

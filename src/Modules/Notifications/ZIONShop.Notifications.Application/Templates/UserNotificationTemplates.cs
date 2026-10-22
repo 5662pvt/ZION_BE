@@ -41,4 +41,21 @@ public static class UserNotificationTemplates
 
     public static (string Title, string Message) ReturnRefunded(string orderCode, decimal amount, string method) =>
         ("Đã hoàn tiền", $"Đơn #{orderCode} đã được hoàn {amount:N0}đ ({(string.Equals(method, "Online", StringComparison.OrdinalIgnoreCase) ? "về phương thức thanh toán" : "tiền mặt")}).");
+
+    public static (string Title, string Message) PointsEarnedFromOrder(int points, string orderCode) =>
+        ("Bạn nhận được Xu", $"Bạn nhận được {points} Xu từ đơn hàng #{orderCode}.");
+
+    public static (string Title, string Message) PointsEarnedFromReview(int points) =>
+        ("Bạn nhận được Xu", $"Bạn nhận được {points} Xu nhờ đánh giá sản phẩm.");
+
+    public static (string Title, string Message) PointsEarnedFromAdminAdjust(int points) =>
+        ("Bạn được cộng Xu", $"Bạn được cộng {points} Xu.");
+
+    public static (string Title, string Message) PointsReturned(int points, string orderCode, string reason) =>
+        ("Đã hoàn Xu", reason switch
+        {
+            "OrderCancelled" => $"Đã hoàn {points} Xu vì đơn hàng #{orderCode} đã bị huỷ.",
+            "OrderRefunded" => $"Đã hoàn {points} Xu vì đơn hàng #{orderCode} đã được hoàn tiền.",
+            _ => $"Đã hoàn {points} Xu cho đơn hàng #{orderCode}."
+        });
 }

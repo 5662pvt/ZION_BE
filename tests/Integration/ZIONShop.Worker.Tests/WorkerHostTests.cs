@@ -13,6 +13,7 @@ using ZIONShop.Orders.Infrastructure.Persistence;
 using ZIONShop.Payments.Infrastructure.Persistence;
 using ZIONShop.Promotions.Infrastructure.BackgroundServices;
 using ZIONShop.Promotions.Infrastructure.Persistence;
+using ZIONShop.Reviews.Infrastructure.Persistence;
 
 namespace ZIONShop.Worker.Tests;
 
@@ -34,6 +35,7 @@ public class WorkerHostTests : IDisposable
         typeof(OutboxPublisherService<OrdersDbContext>),
         typeof(OutboxPublisherService<PaymentsDbContext>),
         typeof(OutboxPublisherService<LoyaltyDbContext>),
+        typeof(OutboxPublisherService<ReviewsDbContext>),
         typeof(ReservationExpiryBackgroundService),
         typeof(StaleReservationReleaseBackgroundService),
         typeof(IdempotencyKeyCleanupBackgroundService),

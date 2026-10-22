@@ -25,7 +25,7 @@ public class ExportRevenueCsvQueryHandler : IRequestHandler<ExportRevenueCsvQuer
 
         var orders = await _orders.GetCompletedOrdersAsync(range.FromUtc, range.ToUtc, cancellationToken);
 
-        decimal OrderTotal(CompletedOrderRow o) => o.Subtotal - o.DiscountAmount + o.ShippingFee;
+        decimal OrderTotal(CompletedOrderRow o) => o.Subtotal - o.DiscountAmount - o.PointsDiscount + o.ShippingFee;
 
         var rows = range.Buckets.Select(b =>
         {

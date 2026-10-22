@@ -10,7 +10,8 @@ public record PlaceOrderCommand(
     string PaymentMethod,
     string? Note,
     string? CouponCode = null,
-    string? IdempotencyKey = null) : IRequest<Result<PlaceOrderResult>>;
+    string? IdempotencyKey = null,
+    bool UsePoints = false) : IRequest<Result<PlaceOrderResult>>;
 
 /// <summary>Wraps the placed/replayed order so the controller can set the <c>Idempotent-Replayed</c>
 /// response header without changing the 200 envelope's <c>data</c> shape (still a plain <see cref="OrderDto"/>).</summary>

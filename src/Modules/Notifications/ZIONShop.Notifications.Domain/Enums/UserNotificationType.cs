@@ -14,5 +14,7 @@ public enum UserNotificationType
     ReturnApproved,
     ReturnRejected,
     ReturnShippedBack,
-    ReturnRefunded
+    ReturnRefunded,
+    PointsEarned,
+    PointsReturned
 }

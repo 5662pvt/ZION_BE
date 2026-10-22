@@ -1,6 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using ZIONShop.Contracts.Loyalty;
 using ZIONShop.Contracts.Orders;
 using ZIONShop.Contracts.Payments;
 using ZIONShop.EventBus.DependencyInjection;
@@ -42,6 +43,8 @@ public static class NotificationsInfrastructureExtensions
         services.AddIntegrationEventHandler<OrderReturnDecidedIntegrationEvent, OrderReturnDecidedNotificationHandler, NotificationsDbContext>();
         services.AddIntegrationEventHandler<OrderReturnShippedBackIntegrationEvent, OrderReturnShippedBackAdminNotificationHandler, NotificationsDbContext>();
         services.AddIntegrationEventHandler<OrderRefundedIntegrationEvent, OrderRefundedNotificationHandler, NotificationsDbContext>();
+        services.AddIntegrationEventHandler<LoyaltyPointsEarnedIntegrationEvent, LoyaltyPointsEarnedNotificationHandler, NotificationsDbContext>();
+        services.AddIntegrationEventHandler<LoyaltyPointsReturnedIntegrationEvent, LoyaltyPointsReturnedNotificationHandler, NotificationsDbContext>();
 
         return services;
     }

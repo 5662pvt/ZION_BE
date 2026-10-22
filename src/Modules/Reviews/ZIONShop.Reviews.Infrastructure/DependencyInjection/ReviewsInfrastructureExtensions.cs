@@ -1,6 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using ZIONShop.EventBus.Outbox;
 using ZIONShop.Reviews.Application.Interfaces;
 using ZIONShop.Reviews.Domain.Repositories;
 using ZIONShop.Reviews.Infrastructure.Persistence;
@@ -20,6 +21,8 @@ public static class ReviewsInfrastructureExtensions
         services.AddScoped<IProductRatingSummaryRepository, ProductRatingSummaryRepository>();
         services.AddScoped<IProductQuestionRepository, ProductQuestionRepository>();
         services.AddScoped<IReviewsUnitOfWork>(sp => sp.GetRequiredService<ReviewsDbContext>());
+
+        services.AddOutbox<ReviewsDbContext>(configuration);
 
         return services;
     }

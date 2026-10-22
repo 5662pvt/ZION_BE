@@ -3,7 +3,7 @@ namespace ZIONShop.Contracts.Orders;
 public sealed record ReportOrderLine(Guid ProductId, string ProductName, int Quantity, decimal UnitPrice, bool IsGift, Guid? GiftPromotionId);
 
 public sealed record CompletedOrderRow(Guid OrderId, DateTime CompletedAtUtc, decimal Subtotal, decimal DiscountAmount, decimal ShippingFee,
-    string PaymentMethod, string? CouponCode, string? DiscountTarget, IReadOnlyList<ReportOrderLine> Lines);
+    string PaymentMethod, string? CouponCode, string? DiscountTarget, IReadOnlyList<ReportOrderLine> Lines, decimal PointsDiscount = 0m);
 
 public interface IOrderReportReader
 {

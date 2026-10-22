@@ -135,4 +135,37 @@ public class GetDashboardQueryHandlerTests
 
         orders.Verify(x => x.GetCompletedOrdersAsync(range.FromUtc, range.ToUtc, It.IsAny<CancellationToken>()), Times.Once);
     }
+
+    [Fact]
+    public async Task Handle_Should_SubtractPointsDiscount_When_OrderUsedLoyaltyPoints()
+    {
+        var range = ReportRange.Create("2026-10-01", "2026-10-07", Now).Value;
+
+        var order = new CompletedOrderRow(
+            Guid.NewGuid(), new DateTime(2026, 10, 3, 10, 0, 0, DateTimeKind.Utc),
+            Subtotal: 200m, DiscountAmount: 0m, ShippingFee: 10m,
+            PaymentMethod: "COD", CouponCode: null, DiscountTarget: null,
+            Lines: Array.Empty<ReportOrderLine>(), PointsDiscount: 50m);
+
+        var orders = new Mock<IOrderReportReader>();
+        orders.Setup(x => x.GetCompletedOrdersAsync(range.FromUtc, range.ToUtc, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new[] { order });
+        orders.Setup(x => x.GetCompletedOrdersAsync(range.PreviousFromUtc, range.PreviousToUtc, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Array.Empty<CompletedOrderRow>());
+        orders.Setup(x => x.GetPlacedStatusCountsAsync(It.IsAny<DateTime>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(ZeroStatusCounts);
+        orders.Setup(x => x.CountAwaitingShipmentAsync(It.IsAny<CancellationToken>())).ReturnsAsync(0);
+
+        var users = new Mock<IUserStatsReader>();
+        users.Setup(x => x.CountCustomersRegisteredAsync(It.IsAny<DateTime>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>())).ReturnsAsync(0);
+
+        var inventory = new Mock<IInventoryStatsReader>();
+        inventory.Setup(x => x.CountLowStockAsync(It.IsAny<CancellationToken>())).ReturnsAsync(0);
+
+        var handler = new GetDashboardQueryHandler(orders.Object, users.Object, inventory.Object, Now, new FakeDistributedCacheService());
+        var result = await handler.Handle(new GetDashboardQuery("2026-10-01", "2026-10-07"), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Kpis.Revenue.Value.Should().Be(160m); // 200 - 0 - 50 + 10
+    }
 }

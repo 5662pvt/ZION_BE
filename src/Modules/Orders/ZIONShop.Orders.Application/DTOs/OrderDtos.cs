@@ -18,7 +18,9 @@ public record OrderDto(
     ShippingAddressDto ShippingAddress,
     IReadOnlyList<OrderLineDto> Lines,
     IReadOnlyList<OrderStatusHistoryDto> History,
-    ReturnRequestDto? ReturnRequest = null);
+    ReturnRequestDto? ReturnRequest = null,
+    int PointsUsed = 0,
+    decimal PointsDiscount = 0m);
 
 public record OrderStatusHistoryDto(string Status, DateTime At, string? Note);
 

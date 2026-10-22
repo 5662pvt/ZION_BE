@@ -72,4 +72,14 @@ public class IdempotencyFingerprintTests
 
         a.Should().NotBe(b);
     }
+
+    [Fact]
+    public void Compute_Should_ReturnDifferentHash_When_UsePointsDiffers()
+    {
+        var addressId = Guid.NewGuid();
+        var a = IdempotencyFingerprint.Compute(addressId, "COD", null, null, usePoints: true);
+        var b = IdempotencyFingerprint.Compute(addressId, "COD", null, null, usePoints: false);
+
+        a.Should().NotBe(b);
+    }
 }
